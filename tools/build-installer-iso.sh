@@ -137,6 +137,10 @@ if ! grep -Rqs 'ds=nocloud' "${ISO_DIR}/boot/grub"; then
   die "ds=nocloud kernel args not found in ISO boot configs after patching"
 fi
 
+[[ -s "${ISO_DIR}/nocloud/user-data" ]] || die "missing nocloud/user-data in ISO staging tree"
+[[ -s "${ISO_DIR}/nocloud/meta-data" ]] || die "missing nocloud/meta-data in ISO staging tree"
+[[ -s "${ISO_DIR}/autoinstall.yaml" ]] || die "missing autoinstall.yaml in ISO staging tree"
+
 VOLID="${OURBOX_ISO_VOLID}"
 
 # Ubuntu 24.04+ uses a hybrid GPT/EFI ISO where the EFI boot image is an
