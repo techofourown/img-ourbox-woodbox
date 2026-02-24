@@ -54,7 +54,9 @@ else
   log "Using cached Ubuntu ISO: ${BASE_ISO}" 
 fi
 
-BASE_VOLID="$(xorriso -indev "${BASE_ISO}" -pvd_info 2>/dev/null | awk -F': *' '/Volume id/ {print $2; exit}' | sed 's/[[:space:]]*$//')"
+BASE_VOLID="$(xorriso -indev "${BASE_ISO}" -pvd_info 2>/dev/null \
+  | awk -F': *' '/Volume id/ {print $2; exit}' \
+  | sed -E "s/[[:space:]]*$//; s/^'//; s/'$//")"
 : "${OURBOX_ISO_VOLID:=${BASE_VOLID}}"
 
 # Require airgap artifacts
