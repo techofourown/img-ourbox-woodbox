@@ -54,6 +54,9 @@ else
   log "Using cached Ubuntu ISO: ${BASE_ISO}" 
 fi
 
+BASE_VOLID="$(xorriso -indev "${BASE_ISO}" -pvd_info 2>/dev/null | awk -F': *' '/Volume id/ {print $2; exit}' | sed 's/[[:space:]]*$//')"
+: "${OURBOX_ISO_VOLID:=${BASE_VOLID}}"
+
 # Require airgap artifacts
 if [[ ! -x "${ROOT}/artifacts/airgap/k3s/k3s" ]]; then
   die "missing artifacts/airgap payloads. Run: ./tools/fetch-airgap-platform.sh"
@@ -76,6 +79,7 @@ export OURBOX_PRODUCT OURBOX_DEVICE OURBOX_TARGET OURBOX_SKU OURBOX_VARIANT OURB
 
 envsubst < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
 envsubst < "${ROOT}/installer/autoinstall/meta-data.tpl" > "${ISO_DIR}/nocloud/meta-data"
+cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
 # Copy OurBox overlay + generate /etc/ourbox/release inside it
 log "Staging OurBox rootfs overlay"
@@ -100,16 +104,25 @@ log "Staging airgap artifacts onto ISO"
 rsync -a "${ROOT}/artifacts/airgap/" "${ISO_DIR}/ourbox/airgap/"
 
 # Patch bootloader configs to force autoinstall
-AUTOINSTALL_ARG='autoinstall ds=nocloud\\;s=/cdrom/nocloud/'
+AUTOINSTALL_ARG='autoinstall cloud-config-url=/dev/null ds=nocloud\\;s=file:///cdrom/nocloud/'
+: "${OURBOX_GRUB_TIMEOUT:=1}"
 
 patch_boot_cfg() {
   local f="$1"
   [[ -f "${f}" ]] || return 0
+
+  if grep -qE '^[[:space:]]*set[[:space:]]+timeout=' "${f}"; then
+    sed -i -E "s/^[[:space:]]*set[[:space:]]+timeout=.*/set timeout=${OURBOX_GRUB_TIMEOUT}/" "${f}" || true
+  fi
+  if grep -qE '^[[:space:]]*set[[:space:]]+timeout_style=' "${f}"; then
+    sed -i -E 's/^[[:space:]]*set[[:space:]]+timeout_style=.*/set timeout_style=hidden/' "${f}" || true
+  fi
+
   if grep -q 'ds=nocloud' "${f}"; then
     return 0
   fi
   # Add args immediately before the existing '---' delimiter
-  sed -i "s| ---| ${AUTOINSTALL_ARG} ---|g" "${f}" || true
+  sed -i -E "/^[[:space:]]*(linux|linuxefi|append)[[:space:]]/ s| ---| ${AUTOINSTALL_ARG} ---|g" "${f}" || true
 }
 
 log "Patching boot configs for autoinstall"
@@ -117,7 +130,14 @@ while IFS= read -r -d '' f; do
   patch_boot_cfg "$f"
 done < <(find "${ISO_DIR}" -type f \( -name 'grub.cfg' -o -name 'loopback.cfg' -o -name 'txt.cfg' -o -name '*.cfg' \) -print0)
 
-VOLID="OURBOX_${OURBOX_DEVICE^^}_${OURBOX_TARGET^^}"
+if ! grep -Rqs 'autoinstall' "${ISO_DIR}/boot/grub"; then
+  die "autoinstall kernel args not found in ISO boot configs after patching"
+fi
+if ! grep -Rqs 'ds=nocloud' "${ISO_DIR}/boot/grub"; then
+  die "ds=nocloud kernel args not found in ISO boot configs after patching"
+fi
+
+VOLID="${OURBOX_ISO_VOLID}"
 
 # Ubuntu 24.04+ uses a hybrid GPT/EFI ISO where the EFI boot image is an
 # appended partition outside the ISO 9660 filesystem. xorriso's -boot_image
