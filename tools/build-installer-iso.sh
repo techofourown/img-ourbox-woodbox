@@ -9,6 +9,7 @@ source "${ROOT}/tools/lib.sh"
 
 need_cmd curl
 need_cmd xorriso
+need_cmd 7z
 need_cmd rsync
 need_cmd sha256sum
 need_cmd envsubst
@@ -117,16 +118,40 @@ while IFS= read -r -d '' f; do
 done < <(find "${ISO_DIR}" -type f \( -name 'grub.cfg' -o -name 'loopback.cfg' -o -name 'txt.cfg' -o -name '*.cfg' \) -print0)
 
 VOLID="OURBOX_${OURBOX_DEVICE^^}_${OURBOX_TARGET^^}"
-log "Repacking ISO: ${OUT_ISO}"
 
+# Ubuntu 24.04+ uses a hybrid GPT/EFI ISO where the EFI boot image is an
+# appended partition outside the ISO 9660 filesystem. xorriso's -boot_image
+# replay cannot reconstruct this from a remapped directory tree.
+# Solution: extract the two hidden boot images with 7z, then rebuild using
+# xorriso -as mkisofs with explicit hybrid boot parameters.
+log "Extracting boot images from source ISO"
+mkdir -p "${WORKDIR}/BOOT"
+7z e "${BASE_ISO}" -o"${WORKDIR}/BOOT" \
+  '[BOOT]/1-Boot-NoEmul.img' \
+  '[BOOT]/2-Boot-NoEmul.img' \
+  >/dev/null 2>&1 \
+  || die "Failed to extract boot images from base ISO"
+
+log "Repacking ISO: ${OUT_ISO}"
 rm -f "${OUT_ISO}" "${OUT_SHA}"
 
-xorriso \
-  -indev "${BASE_ISO}" \
-  -outdev "${OUT_ISO}" \
-  -map "${ISO_DIR}" / \
-  -boot_image any replay \
-  -volid "${VOLID}" \
+xorriso -as mkisofs \
+  -r \
+  -V "${VOLID}" \
+  -o "${OUT_ISO}" \
+  --grub2-mbr "${WORKDIR}/BOOT/1-Boot-NoEmul.img" \
+  -partition_offset 16 \
+  --mbr-force-bootable \
+  -append_partition 2 28732ac11ff8d211ba4b00a0c93ec93b "${WORKDIR}/BOOT/2-Boot-NoEmul.img" \
+  -appended_part_as_gpt \
+  -iso_mbr_part_type a2a0d0ebe5b9334487c068b6b72699c7 \
+  -c '/boot.catalog' \
+  -b '/boot/grub/i386-pc/eltorito.img' \
+  -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
+  -eltorito-alt-boot \
+  -e '--interval:appended_partition_2:::' \
+  -no-emul-boot \
+  "${ISO_DIR}" \
   >/dev/null
 
 log "Computing sha256"
