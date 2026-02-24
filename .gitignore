@@ -8,6 +8,10 @@
 # temp work dirs
 /tmp/
 
+# sentinel written by prepare-installer-media.sh after work begins;
+# presence means this tree has been used — run: git clean -fdx
+/.used
+
 # OS cruft
 .DS_Store
 

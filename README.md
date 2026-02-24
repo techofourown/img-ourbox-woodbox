@@ -26,6 +26,34 @@ cd img-ourbox-woodbox
 # remove media, boot from NVMe
 ```
 
+## Retrying or starting over
+
+The script writes a `.used` sentinel file the moment any real work begins.
+If you run the script again in the same working tree, it will refuse and
+tell you to reset first. This is intentional — we prioritise a known-good
+state over saving a few minutes of download time.
+
+**To reset and retry in place:**
+
+```bash
+git clean -fdx
+./tools/prepare-installer-media.sh
+```
+
+`git clean -fdx` removes everything not tracked by git — downloaded
+artifacts, built ISOs, the sentinel — and leaves you with a clean tree
+identical to a fresh clone, but faster.
+
+**To start from a completely fresh clone:**
+
+```bash
+cd ..
+rm -rf img-ourbox-woodbox
+git clone --recurse-submodules https://github.com/techofourown/img-ourbox-woodbox.git
+cd img-ourbox-woodbox
+./tools/prepare-installer-media.sh
+```
+
 ## Requirements
 
 - A Linux build host (Ubuntu/Debian recommended)

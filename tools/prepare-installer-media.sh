@@ -32,6 +32,32 @@ need_cmd awk
 need_cmd sed
 need_cmd openssl
 
+SENTINEL="${ROOT}/.used"
+
+if [[ -f "${SENTINEL}" ]]; then
+  echo
+  echo "=================================================================="
+  echo "  STALE WORKING TREE DETECTED"
+  echo "=================================================================="
+  echo
+  echo "  This repo has been used before. To guarantee a clean, reliable"
+  echo "  build, always start from a pristine working tree."
+  echo
+  echo "  Reset and retry:"
+  echo
+  echo "    git clean -fdx && ./tools/prepare-installer-media.sh"
+  echo
+  echo "  Or re-clone from scratch:"
+  echo
+  echo "    cd .. && rm -rf img-ourbox-woodbox"
+  echo "    git clone --recurse-submodules https://github.com/techofourown/img-ourbox-woodbox.git"
+  echo "    cd img-ourbox-woodbox && ./tools/prepare-installer-media.sh"
+  echo
+  echo "=================================================================="
+  echo
+  exit 1
+fi
+
 root_backing_disk() {
   local root_src root_real root_parent
   root_src="$(findmnt -nr -o SOURCE / 2>/dev/null || true)"
@@ -240,6 +266,8 @@ main(){
   export OURBOX_HOSTNAME="${hostname}"
   export OURBOX_USERNAME="${username}"
   export OURBOX_PASSWORD_HASH="${passhash}"
+
+  touch "${SENTINEL}"
 
   log "Bootstrapping host dependencies"
   "${ROOT}/tools/bootstrap-host.sh"
