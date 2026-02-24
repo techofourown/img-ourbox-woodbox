@@ -127,8 +127,7 @@ xorriso \
   -map "${ISO_DIR}" / \
   -boot_image any replay \
   -volid "${VOLID}" \
-  -compliance no_emul_toc \
-  >/dev/null 2>&1
+  >/dev/null
 
 log "Computing sha256"
 ( cd "$(dirname "${OUT_ISO}")" && sha256sum "$(basename "${OUT_ISO}")" > "$(basename "${OUT_SHA}")" )
