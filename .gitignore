@@ -1,0 +1,12 @@
+# build outputs
+/deploy/
+/deploy-from-registry/
+
+# downloaded artifacts
+/artifacts/
+
+# temp work dirs
+/tmp/
+
+# OS cruft
+.DS_Store

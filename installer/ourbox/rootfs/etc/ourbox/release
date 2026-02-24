@@ -1,0 +1,8 @@
+# Populated at build time by tools/build-installer-iso.sh
+OURBOX_PRODUCT=ourbox
+OURBOX_DEVICE=woodbox
+OURBOX_TARGET=forge
+OURBOX_SKU=UNKNOWN
+OURBOX_VARIANT=dev
+OURBOX_VERSION=dev
+OURBOX_RECIPE_GIT_HASH=unknown
