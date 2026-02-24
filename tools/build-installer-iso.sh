@@ -108,7 +108,7 @@ patch_boot_cfg() {
     return 0
   fi
   # Add args immediately before the existing '---' delimiter
-  sed -i "s/ ---/ ${AUTOINSTALL_ARG} ---/g" "${f}" || true
+  sed -i "s| ---| ${AUTOINSTALL_ARG} ---|g" "${f}" || true
 }
 
 log "Patching boot configs for autoinstall"
