@@ -6,8 +6,7 @@
 #
 # Usage: format-data-disk.sh <disk>   e.g. format-data-disk.sh /dev/sda
 #
-# Skips entirely if a disk with label OURBOX_DATA already exists.
-# Safe to run multiple times (idempotent via blkid check).
+# Always formats — the operator confirmed FORMAT-AS-DATA in the pre-installer.
 
 set -euo pipefail
 
@@ -15,13 +14,9 @@ log() { echo "[format-data-disk] $*"; }
 
 DATA_DISK="${1:?Usage: format-data-disk.sh <disk-device>}"
 
-# Already exists — nothing to do.
-if blkid -L OURBOX_DATA >/dev/null 2>&1; then
-  log "OURBOX_DATA label already present on $(blkid -L OURBOX_DATA) — skipping"
-  exit 0
-fi
-
 # Safety: refuse to format the system disk.
+# Note: we do NOT skip if OURBOX_DATA already exists — the operator explicitly
+# confirmed FORMAT-AS-DATA in the pre-installer, so we always format.
 SYSTEM_DISK=""
 ROOT_DEV="$(findmnt -nr -o SOURCE /target 2>/dev/null || true)"
 if [[ -n "${ROOT_DEV}" ]]; then
