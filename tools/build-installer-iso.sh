@@ -134,6 +134,9 @@ install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" 
 # lib.sh is sourced by ourbox-preinstall at runtime (/cdrom/ourbox/tools/lib.sh)
 install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
+# format-data-disk.sh is called from autoinstall late-commands
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
+  "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
 
 # Copy airgap artifacts onto ISO (will be copied into /target/opt/ourbox/airgap)
 log "Staging airgap artifacts onto ISO"
