@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+# OurBox Woodbox — pre-installer
+# Runs on TTY1 before Subiquity. Collects disk + identity from the operator,
+# writes /autoinstall.yaml, then exits so Subiquity can run fully automated.
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source /cdrom/ourbox/tools/lib.sh
+
+need_cmd lsblk
+need_cmd readlink
+need_cmd findmnt
+need_cmd udevadm
+need_cmd openssl
+need_cmd envsubst
+need_cmd awk
+need_cmd sed
+
+AUTOINSTALL_TPL="/cdrom/ourbox/autoinstall.tpl"
+AUTOINSTALL_OUT="/autoinstall.yaml"
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+banner() {
+  clear
+  echo
+  echo "  =================================================================="
+  echo "  OurBox Woodbox — Installer"
+  echo "  =================================================================="
+  echo
+}
+
+prompt_confirm_exact() {
+  local expected="$1" prompt="$2" ans=""
+  read -r -p "${prompt} " ans
+  [[ "${ans}" == "${expected}" ]] || die "confirmation did not match (expected: ${expected})"
+}
+
+# ---------------------------------------------------------------------------
+# disk detection
+# ---------------------------------------------------------------------------
+
+installer_disk() {
+  # The disk backing the live USB (the one / is on)
+  local src real parent
+  src="$(findmnt -nr -o SOURCE / 2>/dev/null || true)"
+  real="$(readlink -f "${src}" 2>/dev/null || echo "${src}")"
+  parent="$(lsblk -no PKNAME "${real}" 2>/dev/null || true)"
+  if [[ -n "${parent}" ]]; then
+    echo "/dev/${parent}"
+  else
+    echo "${real}"
+  fi
+}
+
+candidate_disks() {
+  local installer
+  installer="$(installer_disk)"
+  lsblk -dn -o NAME,TYPE,TRAN,RM | awk '$2=="disk" {print "/dev/"$1}' | while read -r disk; do
+    [[ "${disk}" != "${installer}" ]] || continue
+    local tran rm size_bytes
+    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    rm="$(lsblk -dn -o RM "${disk}" 2>/dev/null | tr -d '[:space:]')"
+    # Skip removable non-installer disks (other USB sticks)
+    [[ "${rm}" != "1" ]] || continue
+    # Include NVMe and SATA SSDs; skip large spinning disks > 2TiB
+    size_bytes="$(lsblk -dn -o SIZE --bytes "${disk}" 2>/dev/null | tr -d '[:space:]')"
+    (( size_bytes < 2199023255552 )) || continue  # skip > 2 TiB
+    echo "${disk}"
+  done
+}
+
+print_disk_table() {
+  local idx=0
+  printf '\n  %-3s %-14s %-8s %-6s %-22s %-16s\n' \
+    "#" "Device" "Size" "Tran" "Model" "Serial"
+  echo "  -----------------------------------------------------------------------"
+  while read -r disk; do
+    idx=$((idx + 1))
+    local size tran model serial
+    size="$(lsblk -dn -o SIZE "${disk}" 2>/dev/null | tr -d '[:space:]')"
+    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    model="$(lsblk -dn -o MODEL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    serial="$(lsblk -dn -o SERIAL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -n "${tran}" ]]   || tran="-"
+    [[ -n "${model}" ]]  || model="-"
+    [[ -n "${serial}" ]] || serial="-"
+    printf '  %-3s %-14s %-8s %-6s %-22.22s %-16.16s\n' \
+      "${idx}" "${disk}" "${size}" "${tran}" "${model}" "${serial}"
+  done < <(candidate_disks)
+  echo
+}
+
+select_disk() {
+  local disks=() idx selected serial
+
+  while true; do
+    mapfile -t disks < <(candidate_disks)
+
+    if (( ${#disks[@]} == 0 )); then
+      echo
+      echo "  No suitable target disks found (NVMe/SSD, non-removable, <= 2 TiB)."
+      echo "  Make sure the NVMe drive is seated, then rescan."
+      read -r -p "  Press ENTER to rescan, or q to quit: " _ans
+      [[ "${_ans}" == "q" || "${_ans}" == "Q" ]] && die "operator quit"
+      continue
+    fi
+
+    print_disk_table
+    read -r -p "  Select target disk number (r=rescan, q=quit): " _ans
+    case "${_ans}" in
+      r|R) continue ;;
+      q|Q) die "operator quit" ;;
+    esac
+
+    [[ "${_ans}" =~ ^[0-9]+$ ]] || { log "invalid selection"; continue; }
+    idx=$(( _ans - 1 ))
+    (( idx >= 0 && idx < ${#disks[@]} )) || { log "selection out of range"; continue; }
+
+    selected="${disks[${idx}]}"
+    echo
+    lsblk -o NAME,SIZE,MODEL,SERIAL,TYPE,FSTYPE,LABEL,MOUNTPOINTS "${selected}" || true
+    echo
+    prompt_confirm_exact "INSTALL-TO-THIS-DISK" \
+      "  Type INSTALL-TO-THIS-DISK to confirm this is the target:"
+
+    serial="$(lsblk -dn -o SERIAL "${selected}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    TARGET_DISK="${selected}"
+    TARGET_DISK_SERIAL="${serial}"
+    return 0
+  done
+}
+
+# ---------------------------------------------------------------------------
+# identity
+# ---------------------------------------------------------------------------
+
+prompt_nonempty() {
+  local prompt="$1" default="${2:-}" ans=""
+  if [[ -n "${default}" ]]; then
+    read -r -p "  ${prompt} [${default}]: " ans
+    ans="${ans:-${default}}"
+  else
+    read -r -p "  ${prompt}: " ans
+  fi
+  [[ -n "${ans}" ]] || die "value required"
+  echo "${ans}"
+}
+
+prompt_password_hash() {
+  local pw1="" pw2=""
+  while true; do
+    read -r -s -p "  Password: " pw1; echo
+    read -r -s -p "  Confirm:  " pw2; echo
+    [[ -n "${pw1}" ]] || { echo "  Password cannot be empty."; continue; }
+    [[ "${pw1}" == "${pw2}" ]] || { echo "  Passwords did not match. Try again."; continue; }
+    echo "${pw1}" | openssl passwd -6 -stdin
+    return 0
+  done
+}
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+main() {
+  banner
+
+  udevadm settle --timeout=10 || true
+
+  # --- disk selection ---
+  echo "  Step 1 of 3: Select the target disk"
+  echo "  This disk will be ERASED and OurBox Woodbox OS installed on it."
+  echo "  Showing non-removable NVMe / SSD disks only."
+
+  TARGET_DISK=""
+  TARGET_DISK_SERIAL=""
+  select_disk
+
+  echo
+  echo "  Target disk : ${TARGET_DISK}"
+  echo "  Disk serial : ${TARGET_DISK_SERIAL:-unknown}"
+  echo
+
+  # --- identity ---
+  banner
+  echo "  Step 2 of 3: Set identity for the installed system"
+  echo "  (You can change hostname and password later.)"
+  echo
+
+  OURBOX_HOSTNAME="$(prompt_nonempty "Hostname" "ourbox-woodbox")"
+  OURBOX_USERNAME="$(prompt_nonempty "Username" "ourbox")"
+
+  echo
+  echo "  Set the login password for ${OURBOX_USERNAME}:"
+  OURBOX_PASSWORD_HASH="$(prompt_password_hash)"
+
+  # --- summary + final confirmation ---
+  banner
+  echo "  Step 3 of 3: Confirm and install"
+  echo
+  echo "  Target disk  : ${TARGET_DISK}"
+  [[ -n "${TARGET_DISK_SERIAL}" ]] && \
+    echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
+  echo "  Hostname     : ${OURBOX_HOSTNAME}"
+  echo "  Username     : ${OURBOX_USERNAME}"
+  echo
+  echo "  WARNING: ALL DATA ON ${TARGET_DISK} WILL BE PERMANENTLY ERASED."
+  echo
+  prompt_confirm_exact "INSTALL" "  Type INSTALL to begin (or Ctrl-C to abort):"
+
+  # --- generate autoinstall.yaml ---
+  export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
+
+  # Build the storage match snippet.  NVMe drives should always have a serial;
+  # fall back to ssd: true if for some reason lsblk returned nothing.
+  if [[ -n "${TARGET_DISK_SERIAL}" ]]; then
+    OURBOX_STORAGE_MATCH="        serial: ${TARGET_DISK_SERIAL}"
+  else
+    OURBOX_STORAGE_MATCH="        ssd: true"
+  fi
+  export OURBOX_STORAGE_MATCH
+
+  [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
+
+  RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH}'
+  envsubst "${RUNTIME_VARS}" < "${AUTOINSTALL_TPL}" > "${AUTOINSTALL_OUT}"
+
+  echo
+  echo "  =================================================================="
+  echo "  OurBox Woodbox is now installing."
+  echo "  Do NOT remove the USB stick until the machine powers off."
+  echo "  Installation takes approximately 10-15 minutes."
+  echo "  =================================================================="
+  echo
+}
+
+main "$@"

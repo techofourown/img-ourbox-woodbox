@@ -79,15 +79,31 @@ mkdir -p "${ISO_DIR}/nocloud"
 export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 export OURBOX_PRODUCT OURBOX_DEVICE OURBOX_TARGET OURBOX_SKU OURBOX_VARIANT OURBOX_VERSION
 
-SUBST_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
+# Build-time vars substituted in user-data.tpl (the nocloud seed / cloud-init file).
+# OURBOX_HOSTNAME/USERNAME/PASSWORD_HASH are kept as fallback defaults only;
+# the real identity is collected at install time by ourbox-preinstall.
+: "${OURBOX_HOSTNAME:=ourbox-woodbox}"
+: "${OURBOX_USERNAME:=ourbox}"
+: "${OURBOX_PASSWORD_HASH:=}"
+export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 
-envsubst "${SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
-envsubst "${SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl" > "${ISO_DIR}/nocloud/meta-data"
+SEED_SUBST_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
+envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
+envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl"  > "${ISO_DIR}/nocloud/meta-data"
 cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
+
+# Build-time pass-1 substitution of the runtime autoinstall template.
+# Substitutes product/version vars; leaves runtime vars (OURBOX_STORAGE_MATCH,
+# OURBOX_HOSTNAME, OURBOX_USERNAME, OURBOX_PASSWORD_HASH) intact for
+# ourbox-preinstall to fill in at install time.
+mkdir -p "${ISO_DIR}/ourbox"
+RUNTIME_TPL_SUBST='${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
+envsubst "${RUNTIME_TPL_SUBST}" \
+  < "${ROOT}/installer/autoinstall/autoinstall.tpl" \
+  > "${ISO_DIR}/ourbox/autoinstall.tpl"
 
 # Copy OurBox overlay + generate /etc/ourbox/release inside it
 log "Staging OurBox rootfs overlay"
-mkdir -p "${ISO_DIR}/ourbox"
 rsync -a "${ROOT}/installer/ourbox/rootfs/" "${ISO_DIR}/ourbox/rootfs/"
 
 OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -102,6 +118,18 @@ OURBOX_VERSION=${OURBOX_VERSION}
 OURBOX_RECIPE_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
 EOT
 chmod 0644 "${ISO_DIR}/ourbox/rootfs/etc/ourbox/release"
+
+# Stage ourbox-preinstall script and service unit onto the ISO.
+# bootcmd in user-data.tpl copies these into the live system at boot time.
+log "Staging OurBox pre-installer assets"
+mkdir -p "${ISO_DIR}/ourbox/tools"
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" \
+  "${ISO_DIR}/ourbox/tools/ourbox-preinstall"
+install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" \
+  "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
+# lib.sh is sourced by ourbox-preinstall at runtime (/cdrom/ourbox/tools/lib.sh)
+install -m 0644 "${ROOT}/tools/lib.sh" \
+  "${ISO_DIR}/ourbox/tools/lib.sh"
 
 # Copy airgap artifacts onto ISO (will be copied into /target/opt/ourbox/airgap)
 log "Staging airgap artifacts onto ISO"

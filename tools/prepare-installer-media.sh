@@ -261,17 +261,10 @@ main(){
   validate_target_dev_or_die "${TARGET_DEV}"
   log "Using target media device: ${TARGET_DEV}"
 
-  # identity prompts
+  # Identity (hostname, username, password) is now collected at install time
+  # on the Woodbox itself by ourbox-preinstall. No prompts needed here.
   : "${OURBOX_HOSTNAME:=ourbox-woodbox}"
-  local hostname username passhash
-
-  hostname="$(prompt_nonempty "Hostname for the box" "${OURBOX_HOSTNAME}")"
-  username="$(prompt_nonempty "Username" "ourbox")"
-  passhash="$(prompt_password_hash)"
-
-  export OURBOX_HOSTNAME="${hostname}"
-  export OURBOX_USERNAME="${username}"
-  export OURBOX_PASSWORD_HASH="${passhash}"
+  export OURBOX_HOSTNAME
 
   touch "${SENTINEL}"
 
