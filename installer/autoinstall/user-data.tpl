@@ -7,10 +7,19 @@
 autoinstall:
   version: 1
 
-  # Safety: do NOT auto-pick a disk. Force the operator to select the SYSTEM disk.
+  # Safety: operator must confirm the target disk and set identity.
+  # Storage screen will pre-select the SSD/NVMe (ssd: true) as the default,
+  # but the operator must still confirm — this prevents accidental wipe of
+  # attached USB drives or large external SATA disks.
   interactive-sections:
     - storage
     - identity
+
+  storage:
+    layout:
+      name: lvm
+      match:
+        ssd: true
 
   locale: en_US
   keyboard:
