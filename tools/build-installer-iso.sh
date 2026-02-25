@@ -98,8 +98,8 @@ cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
 # Build-time pass-1 substitution of the runtime autoinstall template.
 # Substitutes product/version vars; leaves runtime vars (OURBOX_STORAGE_MATCH,
-# OURBOX_HOSTNAME, OURBOX_USERNAME, OURBOX_PASSWORD_HASH) intact for
-# ourbox-preinstall to fill in at install time.
+# OURBOX_HOSTNAME, OURBOX_USERNAME, OURBOX_PASSWORD_HASH, OURBOX_DATA_DISK)
+# intact for ourbox-preinstall to fill in at install time.
 mkdir -p "${ISO_DIR}/ourbox"
 RUNTIME_TPL_SUBST='${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
 envsubst "${RUNTIME_TPL_SUBST}" \

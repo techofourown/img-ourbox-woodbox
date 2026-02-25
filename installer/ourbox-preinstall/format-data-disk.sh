@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # format-data-disk.sh — run from autoinstall late-commands (live env, not chroot)
 #
-# Finds the largest non-system, non-USB SATA/SAS disk and formats it as the
-# OurBox DATA disk (GPT + single ext4 partition labeled OURBOX_DATA).
+# Formats the operator-selected disk as the OurBox DATA disk:
+#   GPT + single ext4 partition labeled OURBOX_DATA.
+#
+# Usage: format-data-disk.sh <disk>   e.g. format-data-disk.sh /dev/sda
 #
 # Skips entirely if a disk with label OURBOX_DATA already exists.
 # Safe to run multiple times (idempotent via blkid check).
@@ -11,15 +13,15 @@ set -euo pipefail
 
 log() { echo "[format-data-disk] $*"; }
 
+DATA_DISK="${1:?Usage: format-data-disk.sh <disk-device>}"
+
 # Already exists — nothing to do.
 if blkid -L OURBOX_DATA >/dev/null 2>&1; then
   log "OURBOX_DATA label already present on $(blkid -L OURBOX_DATA) — skipping"
   exit 0
 fi
 
-# Identify the system (boot) disk — the one / is installed on.
-# In the late-command context the target is mounted at /target;
-# the live root is the installer USB.
+# Safety: refuse to format the system disk.
 SYSTEM_DISK=""
 ROOT_DEV="$(findmnt -nr -o SOURCE /target 2>/dev/null || true)"
 if [[ -n "${ROOT_DEV}" ]]; then
@@ -33,49 +35,14 @@ if [[ -n "${ROOT_DEV}" ]]; then
 fi
 log "System disk (will be excluded): ${SYSTEM_DISK:-unknown}"
 
-# Identify the installer USB (the live media — the disk / of the live env is on).
-INSTALLER_DISK=""
-LIVE_ROOT_DEV="$(findmnt -nr -o SOURCE / 2>/dev/null || true)"
-if [[ -n "${LIVE_ROOT_DEV}" ]]; then
-  LIVE_REAL="$(readlink -f "${LIVE_ROOT_DEV}" 2>/dev/null || echo "${LIVE_ROOT_DEV}")"
-  LIVE_PKNAME="$(lsblk -no PKNAME "${LIVE_REAL}" 2>/dev/null || true)"
-  if [[ -n "${LIVE_PKNAME}" ]]; then
-    INSTALLER_DISK="/dev/${LIVE_PKNAME}"
-  else
-    INSTALLER_DISK="${LIVE_REAL}"
-  fi
-fi
-log "Installer disk (will be excluded): ${INSTALLER_DISK:-unknown}"
-
-# Find DATA disk candidate: non-removable, non-system, non-installer, prefer SATA.
-# Takes the largest remaining disk — for Woodbox that's the 6TB SATA.
-DATA_DISK=""
-DATA_SIZE=0
-
-while read -r name; do
-  disk="/dev/${name}"
-  [[ "${disk}" != "${SYSTEM_DISK}" ]]    || continue
-  [[ "${disk}" != "${INSTALLER_DISK}" ]] || continue
-
-  rm="$(lsblk -dn -o RM "${disk}" 2>/dev/null | tr -d '[:space:]')"
-  [[ "${rm}" != "1" ]] || continue  # skip removable (USB sticks)
-
-  size_bytes="$(lsblk -dn -o SIZE --bytes "${disk}" 2>/dev/null | tr -d '[:space:]')"
-  [[ -n "${size_bytes}" ]] || continue
-
-  if (( size_bytes > DATA_SIZE )); then
-    DATA_SIZE="${size_bytes}"
-    DATA_DISK="${disk}"
-  fi
-done < <(lsblk -dn -o NAME,TYPE | awk '$2=="disk"{print $1}')
-
-if [[ -z "${DATA_DISK}" ]]; then
-  log "WARNING: no DATA disk candidate found — skipping format"
-  exit 0
+DATA_DISK_REAL="$(readlink -f "${DATA_DISK}")"
+if [[ -n "${SYSTEM_DISK}" && "${DATA_DISK_REAL}" == "${SYSTEM_DISK}" ]]; then
+  log "ERROR: ${DATA_DISK} resolves to the system disk ${SYSTEM_DISK} — aborting"
+  exit 1
 fi
 
 DATA_SIZE_HUMAN="$(lsblk -dn -o SIZE "${DATA_DISK}" 2>/dev/null | tr -d '[:space:]')"
-log "Selected DATA disk: ${DATA_DISK} (${DATA_SIZE_HUMAN})"
+log "Formatting DATA disk: ${DATA_DISK} (${DATA_SIZE_HUMAN})"
 
 # Wipe existing signatures and partition table.
 log "Wiping ${DATA_DISK}"

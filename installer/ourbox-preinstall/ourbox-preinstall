@@ -55,41 +55,74 @@ installer_disk() {
   fi
 }
 
+# OS disk candidates: NVMe, non-removable, not the installer USB.
 candidate_disks() {
   local installer
   installer="$(installer_disk)"
-  lsblk -dn -o NAME,TYPE,TRAN,RM | awk '$2=="disk" {print "/dev/"$1}' | while read -r disk; do
+  lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}' | while read -r disk; do
     [[ "${disk}" != "${installer}" ]] || continue
-    local tran rm size_bytes
-    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    local rm tran
     rm="$(lsblk -dn -o RM "${disk}" 2>/dev/null | tr -d '[:space:]')"
-    # Skip removable non-installer disks (other USB sticks)
     [[ "${rm}" != "1" ]] || continue
-    # Include NVMe and SATA SSDs; skip large spinning disks > 2TiB
-    size_bytes="$(lsblk -dn -o SIZE --bytes "${disk}" 2>/dev/null | tr -d '[:space:]')"
-    (( size_bytes < 2199023255552 )) || continue  # skip > 2 TiB
+    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    [[ "${tran}" == "nvme" ]] || continue
     echo "${disk}"
   done
 }
 
-print_disk_table() {
-  local idx=0
+# DATA disk candidates: non-removable, not the installer USB, not the OS disk.
+# Any transport type (SATA, SAS, NVMe, etc.) — identified by exclusion, not size.
+candidate_data_disks() {
+  local installer os_disk
+  installer="$(installer_disk)"
+  os_disk="${TARGET_DISK}"
+  lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}' | while read -r disk; do
+    [[ "${disk}" != "${installer}" ]] || continue
+    [[ "${disk}" != "${os_disk}" ]]  || continue
+    local rm
+    rm="$(lsblk -dn -o RM "${disk}" 2>/dev/null | tr -d '[:space:]')"
+    [[ "${rm}" != "1" ]] || continue
+    echo "${disk}"
+  done
+}
+
+_disk_table_row() {
+  local disk="$1" idx="$2"
+  local size tran model serial
+  size="$(lsblk -dn -o SIZE "${disk}" 2>/dev/null | tr -d '[:space:]')"
+  tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  model="$(lsblk -dn -o MODEL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  serial="$(lsblk -dn -o SERIAL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  [[ -n "${tran}" ]]   || tran="-"
+  [[ -n "${model}" ]]  || model="-"
+  [[ -n "${serial}" ]] || serial="-"
+  printf '  %-3s %-14s %-8s %-6s %-22.22s %-16.16s\n' \
+    "${idx}" "${disk}" "${size}" "${tran}" "${model}" "${serial}"
+}
+
+_disk_table_header() {
   printf '\n  %-3s %-14s %-8s %-6s %-22s %-16s\n' \
     "#" "Device" "Size" "Tran" "Model" "Serial"
   echo "  -----------------------------------------------------------------------"
+}
+
+print_disk_table() {
+  local idx=0
+  _disk_table_header
   while read -r disk; do
     idx=$((idx + 1))
-    local size tran model serial
-    size="$(lsblk -dn -o SIZE "${disk}" 2>/dev/null | tr -d '[:space:]')"
-    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
-    model="$(lsblk -dn -o MODEL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    serial="$(lsblk -dn -o SERIAL "${disk}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    [[ -n "${tran}" ]]   || tran="-"
-    [[ -n "${model}" ]]  || model="-"
-    [[ -n "${serial}" ]] || serial="-"
-    printf '  %-3s %-14s %-8s %-6s %-22.22s %-16.16s\n' \
-      "${idx}" "${disk}" "${size}" "${tran}" "${model}" "${serial}"
+    _disk_table_row "${disk}" "${idx}"
   done < <(candidate_disks)
+  echo
+}
+
+print_data_disk_table() {
+  local idx=0
+  _disk_table_header
+  while read -r disk; do
+    idx=$((idx + 1))
+    _disk_table_row "${disk}" "${idx}"
+  done < <(candidate_data_disks)
   echo
 }
 
@@ -101,7 +134,7 @@ select_disk() {
 
     if (( ${#disks[@]} == 0 )); then
       echo
-      echo "  No suitable target disks found (NVMe/SSD, non-removable, <= 2 TiB)."
+      echo "  No NVMe disks found (non-removable)."
       echo "  Make sure the NVMe drive is seated, then rescan."
       read -r -p "  Press ENTER to rescan, or q to quit: " _ans
       [[ "${_ans}" == "q" || "${_ans}" == "Q" ]] && die "operator quit"
@@ -109,7 +142,7 @@ select_disk() {
     fi
 
     print_disk_table
-    read -r -p "  Select target disk number (r=rescan, q=quit): " _ans
+    read -r -p "  Select OS disk number (r=rescan, q=quit): " _ans
     case "${_ans}" in
       r|R) continue ;;
       q|Q) die "operator quit" ;;
@@ -124,11 +157,52 @@ select_disk() {
     lsblk -o NAME,SIZE,MODEL,SERIAL,TYPE,FSTYPE,LABEL,MOUNTPOINTS "${selected}" || true
     echo
     prompt_confirm_exact "INSTALL-TO-THIS-DISK" \
-      "  Type INSTALL-TO-THIS-DISK to confirm this is the target:"
+      "  Type INSTALL-TO-THIS-DISK to confirm this is the OS disk:"
 
     serial="$(lsblk -dn -o SERIAL "${selected}" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     TARGET_DISK="${selected}"
     TARGET_DISK_SERIAL="${serial}"
+    return 0
+  done
+}
+
+select_data_disk() {
+  local disks=() idx selected
+
+  while true; do
+    mapfile -t disks < <(candidate_data_disks)
+
+    if (( ${#disks[@]} == 0 )); then
+      echo
+      echo "  No DATA disk candidates found (non-removable, non-OS, non-USB)."
+      echo "  Make sure the data drive is connected, then rescan."
+      read -r -p "  Press ENTER to rescan, or q to quit: " _ans
+      [[ "${_ans}" == "q" || "${_ans}" == "Q" ]] && die "operator quit"
+      continue
+    fi
+
+    print_data_disk_table
+    read -r -p "  Select DATA disk number (r=rescan, q=quit): " _ans
+    case "${_ans}" in
+      r|R) continue ;;
+      q|Q) die "operator quit" ;;
+    esac
+
+    [[ "${_ans}" =~ ^[0-9]+$ ]] || { log "invalid selection"; continue; }
+    idx=$(( _ans - 1 ))
+    (( idx >= 0 && idx < ${#disks[@]} )) || { log "selection out of range"; continue; }
+
+    selected="${disks[${idx}]}"
+    echo
+    lsblk -o NAME,SIZE,MODEL,SERIAL,TYPE,FSTYPE,LABEL,MOUNTPOINTS "${selected}" || true
+    echo
+    echo "  WARNING: ALL DATA ON ${selected} WILL BE PERMANENTLY ERASED"
+    echo "  and formatted as the OurBox data volume (LABEL=OURBOX_DATA)."
+    echo
+    prompt_confirm_exact "FORMAT-AS-DATA" \
+      "  Type FORMAT-AS-DATA to confirm this is the data disk:"
+
+    DATA_DISK="${selected}"
     return 0
   done
 }
@@ -172,23 +246,36 @@ main() {
 
   udevadm settle --timeout=10 || true
 
-  # --- disk selection ---
-  echo "  Step 1 of 3: Select the target disk"
+  # --- Step 1: OS disk ---
+  echo "  Step 1 of 4: Select the OS disk"
   echo "  This disk will be ERASED and OurBox Woodbox OS installed on it."
-  echo "  Showing non-removable NVMe / SSD disks only."
+  echo "  Showing NVMe disks only."
 
   TARGET_DISK=""
   TARGET_DISK_SERIAL=""
   select_disk
 
   echo
-  echo "  Target disk : ${TARGET_DISK}"
+  echo "  OS disk     : ${TARGET_DISK}"
   echo "  Disk serial : ${TARGET_DISK_SERIAL:-unknown}"
   echo
 
-  # --- identity ---
+  # --- Step 2: DATA disk ---
   banner
-  echo "  Step 2 of 3: Set identity for the installed system"
+  echo "  Step 2 of 4: Select the DATA disk"
+  echo "  This disk will be formatted as the OurBox data volume."
+  echo "  Showing all non-OS, non-removable disks."
+
+  DATA_DISK=""
+  select_data_disk
+
+  echo
+  echo "  DATA disk   : ${DATA_DISK}"
+  echo
+
+  # --- Step 3: Identity ---
+  banner
+  echo "  Step 3 of 4: Set identity for the installed system"
   echo "  (You can change hostname and password later.)"
   echo
 
@@ -199,22 +286,23 @@ main() {
   echo "  Set the login password for ${OURBOX_USERNAME}:"
   OURBOX_PASSWORD_HASH="$(prompt_password_hash)"
 
-  # --- summary + final confirmation ---
+  # --- Step 4: Summary + final confirmation ---
   banner
-  echo "  Step 3 of 3: Confirm and install"
+  echo "  Step 4 of 4: Confirm and install"
   echo
-  echo "  Target disk  : ${TARGET_DISK}"
+  echo "  OS disk      : ${TARGET_DISK}"
   [[ -n "${TARGET_DISK_SERIAL}" ]] && \
     echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
+  echo "  DATA disk    : ${DATA_DISK}"
   echo "  Hostname     : ${OURBOX_HOSTNAME}"
   echo "  Username     : ${OURBOX_USERNAME}"
   echo
-  echo "  WARNING: ALL DATA ON ${TARGET_DISK} WILL BE PERMANENTLY ERASED."
+  echo "  WARNING: ALL DATA ON ${TARGET_DISK} AND ${DATA_DISK} WILL BE PERMANENTLY ERASED."
   echo
   prompt_confirm_exact "INSTALL" "  Type INSTALL to begin (or Ctrl-C to abort):"
 
   # --- generate autoinstall.yaml ---
-  export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
+  export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH OURBOX_DATA_DISK="${DATA_DISK}"
 
   # Match by device path (/dev/nvme0n1) rather than serial number.
   # Subiquity's prober reads the serial directly from sysfs, which includes
@@ -227,7 +315,7 @@ main() {
 
   [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
 
-  RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH}'
+  RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH} ${OURBOX_DATA_DISK}'
   envsubst "${RUNTIME_VARS}" < "${AUTOINSTALL_TPL}" > "${AUTOINSTALL_OUT}"
 
   echo

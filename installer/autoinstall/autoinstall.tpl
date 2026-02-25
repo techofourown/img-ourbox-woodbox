@@ -78,10 +78,9 @@ ${OURBOX_STORAGE_MATCH}
     # which differs from the installed system (NVMe changes slot ordering).
     - 'printf "network:\n  version: 2\n  ethernets:\n    id0:\n      match:\n        name: \"en*\"\n      dhcp4: true\n" > /target/etc/netplan/00-installer-config.yaml'
 
-    # Format the OURBOX_DATA disk (largest non-system non-USB disk, SATA/SAS).
-    # Finds the disk, wipes it, creates a GPT + single ext4 partition labeled
-    # OURBOX_DATA.  Skips if OURBOX_DATA label already exists.
-    - 'blkid -L OURBOX_DATA >/dev/null 2>&1 || /bin/bash /cdrom/ourbox/tools/format-data-disk.sh'
+    # Format the operator-selected DATA disk as OURBOX_DATA.
+    # Skips if OURBOX_DATA label already exists (idempotent).
+    - '/bin/bash /cdrom/ourbox/tools/format-data-disk.sh ${OURBOX_DATA_DISK}'
 
     # Clear static MOTD so only our dynamic status script runs
     - truncate -s 0 /target/etc/motd
