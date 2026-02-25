@@ -31,8 +31,12 @@ mkdir -p "${ROOT}/deploy" "${ROOT}/artifacts"
 # OS defaults (interactive identity in installer; these act as defaults)
 : "${OURBOX_HOSTNAME:=ourbox-woodbox}"
 : "${OURBOX_USERNAME:=ourbox}"
-# Placeholder hash (installer prompts for identity; do not rely on this)
-: "${OURBOX_PASSWORD_HASH:='$6$placeholder$u4o2q0nN6d0fPp7kqzN0R5rH6G3a8uM0IhYf9wq3Zq2IY9xQO2O3sZVnO0Xo0c8zVx7Qz5yT3uEJq0mY1/'}"
+# Placeholder hash (installer prompts for identity; do not rely on this).
+# Must be assigned via a single-quoted temp var — dollar signs in sha512crypt
+# strings would be expanded by bash if placed directly inside double quotes.
+_ph='$6$placeholder$u4o2q0nN6d0fPp7kqzN0R5rH6G3a8uM0IhYf9wq3Zq2IY9xQO2O3sZVnO0Xo0c8zVx7Qz5yT3uEJq0mY1/'
+: "${OURBOX_PASSWORD_HASH:=${_ph}}"
+unset _ph
 
 # Slugs for filenames
 OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr 'A-Z' 'a-z')"
