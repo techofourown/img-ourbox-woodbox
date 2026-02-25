@@ -221,18 +221,24 @@ prompt_nonempty() {
 
 prompt_password_hash() {
   local pw1="" pw2=""
-  echo
-  echo "Set the initial password for the installed system user."
-  echo "(You can change it later with: passwd)"
-  echo
+
+  {
+    echo
+    echo "Set the initial password for the installed system user."
+    echo "(You can change it later with: passwd)"
+    echo
+  } >&2
+
   while true; do
     read -r -s -p "Password: " pw1
-    echo
+    echo >&2
     read -r -s -p "Confirm:  " pw2
-    echo
-    [[ -n "${pw1}" ]] || { echo "Password cannot be empty."; continue; }
-    [[ "${pw1}" == "${pw2}" ]] || { echo "Passwords did not match. Try again."; continue; }
-    # openssl passwd -6 prompts for salt automatically.
+    echo >&2
+
+    [[ -n "${pw1}" ]] || { echo "Password cannot be empty." >&2; continue; }
+    [[ "${pw1}" == "${pw2}" ]] || { echo "Passwords did not match. Try again." >&2; continue; }
+
+    # IMPORTANT: only the hash is printed to stdout (so command substitution captures only this)
     echo "${pw1}" | openssl passwd -6 -stdin
     return 0
   done

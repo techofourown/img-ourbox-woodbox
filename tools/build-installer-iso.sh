@@ -79,8 +79,10 @@ mkdir -p "${ISO_DIR}/nocloud"
 export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 export OURBOX_PRODUCT OURBOX_DEVICE OURBOX_TARGET OURBOX_SKU OURBOX_VARIANT OURBOX_VERSION
 
-envsubst < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
-envsubst < "${ROOT}/installer/autoinstall/meta-data.tpl" > "${ISO_DIR}/nocloud/meta-data"
+SUBST_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
+
+envsubst "${SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
+envsubst "${SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl" > "${ISO_DIR}/nocloud/meta-data"
 cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
 # Copy OurBox overlay + generate /etc/ourbox/release inside it
