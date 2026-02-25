@@ -65,6 +65,7 @@ ${OURBOX_STORAGE_MATCH}
     - curtin in-target --target=/target -- systemctl enable ourbox-status.service
     - curtin in-target --target=/target -- systemctl enable avahi-daemon.service
     - curtin in-target --target=/target -- systemctl enable ourbox-mdns-aliases.service
+    - curtin in-target --target=/target -- systemctl enable k3s.service
 
     # OurBox DATA mount contract (by label).
     # Written directly to /target/etc/fstab — late-commands run in the live
@@ -82,6 +83,13 @@ ${OURBOX_STORAGE_MATCH}
     # Format the operator-selected DATA disk as OURBOX_DATA.
     # Skips if OURBOX_DATA label already exists (idempotent).
     - '/bin/bash /cdrom/ourbox/tools/format-data-disk.sh ${OURBOX_DATA_DISK}'
+
+    # Restore USB boot priority after grub-install pushes itself to the front.
+    # BootCurrent is the EFI entry we actually booted from (the USB stick).
+    # We put it first, then all other active entries after — so the USB is
+    # tried first on every subsequent boot. When no USB is present, UEFI
+    # skips it and falls through to the NVMe entry automatically.
+    - 'CURRENT=$(efibootmgr | awk "/^BootCurrent:/ {print \$2}"); OTHERS=$(efibootmgr | awk -v c="$CURRENT" "/^Boot[0-9A-F]+[*]/ {match(\$1, /Boot([0-9A-F]+)/, m); if(m[1] != c) printf m[1]\",\"}" | sed "s/,$//"); if [ -n "$CURRENT" ]; then ORDER="$CURRENT"; [ -n "$OTHERS" ] && ORDER="$CURRENT,$OTHERS"; efibootmgr --bootorder "$ORDER" >/dev/null; fi'
 
     # Clear static MOTD so only our dynamic status script runs
     - truncate -s 0 /target/etc/motd

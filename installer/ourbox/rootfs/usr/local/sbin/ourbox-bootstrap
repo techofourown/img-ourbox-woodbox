@@ -8,8 +8,12 @@ MARKER="${STATE_DIR}/bootstrap.done"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 HOSTNAME="$(hostname)"
 
-# idempotent
+# idempotent — but always ensure k3s is enabled and running, even on reinstall.
+# A fresh OS install resets systemd unit state while leaving the DATA disk intact,
+# so bootstrap.done can exist without k3s being enabled. We handle that here.
 if [[ -f "$MARKER" ]]; then
+  systemctl is-enabled --quiet k3s.service 2>/dev/null || systemctl enable k3s.service
+  systemctl is-active  --quiet k3s.service 2>/dev/null || systemctl start  k3s.service
   exit 0
 fi
 
