@@ -216,13 +216,13 @@ main() {
   # --- generate autoinstall.yaml ---
   export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 
-  # Build the storage match snippet.  NVMe drives should always have a serial;
-  # fall back to ssd: true if for some reason lsblk returned nothing.
-  if [[ -n "${TARGET_DISK_SERIAL}" ]]; then
-    OURBOX_STORAGE_MATCH="        serial: ${TARGET_DISK_SERIAL}"
-  else
-    OURBOX_STORAGE_MATCH="        ssd: true"
-  fi
+  # Match by device path (/dev/nvme0n1) rather than serial number.
+  # Subiquity's prober reads the serial directly from sysfs, which includes
+  # trailing spaces (e.g. "794PCBKPPQKN        ").  lsblk strips those spaces,
+  # so a serial-based match always fails.  Path matching is unambiguous and
+  # requires no serial normalization.
+  TARGET_DISK_REAL="$(readlink -f "${TARGET_DISK}")"
+  OURBOX_STORAGE_MATCH="        path: ${TARGET_DISK_REAL}"
   export OURBOX_STORAGE_MATCH
 
   [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
