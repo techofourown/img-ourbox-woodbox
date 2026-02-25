@@ -72,11 +72,12 @@ ${OURBOX_STORAGE_MATCH}
     # Single-line to avoid YAML plain-scalar newline folding (bash exit 2).
     - 'mkdir -p /target/var/lib/ourbox && grep -qF "LABEL=OURBOX_DATA" /target/etc/fstab || echo "LABEL=OURBOX_DATA /var/lib/ourbox ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2" >> /target/etc/fstab'
 
-    # Rewrite netplan to match any en* interface by wildcard so DHCP works
-    # regardless of whether the installed kernel names the NIC enp1s0, enp2s0, etc.
-    # Subiquity writes the config based on the live-installer's PCI enumeration,
-    # which differs from the installed system (NVMe changes slot ordering).
-    - 'printf "network:\n  version: 2\n  ethernets:\n    id0:\n      match:\n        name: \"en*\"\n      dhcp4: true\n" > /target/etc/netplan/00-installer-config.yaml'
+    # Rewrite netplan to match the NIC by MAC address — stable across reboots,
+    # kernel versions, PCI slot renumbering, and different motherboards.
+    # We detect the live installer's active NIC (the one with the default route)
+    # and read its MAC from sysfs. This survives any interface naming scheme:
+    # enp1s0, enp2s0, ens3, eth0, enx..., etc.
+    - 'iface=$(ip route show default 2>/dev/null | awk "{print \$5; exit}"); mac=$(cat /sys/class/net/"$iface"/address 2>/dev/null); [ -n "$mac" ] && printf "network:\n  version: 2\n  ethernets:\n    id0:\n      match:\n        macaddress: %s\n      dhcp4: true\n" "$mac" > /target/etc/netplan/00-installer-config.yaml'
 
     # Format the operator-selected DATA disk as OURBOX_DATA.
     # Skips if OURBOX_DATA label already exists (idempotent).
