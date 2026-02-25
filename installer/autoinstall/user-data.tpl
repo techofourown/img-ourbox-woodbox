@@ -65,7 +65,7 @@ autoinstall:
       '
 
     # Clear static MOTD so only our dynamic status script runs
-    - curtin in-target --target=/target -- /bin/bash -lc ': > /etc/motd'
+    - curtin in-target --target=/target -- truncate -s 0 /etc/motd
 
     # Try to install NVIDIA drivers (requires internet); safe to fail.
     # If you are fully airgapped, remove this line.
