@@ -18,6 +18,7 @@ Model identifies the physical hardware class; SKU identifies the exact bill-of-m
 ## Happy path (build host → USB installer → Woodbox install)
 
 ```bash
+cd ~
 git clone --recurse-submodules https://github.com/techofourown/img-ourbox-woodbox.git
 cd img-ourbox-woodbox
 ./tools/prepare-installer-media.sh
