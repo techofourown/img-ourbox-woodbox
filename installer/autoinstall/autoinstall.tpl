@@ -66,15 +66,11 @@ ${OURBOX_STORAGE_MATCH}
     - curtin in-target --target=/target -- systemctl enable avahi-daemon.service
     - curtin in-target --target=/target -- systemctl enable ourbox-mdns-aliases.service
 
-    # OurBox DATA mount contract (by label)
-    - curtin in-target --target=/target -- /bin/bash -lc '
-        set -euo pipefail
-        FSTAB_LINE="LABEL=OURBOX_DATA /var/lib/ourbox ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2"
-        mkdir -p /var/lib/ourbox
-        if ! grep -qF "LABEL=OURBOX_DATA /var/lib/ourbox" /etc/fstab; then
-          echo "${FSTAB_LINE}" >> /etc/fstab
-        fi
-      '
+    # OurBox DATA mount contract (by label).
+    # Written directly to /target/etc/fstab — late-commands run in the live
+    # env with the target already mounted, so curtin in-target is not needed.
+    # Single-line to avoid YAML plain-scalar newline folding (bash exit 2).
+    - 'mkdir -p /target/var/lib/ourbox && grep -qF "LABEL=OURBOX_DATA" /target/etc/fstab || echo "LABEL=OURBOX_DATA /var/lib/ourbox ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2" >> /target/etc/fstab'
 
     # Clear static MOTD so only our dynamic status script runs
     - curtin in-target --target=/target -- truncate -s 0 /etc/motd
