@@ -47,3 +47,29 @@ If ready, you should be able to reach:
 - `http://notes.<hostname>.local`
 - `http://todo.<hostname>.local`
 
+---
+
+## Platform contract provenance (what baseline did this image ship?)
+
+This image repo is responsible for "boot + bootstrap," but the *platform contract* (baseline
+manifests / platform components contract) is sourced from `sw-ourbox-os`.
+
+When debugging a device, the first question is:
+
+> "What platform contract revision/digest am I running?"
+
+Check:
+
+```bash
+sudo cat /etc/ourbox/release
+```
+
+Look for the `OURBOX_PLATFORM_CONTRACT_*` keys:
+- `OURBOX_PLATFORM_CONTRACT_SOURCE`
+- `OURBOX_PLATFORM_CONTRACT_REVISION`
+- (when available) `OURBOX_PLATFORM_CONTRACT_VERSION`
+- (when available) `OURBOX_PLATFORM_CONTRACT_DIGEST`
+
+This is the provenance boundary that keeps "official baseline" legible even before we enforce
+signatures.
+
