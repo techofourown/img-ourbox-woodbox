@@ -37,6 +37,9 @@ done
 # 2. Forbidden content patterns — must not appear anywhere in tracked files
 # ---------------------------------------------------------------------------
 declare -A PATTERNS=(
+  ["registry\\.benac\\.dev"]="internal registry hostname"
+  ["/etc/ssl/centroid-ca"]="internal CA cert path"
+  ["nodeName:.*centroid"]="internal node name in Kubernetes manifest"
   ["hostPID:.*true"]="privileged host access in Kubernetes manifest"
   ["privileged:.*true"]="privileged container in Kubernetes manifest"
   ["hostPath:"]="host filesystem mount in Kubernetes manifest"
@@ -63,8 +66,12 @@ done
 # 3. Banned words — must not appear anywhere in tracked files
 # ---------------------------------------------------------------------------
 # "forge" is a banned legacy model name for Woodbox (correct name: Woodbox / x86).
+# "centroid" is an internal machine name that must not appear in public content.
+# "ops-techofourown-private" is a private infrastructure repo that must not be referenced publicly.
 BANNED_WORDS=(
   "forge"
+  "centroid"
+  "ops-techofourown-private"
 )
 
 for word in "${BANNED_WORDS[@]}"; do
