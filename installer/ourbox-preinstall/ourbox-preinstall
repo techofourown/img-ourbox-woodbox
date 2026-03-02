@@ -487,8 +487,22 @@ resolve_and_stage_os_artifact() {
       pull_ref="${repo_base}@${resolved_digest}"
       log "  Resolved: ${resolved_digest}"
     else
-      log "  WARNING: oras resolve failed; pulling by tag (digest will not be captured before pull)"
-      pull_ref="${selected_ref}"
+      # oras resolve failed: artifact identity cannot be established before pull.
+      # By default this is a hard failure — pulling by a floating tag installs an
+      # unverified artifact whose identity cannot be recorded in provenance.
+      # Set OURBOX_ALLOW_UNRESOLVED_PULL=1 only for development / testing.
+      if [[ "${OURBOX_ALLOW_UNRESOLVED_PULL:-0}" == "1" ]]; then
+        log "  WARNING: oras resolve failed; pulling by tag (OURBOX_ALLOW_UNRESOLVED_PULL=1)"
+        log "  WARNING: artifact identity will not be captured in provenance"
+        pull_ref="${selected_ref}"
+      else
+        die "Cannot establish artifact identity: oras resolve failed for ${selected_ref}
+  The installer requires a digest-pinned artifact ref to ensure provenance.
+  Options:
+    1. Use a digest-pinned ref (catalog or OS_DEFAULT_REF usually provides this)
+    2. Check registry connectivity and retry
+    3. Set OURBOX_ALLOW_UNRESOLVED_PULL=1 to skip this check (dev/testing only)"
+      fi
     fi
   fi
 
@@ -507,9 +521,11 @@ resolve_and_stage_os_artifact() {
   printf '%s\n' "${pull_out}"
   [[ "${pull_status}" -eq 0 ]] || die "oras pull failed for ${pull_ref} (exit ${pull_status})"
 
-  # If digest was not captured via oras resolve, try to parse from pull output as a last resort.
+  # OS_ARTIFACT_DIGEST is set from oras resolve (or from an @sha256: pinned ref).
+  # In OURBOX_ALLOW_UNRESOLVED_PULL=1 mode it is still empty — mark it explicitly
+  # so provenance records the ambiguous state rather than silently recording empty.
   if [[ -z "${OS_ARTIFACT_DIGEST}" ]]; then
-    OS_ARTIFACT_DIGEST="$(printf '%s\n' "${pull_out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1 || true)"
+    OS_ARTIFACT_DIGEST="unresolved"
   fi
 
   _verify_staged_payload
@@ -529,8 +545,12 @@ write_install_provenance() {
   fi
 
   # Write env file consumed by the late-commands append-provenance.sh script.
+  # INSTALLER_VERSION and INSTALLER_GIT_HASH come from defaults.env (baked at
+  # ISO build time); they uniquely identify the installer artifact that ran.
   cat > "${cache_dir}/install-provenance.env" <<EOF
 INSTALLER_ID=${INSTALLER_ID:-woodbox}
+INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
+INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
 OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
 OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
@@ -556,6 +576,8 @@ fi
 . "${PROV}"
 cat >> "${TARGET}/etc/ourbox/release" <<EOT
 OURBOX_INSTALLER_ID=${INSTALLER_ID:-woodbox}
+OURBOX_INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
+OURBOX_INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
 OURBOX_OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
 OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}

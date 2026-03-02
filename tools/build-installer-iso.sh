@@ -166,17 +166,32 @@ install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
 # binary, which may be arm64 if building on a non-x86 host.
 log "Bundling linux-amd64 ORAS binary into installer"
 : "${ORAS_VERSION:=1.3.0}"
-ORAS_LINUX_AMD64_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+ORAS_BASE_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}"
+ORAS_TARBALL="oras_${ORAS_VERSION}_linux_amd64.tar.gz"
 ORAS_TMP="${WORKDIR}/oras-download"
 mkdir -p "${ORAS_TMP}"
 log "  Downloading ORAS ${ORAS_VERSION} linux-amd64"
 curl -fsSL --retry 3 --retry-delay 2 \
-  -o "${ORAS_TMP}/oras.tar.gz" \
-  "${ORAS_LINUX_AMD64_URL}"
-tar -xzf "${ORAS_TMP}/oras.tar.gz" -C "${ORAS_TMP}" oras
+  -o "${ORAS_TMP}/${ORAS_TARBALL}" \
+  "${ORAS_BASE_URL}/${ORAS_TARBALL}"
+log "  Verifying ORAS ${ORAS_VERSION} checksum"
+curl -fsSL --retry 3 --retry-delay 2 \
+  -o "${ORAS_TMP}/checksums.txt" \
+  "${ORAS_BASE_URL}/oras_${ORAS_VERSION}_checksums.txt"
+ORAS_EXPECTED_SHA="$(grep " ${ORAS_TARBALL}\$" "${ORAS_TMP}/checksums.txt" | awk '{print $1}')"
+[[ -n "${ORAS_EXPECTED_SHA}" ]] || die "oras checksum not found in checksums.txt for ${ORAS_TARBALL}"
+ORAS_ACTUAL_SHA="$(sha256sum "${ORAS_TMP}/${ORAS_TARBALL}" | awk '{print $1}')"
+if [[ "${ORAS_EXPECTED_SHA}" != "${ORAS_ACTUAL_SHA}" ]]; then
+  die "ORAS binary checksum mismatch
+  Expected: ${ORAS_EXPECTED_SHA}
+  Actual:   ${ORAS_ACTUAL_SHA}
+  File:     ${ORAS_TMP}/${ORAS_TARBALL}"
+fi
+log "  ORAS checksum verified: ${ORAS_ACTUAL_SHA}"
+tar -xzf "${ORAS_TMP}/${ORAS_TARBALL}" -C "${ORAS_TMP}" oras
 [[ -f "${ORAS_TMP}/oras" ]] || die "oras binary not found after extraction"
 install -m 0755 "${ORAS_TMP}/oras" "${ISO_DIR}/ourbox/tools/oras"
-log "  oras: ${ORAS_VERSION} linux-amd64 bundled"
+log "  oras: ${ORAS_VERSION} linux-amd64 bundled and verified"
 
 # Stage installer defaults (baked fallback for offline operation)
 log "Staging installer defaults"
