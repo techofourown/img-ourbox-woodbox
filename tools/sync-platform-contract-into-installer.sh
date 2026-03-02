@@ -9,11 +9,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACT_DIGEST_FILE="${ROOT}/artifacts/platform-contract/extracted/platform-contract/contract.digest"
 if [[ -f "${CONTRACT_DIGEST_FILE}" ]]; then
   DIGEST="$(cat "${CONTRACT_DIGEST_FILE}")"
+  # Validate it is actually a sha256 digest, not a stale ref or tag
+  if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "WARNING: contract.digest contains non-digest value '${DIGEST}'; treating as unknown" >&2
+    DIGEST="unknown"
+  fi
 else
-  # Fall back to reading from contracts/ ref if digest was not captured
-  REF_FILE="${ROOT}/contracts/platform-contract.ref"
-  [[ -f "${REF_FILE}" ]] || { echo "Missing ${REF_FILE}" >&2; exit 1; }
-  DIGEST="$(cat "${REF_FILE}")"
+  # No digest file — this means fetch-platform-contract.sh was called with a
+  # floating tag and oras resolve did not capture a digest. Fall back to unknown
+  # rather than writing a full ref string as the digest (which would be incorrect).
+  echo "WARNING: No contract.digest file found. Platform contract digest will be 'unknown'." >&2
+  echo "  Re-run ./tools/fetch-platform-contract.sh to capture a digest." >&2
+  DIGEST="unknown"
 fi
 
 SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"

@@ -21,6 +21,7 @@ source "${ROOT}/tools/lib.sh"
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
 
 need_cmd tar
+need_cmd rsync
 need_cmd sha256sum
 need_cmd date
 need_cmd git
@@ -64,6 +65,18 @@ CONTRACT_DIGEST_FILE="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform
 source "${CONTRACT_ENV}"
 CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}" 2>/dev/null || echo unknown)"
 
+# Capture airgap-platform ref and digest for provenance.
+# AIRGAP_PLATFORM_REF is the ref used to fetch (from release/official-inputs.env or env var).
+# The actual digest is stored in artifacts/.airgap-platform-meta/oras.pull.log if available.
+AIRGAP_PLATFORM_REF_USED="${AIRGAP_PLATFORM_REF:-${OURBOX_AIRGAP_PLATFORM_REF:-unknown}}"
+AIRGAP_PLATFORM_DIGEST="unknown"
+AIRGAP_META_LOG="${ROOT}/artifacts/.airgap-platform-meta/oras.pull.log"
+if [[ -f "${AIRGAP_META_LOG}" ]]; then
+  _d="$(grep -Eo 'sha256:[0-9a-f]{64}' "${AIRGAP_META_LOG}" | tail -n1 || true)"
+  [[ -n "${_d}" ]] && AIRGAP_PLATFORM_DIGEST="${_d}"
+  unset _d
+fi
+
 GIT_SHA="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 GIT_SHA_SHORT="$(git -C "${ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
 BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -97,9 +110,13 @@ OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
 OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
 OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}
 OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
+OURBOX_AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF_USED}
+OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_PLATFORM_DIGEST}
+OURBOX_BASE_ISO_URL=${UBUNTU_ISO_URL:-unknown}
+OURBOX_BASE_ISO_SHA256=${UBUNTU_ISO_SHA256:-unknown}
 OURBOX_BUILD_TS=${BUILD_TS}
 EOT
-# Install-time provenance fields (appended by autoinstall late-commands):
+# Install-time provenance fields (appended by autoinstall late-commands via append-provenance.sh):
 #   OURBOX_INSTALLER_ID, OURBOX_OS_ARTIFACT_SOURCE, OURBOX_OS_ARTIFACT_REF,
 #   OURBOX_OS_ARTIFACT_DIGEST, OURBOX_OS_IMAGE_SHA256, OURBOX_RELEASE_CHANNEL,
 #   OURBOX_INSTALL_DEFAULTS_SOURCE, OURBOX_INSTALL_DEFAULTS_REF
@@ -120,6 +137,10 @@ OURBOX_PLATFORM_CONTRACT_SOURCE=${OURBOX_PLATFORM_CONTRACT_SOURCE:-https://githu
 OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
 OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
 OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
+OURBOX_AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF_USED}
+OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_PLATFORM_DIGEST}
+OURBOX_BASE_ISO_URL=${UBUNTU_ISO_URL:-unknown}
+OURBOX_BASE_ISO_SHA256=${UBUNTU_ISO_SHA256:-unknown}
 K3S_VERSION=${K3S_VERSION:-unknown}
 GITHUB_WORKFLOW=${GITHUB_WORKFLOW:-}
 GITHUB_RUN_ID=${GITHUB_RUN_ID:-}

@@ -34,6 +34,17 @@ META_DIR="${ROOT}/artifacts/.airgap-platform-meta"
 
 log "Using airgap platform ref: ${REF}"
 
+# Enforce digest pinning in official builds (GITHUB_ACTIONS + official workflow context).
+# If AIRGAP_PLATFORM_REF is a floating tag, official artifacts are non-reproducible.
+if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${GITHUB_WORKFLOW:-}" =~ [Oo]fficial ]]; then
+  if [[ "${REF}" != *"@sha256:"* ]]; then
+    die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
+  Official builds require @sha256: refs to ensure reproducibility.
+  Update AIRGAP_PLATFORM_REF in release/official-inputs.env:
+    oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64"
+  fi
+fi
+
 # Refuse to overwrite existing artifacts unless operator confirms
 if [[ -d "${OUT}" ]] && find "${OUT}" -mindepth 1 -print -quit >/dev/null 2>&1; then
   log "ERROR: Existing artifacts detected in ${OUT} (refusing to overwrite)"

@@ -38,10 +38,28 @@ mkdir -p "${PULL_DIR}" "${EXTRACT_DIR}" "${META_DIR}"
 echo "Pulling platform contract:"
 echo "  ${REF}"
 
-oras pull "${REF}" -o "${PULL_DIR}" | tee "${META_DIR}/oras.pull.log"
+# Resolve to an immutable digest before pulling.
+# This is required for reliable provenance recording — grepping pull output
+# is fragile. oras resolve gives a definitive sha256: digest string.
+RESOLVED_DIGEST=""
+if [[ "${REF}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+  # Ref already contains a digest — extract it directly.
+  RESOLVED_DIGEST="${REF##*@}"
+else
+  echo "  Resolving digest for ${REF}"
+  set +e
+  RESOLVED_DIGEST="$(oras resolve "${REF}" 2>/dev/null)"
+  resolve_status=$?
+  set -e
+  if [[ "${resolve_status}" -ne 0 || ! "${RESOLVED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "  WARNING: oras resolve failed; digest will not be captured" >&2
+    RESOLVED_DIGEST=""
+  else
+    echo "  Resolved: ${RESOLVED_DIGEST}"
+  fi
+fi
 
-# Capture resolved digest for traceability when using a tag (e.g., edge)
-RESOLVED_DIGEST="$(grep -Eo 'sha256:[0-9a-f]{64}' "${META_DIR}/oras.pull.log" | tail -n1 || true)"
+oras pull "${REF}" -o "${PULL_DIR}" | tee "${META_DIR}/oras.pull.log"
 
 TARBALL="${PULL_DIR}/dist/platform-contract.tar.gz"
 if [[ ! -f "${TARBALL}" ]]; then
@@ -59,6 +77,9 @@ tar -xzf "${TARBALL}" -C "${EXTRACT_DIR}"
 
 if [[ -n "${RESOLVED_DIGEST}" ]]; then
   printf '%s\n' "${RESOLVED_DIGEST}" > "${EXTRACT_DIR}/platform-contract/contract.digest"
+  echo "  Digest recorded: ${RESOLVED_DIGEST}"
+else
+  echo "  WARNING: no digest captured; contract.digest will not be written" >&2
 fi
 
 echo "OK: extracted to ${EXTRACT_DIR}/platform-contract"
