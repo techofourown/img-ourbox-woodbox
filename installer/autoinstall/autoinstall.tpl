@@ -7,7 +7,7 @@
 #                  OURBOX_VARIANT OURBOX_VERSION
 #   Pass 2 (install time, ourbox-preinstall):
 #     Substitutes: OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
-#                  OURBOX_STORAGE_MATCH
+#                  OURBOX_STORAGE_MATCH OURBOX_DATA_DISK
 
 autoinstall:
   version: 1
@@ -47,18 +47,20 @@ ${OURBOX_STORAGE_MATCH}
     - avahi-utils
 
   late-commands:
-    # Copy OurBox overlay rootfs into the installed system
-    # (includes /etc/ourbox/release written by build-installer-iso.sh)
-    - curtin in-target --target=/target -- /bin/bash -lc 'echo "==> Installing OurBox rootfs overlay"'
-    - cp -a /cdrom/ourbox/rootfs/. /target/
-
-    # Copy airgap payloads into /opt/ourbox/airgap
-    - curtin in-target --target=/target -- /bin/bash -lc 'echo "==> Copying airgap artifacts"'
+    # Extract staged OS payload (rootfs overlay + airgap artifacts).
+    # Payload staged by ourbox-preinstall from embedded ISO or pulled from registry.
+    - curtin in-target --target=/target -- /bin/bash -lc 'echo "==> Extracting staged OS payload"'
+    - mkdir -p /opt/ourbox/installer/cache/payload-staging
+    - tar -xzf /opt/ourbox/installer/cache/payload/os-payload.tar.gz -C /opt/ourbox/installer/cache/payload-staging
+    - cp -a /opt/ourbox/installer/cache/payload-staging/rootfs/. /target/
     - mkdir -p /target/opt/ourbox/airgap
-    - cp -a /cdrom/ourbox/airgap/. /target/opt/ourbox/airgap/
+    - cp -a /opt/ourbox/installer/cache/payload-staging/airgap/. /target/opt/ourbox/airgap/
 
-    # Install k3s binary from airgap payload
-    - install -D -m 0755 /cdrom/ourbox/airgap/k3s/k3s /target/usr/local/bin/k3s
+    # Install k3s binary from staged airgap payload
+    - install -D -m 0755 /opt/ourbox/installer/cache/payload-staging/airgap/k3s/k3s /target/usr/local/bin/k3s
+
+    # Append install-time provenance to /etc/ourbox/release
+    - /bin/bash /opt/ourbox/installer/cache/append-provenance.sh
 
     # Enable required services
     - curtin in-target --target=/target -- systemctl enable ourbox-bootstrap.service

@@ -18,6 +18,8 @@ need_cmd sed
 
 AUTOINSTALL_TPL="/cdrom/ourbox/autoinstall.tpl"
 AUTOINSTALL_OUT="/autoinstall.yaml"
+DEFAULTS_ENV="/cdrom/ourbox/installer/defaults.env"
+PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -208,6 +210,148 @@ select_data_disk() {
 }
 
 # ---------------------------------------------------------------------------
+# OS artifact resolution
+# ---------------------------------------------------------------------------
+
+# Globals set by resolve_and_stage_os_artifact:
+OS_ARTIFACT_SOURCE=""
+OS_ARTIFACT_REF=""
+OS_ARTIFACT_DIGEST=""
+OS_IMAGE_SHA256=""
+INSTALLER_ID="woodbox"
+OS_CHANNEL="stable"
+
+resolve_and_stage_os_artifact() {
+  banner
+  echo "  Resolving OS artifact"
+  echo
+
+  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
+  # shellcheck disable=SC1090
+  source "${DEFAULTS_ENV}"
+
+  INSTALLER_ID="${INSTALLER_ID:-woodbox}"
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+
+  mkdir -p "${PAYLOAD_CACHE_DIR}"
+
+  local embedded_payload="/cdrom/ourbox/payload/os-payload.tar.gz"
+  if [[ -f "${embedded_payload}" ]]; then
+    log "  Embedded OS payload detected (offline/local-build mode)"
+    cp "${embedded_payload}" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
+    [[ -f "${embedded_payload}.sha256" ]] && \
+      cp "${embedded_payload}.sha256" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
+    [[ -f "/cdrom/ourbox/payload/payload.meta.env" ]] && \
+      cp "/cdrom/ourbox/payload/payload.meta.env" "${PAYLOAD_CACHE_DIR}/payload.meta.env"
+    OS_ARTIFACT_SOURCE="embedded"
+    OS_ARTIFACT_REF="embedded"
+    OS_ARTIFACT_DIGEST="embedded"
+  else
+    need_cmd oras
+    local ref="${OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}:${OS_TARGET:-x86}-${OS_CHANNEL}"
+    echo "  Pulling OS artifact from registry:"
+    echo "    ${ref}"
+    echo
+    local pull_out pull_status
+    set +e
+    pull_out="$(oras pull "${ref}" -o "${PAYLOAD_CACHE_DIR}" 2>&1)"
+    pull_status=$?
+    set -e
+    printf '%s\n' "${pull_out}"
+    [[ "${pull_status}" -eq 0 ]] || die "oras pull failed for ${ref} (exit ${pull_status})"
+    OS_ARTIFACT_SOURCE="registry"
+    OS_ARTIFACT_REF="${ref}"
+    OS_ARTIFACT_DIGEST="$(printf '%s\n' "${pull_out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1 || true)"
+  fi
+
+  [[ -f "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" ]] || \
+    die "OS payload not staged: ${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
+
+  local sha256_file="${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
+  if [[ -f "${sha256_file}" ]]; then
+    local expected actual
+    expected="$(awk 'NF>=1 {print $1; exit}' "${sha256_file}")"
+    expected="${expected,,}"
+    [[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os-payload.tar.gz.sha256"
+    actual="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
+    [[ "${expected}" == "${actual}" ]] || \
+      die "OS payload SHA256 mismatch (expected ${expected}, got ${actual})"
+    OS_IMAGE_SHA256="${actual}"
+    log "  SHA256 verified: ${actual}"
+  else
+    OS_IMAGE_SHA256="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
+    log "  SHA256: ${OS_IMAGE_SHA256} (no checksum file to verify against)"
+  fi
+
+  local meta_env="${PAYLOAD_CACHE_DIR}/payload.meta.env"
+  local payload_version="unknown"
+  local payload_variant="unknown"
+  local payload_contract_digest="unknown"
+  if [[ -f "${meta_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${meta_env}"
+    payload_version="${OURBOX_VERSION:-unknown}"
+    payload_variant="${OURBOX_VARIANT:-unknown}"
+    payload_contract_digest="${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  fi
+
+  echo
+  echo "  =================================================================="
+  echo "  OS Artifact"
+  echo "  =================================================================="
+  echo "  Source   : ${OS_ARTIFACT_SOURCE}"
+  echo "  Ref      : ${OS_ARTIFACT_REF}"
+  [[ -n "${OS_ARTIFACT_DIGEST}" && "${OS_ARTIFACT_DIGEST}" != "embedded" ]] && \
+    echo "  Digest   : ${OS_ARTIFACT_DIGEST}"
+  echo "  SHA256   : ${OS_IMAGE_SHA256}"
+  echo "  Version  : ${payload_version}"
+  echo "  Variant  : ${payload_variant}"
+  echo "  Contract : ${payload_contract_digest}"
+  echo "  =================================================================="
+  echo
+}
+
+write_install_provenance() {
+  local cache_dir="/opt/ourbox/installer/cache"
+  mkdir -p "${cache_dir}"
+
+  # Write env file for the late-commands append-provenance.sh script
+  cat > "${cache_dir}/install-provenance.env" <<EOF
+INSTALLER_ID=${INSTALLER_ID:-woodbox}
+OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
+OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
+OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
+OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
+RELEASE_CHANNEL=${OS_CHANNEL:-unknown}
+EOF
+
+  # Write the provenance-append script called by autoinstall.tpl late-commands.
+  # Uses single-quoted heredoc so the variable references are literal in the script
+  # and expand when the script runs (after sourcing install-provenance.env).
+  cat > "${cache_dir}/append-provenance.sh" <<'SCRIPT'
+#!/bin/sh
+set -e
+PROV="/opt/ourbox/installer/cache/install-provenance.env"
+TARGET="${1:-/target}"
+if [ ! -f "${PROV}" ]; then
+  echo "append-provenance.sh: ${PROV} not found, skipping" >&2
+  exit 0
+fi
+# shellcheck disable=SC1090
+. "${PROV}"
+cat >> "${TARGET}/etc/ourbox/release" <<EOT
+OURBOX_INSTALLER_ID=${INSTALLER_ID:-woodbox}
+OURBOX_OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
+OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
+OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
+OURBOX_OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
+OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-unknown}
+EOT
+SCRIPT
+  chmod +x "${cache_dir}/append-provenance.sh"
+}
+
+# ---------------------------------------------------------------------------
 # identity
 # ---------------------------------------------------------------------------
 
@@ -247,7 +391,7 @@ main() {
   udevadm settle --timeout=10 || true
 
   # --- Step 1: OS disk ---
-  echo "  Step 1 of 4: Select the OS disk"
+  echo "  Step 1 of 5: Select the OS disk"
   echo "  This disk will be ERASED and OurBox Woodbox OS installed on it."
   echo "  Showing NVMe disks only."
 
@@ -262,7 +406,7 @@ main() {
 
   # --- Step 2: DATA disk ---
   banner
-  echo "  Step 2 of 4: Select the DATA disk"
+  echo "  Step 2 of 5: Select the DATA disk"
   echo "  This disk will be formatted as the OurBox data volume."
   echo "  Showing all non-OS, non-removable disks."
 
@@ -273,9 +417,17 @@ main() {
   echo "  DATA disk   : ${DATA_DISK}"
   echo
 
-  # --- Step 3: Identity ---
+  # --- Step 3: OS artifact ---
   banner
-  echo "  Step 3 of 4: Set identity for the installed system"
+  echo "  Step 3 of 5: Resolve OS artifact"
+  echo "  Checking for embedded payload or pulling from registry..."
+  echo
+  resolve_and_stage_os_artifact
+  write_install_provenance
+
+  # --- Step 4: Identity ---
+  banner
+  echo "  Step 4 of 5: Set identity for the installed system"
   echo "  (You can change hostname and password later.)"
   echo
 
@@ -286,14 +438,16 @@ main() {
   echo "  Set the login password for ${OURBOX_USERNAME}:"
   OURBOX_PASSWORD_HASH="$(prompt_password_hash)"
 
-  # --- Step 4: Summary + final confirmation ---
+  # --- Step 5: Summary + final confirmation ---
   banner
-  echo "  Step 4 of 4: Confirm and install"
+  echo "  Step 5 of 5: Confirm and install"
   echo
   echo "  OS disk      : ${TARGET_DISK}"
   [[ -n "${TARGET_DISK_SERIAL}" ]] && \
     echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
   echo "  DATA disk    : ${DATA_DISK}"
+  echo "  OS artifact  : ${OS_ARTIFACT_REF}"
+  echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
   echo "  Hostname     : ${OURBOX_HOSTNAME}"
   echo "  Username     : ${OURBOX_USERNAME}"
   echo

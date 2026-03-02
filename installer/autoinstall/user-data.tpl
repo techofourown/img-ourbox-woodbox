@@ -16,6 +16,9 @@
 # before Subiquity snap services start. We use it to inject our systemd service
 # and drop-ins so that Subiquity waits for ourbox-preinstall to finish first.
 bootcmd:
+  # Make ORAS available to ourbox-preinstall for installer-time artifact pulls
+  - cp /cdrom/ourbox/tools/oras /usr/local/bin/oras
+  - chmod 0755 /usr/local/bin/oras
   - mkdir -p /opt/ourbox/tools
   - cp /cdrom/ourbox/tools/ourbox-preinstall /opt/ourbox/tools/ourbox-preinstall
   - chmod +x /opt/ourbox/tools/ourbox-preinstall

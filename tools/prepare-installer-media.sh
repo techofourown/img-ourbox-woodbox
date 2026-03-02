@@ -4,59 +4,75 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
-# shellcheck disable=SC1091
-[ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
 
-usage(){
-  cat <<USAGE
-Usage: $0
+usage() {
+  cat <<EOF
+Usage: $0 [--build-local] [--installer-ref REF] [--installer-channel CHANNEL] [--installer-outdir DIR]
 
-Interactive workflow:
-  1) installs build host deps (best-effort)
-  2) fetches airgap artifacts
-  3) builds a custom Ubuntu Server autoinstall ISO
-  4) flashes it to a removable USB disk you select
-USAGE
+Always interactive:
+- lists removable/USB disks
+- shows mount/label context
+- requires operator selection in-session before flashing
+
+Default mode (recommended):
+- bootstraps host tools
+- pulls official installer artifact from registry
+- flashes selected media
+
+Local source-build mode (--build-local):
+- bootstraps host tools
+- fetches airgap platform bundle
+- builds OS payload + installer ISO locally (with payload embedded)
+- flashes selected media
+EOF
 }
 
-if [[ $# -gt 0 && ("${1}" == "-h" || "${1}" == "--help") ]]; then
-  usage
-  exit 0
+BUILD_LOCAL=0
+INSTALLER_REF=""
+INSTALLER_CHANNEL="${INSTALLER_CHANNEL:-stable}"
+INSTALLER_OUTDIR=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --build-local)
+      BUILD_LOCAL=1
+      shift
+      ;;
+    --installer-ref)
+      [[ $# -ge 2 ]] || die "--installer-ref requires a value"
+      INSTALLER_REF="$2"
+      shift 2
+      ;;
+    --installer-channel)
+      [[ $# -ge 2 ]] || die "--installer-channel requires a value"
+      INSTALLER_CHANNEL="$2"
+      shift 2
+      ;;
+    --installer-outdir)
+      [[ $# -ge 2 ]] || die "--installer-outdir requires a value"
+      INSTALLER_OUTDIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ "${BUILD_LOCAL}" == "1" && -n "${INSTALLER_REF}" ]]; then
+  die "--installer-ref cannot be combined with --build-local"
 fi
-[[ $# -eq 0 ]] || { usage; die "no positional args supported"; }
 
 need_cmd lsblk
 need_cmd readlink
 need_cmd findmnt
 need_cmd awk
 need_cmd sed
-need_cmd openssl
-
-SENTINEL="${ROOT}/.used"
-
-if [[ -f "${SENTINEL}" ]]; then
-  echo
-  echo "=================================================================="
-  echo "  STALE WORKING TREE DETECTED"
-  echo "=================================================================="
-  echo
-  echo "  This repo has been used before. To guarantee a clean, reliable"
-  echo "  build, always start from a pristine working tree."
-  echo
-  echo "  Reset and retry:"
-  echo
-  echo "    git clean -fdx && ./tools/prepare-installer-media.sh"
-  echo
-  echo "  Or re-clone from scratch:"
-  echo
-  echo "    cd .. && rm -rf img-ourbox-woodbox"
-  echo "    git clone --recurse-submodules https://github.com/techofourown/img-ourbox-woodbox.git"
-  echo "    cd img-ourbox-woodbox && ./tools/prepare-installer-media.sh"
-  echo
-  echo "=================================================================="
-  echo
-  exit 1
-fi
 
 root_backing_disk() {
   local root_src root_real root_parent
@@ -91,7 +107,7 @@ preferred_byid_for_disk() {
     [[ -z "${best}" ]] && best="${p}"
   done
 
-  [[ -n "${best}" ]] && echo "${best}" || true
+  if [[ -n "${best}" ]]; then echo "${best}"; fi
 }
 
 is_candidate_media_disk() {
@@ -201,100 +217,63 @@ select_target_device_interactive() {
     echo
     read -r -p "Type SELECT to use ${selected}: " confirm
     [[ "${confirm}" == "SELECT" ]] || { log "selection not confirmed; returning to list"; continue; }
-
     TARGET_DEV="${selected}"
     return 0
   done
 }
 
-prompt_nonempty() {
-  local prompt="$1" default="${2:-}" ans=""
-  if [[ -n "${default}" ]]; then
-    read -r -p "${prompt} [${default}]: " ans
-    ans="${ans:-${default}}"
-  else
-    read -r -p "${prompt}: " ans
-  fi
-  [[ -n "${ans}" ]] || die "value required"
-  echo "${ans}"
-}
+log "Entering interactive media selection."
+TARGET_DEV=""
+select_target_device_interactive
+validate_target_dev_or_die "${TARGET_DEV}"
+log "Using target media device: ${TARGET_DEV}"
 
-prompt_password_hash() {
-  local pw1="" pw2=""
+"${ROOT}/tools/bootstrap-host.sh"
 
-  {
-    echo
-    echo "Set the initial password for the installed system user."
-    echo "(You can change it later with: passwd)"
-    echo
-  } >&2
+: "${OURBOX_TARGET:=x86}"
+: "${OURBOX_VARIANT:=prod}"
+: "${OURBOX_VERSION:=dev}"
 
-  while true; do
-    read -r -s -p "Password: " pw1
-    echo >&2
-    read -r -s -p "Confirm:  " pw2
-    echo >&2
-
-    [[ -n "${pw1}" ]] || { echo "Password cannot be empty." >&2; continue; }
-    [[ "${pw1}" == "${pw2}" ]] || { echo "Passwords did not match. Try again." >&2; continue; }
-
-    # IMPORTANT: only the hash is printed to stdout (so command substitution captures only this)
-    echo "${pw1}" | openssl passwd -6 -stdin
-    return 0
-  done
-}
-
-banner() {
-  echo
-  echo "=================================================================="
-  echo "OurBox Woodbox — Build USB installer media (destructive on target)"
-  echo "=================================================================="
-  echo
-}
-
-main(){
-  banner
-
-  log "Selecting target USB media"
-  TARGET_DEV=""
-  select_target_device_interactive
-  validate_target_dev_or_die "${TARGET_DEV}"
-  log "Using target media device: ${TARGET_DEV}"
-
-  # Identity (hostname, username, password) is now collected at install time
-  # on the Woodbox itself by ourbox-preinstall. No prompts needed here.
-  : "${OURBOX_HOSTNAME:=ourbox-woodbox}"
-  export OURBOX_HOSTNAME
-
-  touch "${SENTINEL}"
-
-  log "Bootstrapping host dependencies"
-  "${ROOT}/tools/bootstrap-host.sh"
-
-  log "Fetching airgap artifacts"
+installer_iso=""
+if [[ "${BUILD_LOCAL}" == "1" ]]; then
+  log "Mode: local source build for OS + installer artifacts."
   "${ROOT}/tools/fetch-airgap-platform.sh"
-
-  log "Building installer ISO"
-  "${ROOT}/tools/build-installer-iso.sh"
-
-  iso="$(ls -1t "${ROOT}"/deploy/installer-ourbox-woodbox-*.iso 2>/dev/null | head -n 1 || true)"
-  if [[ -z "${iso}" || ! -f "${iso}" ]]; then
-    log "ERROR: no installer ISO found in deploy/"
-    ls -lah "${ROOT}/deploy" || true
-    die "build did not produce installer ISO"
+  OURBOX_TARGET="${OURBOX_TARGET}" OURBOX_VARIANT="${OURBOX_VARIANT}" OURBOX_VERSION="${OURBOX_VERSION}" \
+    "${ROOT}/tools/build-os-payload.sh"
+  # shellcheck disable=SC2012
+  payload_tar="$(ls -1t "${ROOT}"/deploy/os-payload-ourbox-woodbox-"${OURBOX_TARGET,,}"-*.tar.gz 2>/dev/null | head -n 1 || true)"
+  [[ -n "${payload_tar}" && -f "${payload_tar}" ]] || die "OS payload build did not produce expected tar.gz"
+  OURBOX_TARGET="${OURBOX_TARGET}" OURBOX_VARIANT="${OURBOX_VARIANT}" OURBOX_VERSION="${OURBOX_VERSION}" \
+    "${ROOT}/tools/build-installer-iso.sh" --embed-payload "${payload_tar}"
+  # shellcheck disable=SC2012
+  installer_iso="$(ls -1t "${ROOT}"/deploy/installer-ourbox-woodbox-"${OURBOX_TARGET,,}"-*.iso 2>/dev/null | head -n 1 || true)"
+else
+  : "${INSTALLER_OUTDIR:=${ROOT}/deploy-installer-from-registry}"
+  log "Mode: pull published installer artifact from registry."
+  pull_args=(--outdir "${INSTALLER_OUTDIR}")
+  if [[ -n "${INSTALLER_REF}" ]]; then
+    pull_args+=(--ref "${INSTALLER_REF}")
+  else
+    pull_args+=(--channel "${INSTALLER_CHANNEL}")
   fi
+  OURBOX_TARGET="${OURBOX_TARGET}" "${ROOT}/tools/pull-installer-artifact.sh" "${pull_args[@]}"
+  installer_iso="${INSTALLER_OUTDIR}/installer.iso"
+fi
 
-  log "Flashing installer ISO to ${TARGET_DEV}"
-  "${ROOT}/tools/flash-installer-media.sh" "${iso}" "${TARGET_DEV}"
+if [[ -z "${installer_iso}" || ! -f "${installer_iso}" ]]; then
+  log "ERROR: installer ISO not found."
+  log "Expected: ${installer_iso:-<none>}"
+  if [[ -n "${INSTALLER_OUTDIR:-}" ]]; then
+    log "Installer output dir contents:"
+    ls -lah "${INSTALLER_OUTDIR}" || true
+  fi
+  log "Deploy dir contents:"
+  ls -lah "${ROOT}/deploy" || true
+  die "no installer ISO available to flash"
+fi
 
-  echo
-  echo "Done."
-  echo
-  echo "Next steps:"
-  echo "  1) Boot the Woodbox from this USB (UEFI boot menu)"
-  echo "  2) The installer will run unattended (watch console for progress)"
-  echo "  3) When it powers off, remove the USB and boot from NVMe"
-  echo
-}
+"${ROOT}/tools/flash-installer-media.sh" "${installer_iso}" "${TARGET_DEV}"
 
-main "$@"
+echo
+echo "Done. Boot the Woodbox from this USB (UEFI boot menu)."
+echo "The installer will run unattended. When it powers off, remove the USB and boot from NVMe."

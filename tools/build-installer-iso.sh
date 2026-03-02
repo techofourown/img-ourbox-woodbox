@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# Build the OurBox Woodbox installer ISO.
+#
+# The installer ISO is a thin installer: it contains the installer tooling,
+# ORAS binary (for artifact pulls at install time), and local fallback defaults.
+# It does NOT embed the full OS payload by default — the payload is resolved
+# and pulled at install time by ourbox-preinstall.
+#
+# For fully local/offline builds (--build-local mode), a local OS payload
+# tarball can be baked into the ISO for offline operation. In that case the
+# preinstaller detects the local payload and uses it directly, applying the
+# same verification flow.
+#
+# Flags:
+#   --embed-payload PATH  Embed the specified OS payload tar.gz into the ISO
+#                         (for offline/local-build operation).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -6,6 +21,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
+# shellcheck disable=SC1091
+[ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
 
 need_cmd curl
 need_cmd xorriso
@@ -16,27 +33,37 @@ need_cmd envsubst
 need_cmd sed
 need_cmd awk
 
+EMBED_PAYLOAD=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --embed-payload)
+      [[ $# -ge 2 ]] || die "--embed-payload requires a path"
+      EMBED_PAYLOAD="$2"
+      shift 2
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ -n "${EMBED_PAYLOAD}" ]]; then
+  [[ -f "${EMBED_PAYLOAD}" ]] || die "embedded payload not found: ${EMBED_PAYLOAD}"
+  log "Local-build mode: embedding OS payload from ${EMBED_PAYLOAD}"
+fi
+
 mkdir -p "${ROOT}/deploy" "${ROOT}/artifacts"
 
 : "${UBUNTU_ISO_URL:?UBUNTU_ISO_URL must be set (tools/versions.env)}"
+: "${UBUNTU_ISO_SHA256:?UBUNTU_ISO_SHA256 must be set (tools/versions.env)}"
 
 # Identity inputs (override by env)
 : "${OURBOX_PRODUCT:=ourbox}"
 : "${OURBOX_DEVICE:=woodbox}"
-: "${OURBOX_TARGET:=forge}"
-: "${OURBOX_SKU:=TOO-OBX-WBX-FORGE-JU3XK8}"
+: "${OURBOX_TARGET:=x86}"
+: "${OURBOX_SKU:=TOO-OBX-WBX-BASE-JU3XK8}"
 : "${OURBOX_VARIANT:=prod}"
 : "${OURBOX_VERSION:=dev}"
-
-# OS defaults (interactive identity in installer; these act as defaults)
-: "${OURBOX_HOSTNAME:=ourbox-woodbox}"
-: "${OURBOX_USERNAME:=ourbox}"
-# Placeholder hash (installer prompts for identity; do not rely on this).
-# Must be assigned via a single-quoted temp var — dollar signs in sha512crypt
-# strings would be expanded by bash if placed directly inside double quotes.
-_ph='$6$placeholder$u4o2q0nN6d0fPp7kqzN0R5rH6G3a8uM0IhYf9wq3Zq2IY9xQO2O3sZVnO0Xo0c8zVx7Qz5yT3uEJq0mY1/'
-: "${OURBOX_PASSWORD_HASH:=${_ph}}"
-unset _ph
 
 # Slugs for filenames
 OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr 'A-Z' 'a-z')"
@@ -51,22 +78,32 @@ mkdir -p "${ISO_STORE}"
 BASE_ISO_NAME="$(basename "${UBUNTU_ISO_URL}")"
 BASE_ISO="${ISO_STORE}/${BASE_ISO_NAME}"
 
+# Download Ubuntu ISO if not cached
 if [[ ! -f "${BASE_ISO}" ]]; then
   log "Downloading Ubuntu ISO: ${UBUNTU_ISO_URL}"
   curl -fL --retry 3 --retry-delay 2 -o "${BASE_ISO}" "${UBUNTU_ISO_URL}"
 else
-  log "Using cached Ubuntu ISO: ${BASE_ISO}" 
+  log "Using cached Ubuntu ISO: ${BASE_ISO}"
 fi
+
+# Verify SHA256 of base ISO
+log "Verifying Ubuntu ISO SHA256"
+ACTUAL_SHA256="$(sha256sum "${BASE_ISO}" | awk '{print $1}')"
+ACTUAL_SHA256="${ACTUAL_SHA256,,}"
+EXPECTED_SHA256="${UBUNTU_ISO_SHA256,,}"
+if [[ "${ACTUAL_SHA256}" != "${EXPECTED_SHA256}" ]]; then
+  die "Ubuntu ISO SHA256 mismatch!
+  Expected: ${EXPECTED_SHA256}
+  Actual:   ${ACTUAL_SHA256}
+  ISO:      ${BASE_ISO}
+  Update UBUNTU_ISO_SHA256 in tools/versions.env or release/official-inputs.env if intentional."
+fi
+log "SHA256 verified: ${ACTUAL_SHA256}"
 
 BASE_VOLID="$(xorriso -indev "${BASE_ISO}" -pvd_info 2>/dev/null \
   | awk -F': *' '/Volume id/ {print $2; exit}' \
   | sed -E "s/[[:space:]]*$//; s/^'//; s/'$//")"
 : "${OURBOX_ISO_VOLID:=${BASE_VOLID}}"
-
-# Require airgap artifacts
-if [[ ! -x "${ROOT}/artifacts/airgap/k3s/k3s" ]]; then
-  die "missing artifacts/airgap payloads. Run: ./tools/fetch-airgap-platform.sh"
-fi
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
@@ -83,9 +120,6 @@ mkdir -p "${ISO_DIR}/nocloud"
 export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 export OURBOX_PRODUCT OURBOX_DEVICE OURBOX_TARGET OURBOX_SKU OURBOX_VARIANT OURBOX_VERSION
 
-# Build-time vars substituted in user-data.tpl (the nocloud seed / cloud-init file).
-# OURBOX_HOSTNAME/USERNAME/PASSWORD_HASH are kept as fallback defaults only;
-# the real identity is collected at install time by ourbox-preinstall.
 : "${OURBOX_HOSTNAME:=ourbox-woodbox}"
 : "${OURBOX_USERNAME:=ourbox}"
 : "${OURBOX_PASSWORD_HASH:=}"
@@ -96,51 +130,70 @@ envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > 
 envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl"  > "${ISO_DIR}/nocloud/meta-data"
 cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
-# Build-time pass-1 substitution of the runtime autoinstall template.
-# Substitutes product/version vars; leaves runtime vars (OURBOX_STORAGE_MATCH,
-# OURBOX_HOSTNAME, OURBOX_USERNAME, OURBOX_PASSWORD_HASH, OURBOX_DATA_DISK)
-# intact for ourbox-preinstall to fill in at install time.
+# Pass-1 substitution of runtime autoinstall template.
 mkdir -p "${ISO_DIR}/ourbox"
 RUNTIME_TPL_SUBST='${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
 envsubst "${RUNTIME_TPL_SUBST}" \
   < "${ROOT}/installer/autoinstall/autoinstall.tpl" \
   > "${ISO_DIR}/ourbox/autoinstall.tpl"
 
-# Copy OurBox overlay + generate /etc/ourbox/release inside it
-log "Staging OurBox rootfs overlay"
-rsync -a "${ROOT}/installer/ourbox/rootfs/" "${ISO_DIR}/ourbox/rootfs/"
-
-OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
-install -d -m 0755 "${ISO_DIR}/ourbox/rootfs/etc/ourbox"
-cat > "${ISO_DIR}/ourbox/rootfs/etc/ourbox/release" <<EOT
-OURBOX_PRODUCT=${OURBOX_PRODUCT}
-OURBOX_DEVICE=${OURBOX_DEVICE}
-OURBOX_TARGET=${OURBOX_TARGET}
-OURBOX_SKU=${OURBOX_SKU}
-OURBOX_VARIANT=${OURBOX_VARIANT}
-OURBOX_VERSION=${OURBOX_VERSION}
-OURBOX_RECIPE_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
-EOT
-chmod 0644 "${ISO_DIR}/ourbox/rootfs/etc/ourbox/release"
-
-# Stage ourbox-preinstall script and service unit onto the ISO.
-# bootcmd in user-data.tpl copies these into the live system at boot time.
+# Stage preinstaller tooling
 log "Staging OurBox pre-installer assets"
 mkdir -p "${ISO_DIR}/ourbox/tools"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall"
 install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
-# lib.sh is sourced by ourbox-preinstall at runtime (/cdrom/ourbox/tools/lib.sh)
 install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
-# format-data-disk.sh is called from autoinstall late-commands
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
   "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
 
-# Copy airgap artifacts onto ISO (will be copied into /target/opt/ourbox/airgap)
-log "Staging airgap artifacts onto ISO"
-rsync -a "${ROOT}/artifacts/airgap/" "${ISO_DIR}/ourbox/airgap/"
+# Bundle ORAS binary for use at install time (offline-capable)
+log "Bundling ORAS binary into installer"
+ORAS_BIN="$(command -v oras 2>/dev/null || true)"
+if [[ -z "${ORAS_BIN}" ]]; then
+  die "oras not found — run ./tools/bootstrap-host.sh first"
+fi
+install -m 0755 "${ORAS_BIN}" "${ISO_DIR}/ourbox/tools/oras"
+log "  oras: bundled from ${ORAS_BIN}"
+
+# Stage installer defaults (baked fallback for offline operation)
+log "Staging installer defaults"
+mkdir -p "${ISO_DIR}/ourbox/installer"
+
+OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
+
+# Build the baked defaults.env for the installer
+cat > "${ISO_DIR}/ourbox/installer/defaults.env" <<EOT
+# OurBox Woodbox installer baked defaults.
+# These are loaded by ourbox-preinstall as the local fallback.
+# Remote defaults (from sw-ourbox-os install-defaults) may override these.
+INSTALLER_ID=woodbox
+OS_REPO=${OFFICIAL_OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}
+OS_TARGET=${OURBOX_TARGET}
+OS_CHANNEL=stable
+OS_CATALOG_ENABLED=1
+OS_CATALOG_TAG=${OURBOX_TARGET}-catalog
+OS_ORAS_VERSION=${ORAS_VERSION:-1.3.0}
+INSTALLER_VERSION=${OURBOX_VERSION}
+INSTALLER_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
+EOT
+
+# If an OS payload is being embedded (local/offline build), stage it
+if [[ -n "${EMBED_PAYLOAD}" ]]; then
+  log "Embedding OS payload: $(basename "${EMBED_PAYLOAD}")"
+  mkdir -p "${ISO_DIR}/ourbox/payload"
+  cp "${EMBED_PAYLOAD}" "${ISO_DIR}/ourbox/payload/os-payload.tar.gz"
+  sha256sum "${ISO_DIR}/ourbox/payload/os-payload.tar.gz" \
+    | awk '{print $1}' > "${ISO_DIR}/ourbox/payload/os-payload.tar.gz.sha256"
+  # Copy meta.env if it exists alongside the payload
+  PAYLOAD_META="${EMBED_PAYLOAD%.tar.gz}.meta.env"
+  if [[ -f "${PAYLOAD_META}" ]]; then
+    cp "${PAYLOAD_META}" "${ISO_DIR}/ourbox/payload/payload.meta.env"
+  fi
+  log "  payload baked into ISO for offline operation"
+fi
 
 # Patch bootloader configs to force autoinstall
 AUTOINSTALL_ARG='autoinstall cloud-config-url=/dev/null ds=nocloud\\;s=file:///cdrom/nocloud/'
@@ -160,7 +213,6 @@ patch_boot_cfg() {
   if grep -q 'ds=nocloud' "${f}"; then
     return 0
   fi
-  # Add args immediately before the existing '---' delimiter
   sed -i -E "/^[[:space:]]*(linux|linuxefi|append)[[:space:]]/ s| ---| ${AUTOINSTALL_ARG} ---|g" "${f}" || true
 }
 
@@ -182,11 +234,6 @@ fi
 
 VOLID="${OURBOX_ISO_VOLID}"
 
-# Ubuntu 24.04+ uses a hybrid GPT/EFI ISO where the EFI boot image is an
-# appended partition outside the ISO 9660 filesystem. xorriso's -boot_image
-# replay cannot reconstruct this from a remapped directory tree.
-# Solution: extract the two hidden boot images with 7z, then rebuild using
-# xorriso -as mkisofs with explicit hybrid boot parameters.
 log "Extracting boot images from source ISO"
 mkdir -p "${WORKDIR}/BOOT"
 7z e "${BASE_ISO}" -o"${WORKDIR}/BOOT" \
@@ -222,3 +269,8 @@ log "Computing sha256"
 
 log "Installer ISO ready: ${OUT_ISO}"
 log "SHA256: ${OUT_SHA}"
+if [[ -n "${EMBED_PAYLOAD}" ]]; then
+  log "Mode: local-build (OS payload embedded)"
+else
+  log "Mode: thin installer (OS payload resolved at install time)"
+fi
