@@ -210,7 +210,7 @@ select_data_disk() {
 }
 
 # ---------------------------------------------------------------------------
-# OS artifact resolution
+# OS artifact resolution — Matchbox-style install defaults / catalog lane
 # ---------------------------------------------------------------------------
 
 # Globals set by resolve_and_stage_os_artifact:
@@ -220,50 +220,61 @@ OS_ARTIFACT_DIGEST=""
 OS_IMAGE_SHA256=""
 INSTALLER_ID="woodbox"
 OS_CHANNEL="stable"
+INSTALL_DEFAULTS_SOURCE="baked"
+INSTALL_DEFAULTS_REF=""
 
-resolve_and_stage_os_artifact() {
-  banner
-  echo "  Resolving OS artifact"
-  echo
+# _try_catalog_resolve REPO CATALOG_TAG CHANNEL FALLBACK_REF
+# If the catalog TSV is available and has an entry for CHANNEL, print the
+# pinned_ref (last column) for the most-recent matching row. Otherwise print
+# FALLBACK_REF. Always succeeds (never exits non-zero).
+_try_catalog_resolve() {
+  local repo="$1" catalog_tag="$2" channel="$3" fallback_ref="$4"
+  local catalog_dir
+  catalog_dir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '${catalog_dir}'" RETURN
 
-  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
-  # shellcheck disable=SC1090
-  source "${DEFAULTS_ENV}"
+  set +e
+  oras pull "${repo}:${catalog_tag}" -o "${catalog_dir}" >/dev/null 2>&1
+  local pull_status=$?
+  set -e
 
-  INSTALLER_ID="${INSTALLER_ID:-woodbox}"
-  OS_CHANNEL="${OS_CHANNEL:-stable}"
-
-  mkdir -p "${PAYLOAD_CACHE_DIR}"
-
-  local embedded_payload="/cdrom/ourbox/payload/os-payload.tar.gz"
-  if [[ -f "${embedded_payload}" ]]; then
-    log "  Embedded OS payload detected (offline/local-build mode)"
-    cp "${embedded_payload}" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
-    [[ -f "${embedded_payload}.sha256" ]] && \
-      cp "${embedded_payload}.sha256" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
-    [[ -f "/cdrom/ourbox/payload/payload.meta.env" ]] && \
-      cp "/cdrom/ourbox/payload/payload.meta.env" "${PAYLOAD_CACHE_DIR}/payload.meta.env"
-    OS_ARTIFACT_SOURCE="embedded"
-    OS_ARTIFACT_REF="embedded"
-    OS_ARTIFACT_DIGEST="embedded"
-  else
-    need_cmd oras
-    local ref="${OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}:${OS_TARGET:-x86}-${OS_CHANNEL}"
-    echo "  Pulling OS artifact from registry:"
-    echo "    ${ref}"
-    echo
-    local pull_out pull_status
-    set +e
-    pull_out="$(oras pull "${ref}" -o "${PAYLOAD_CACHE_DIR}" 2>&1)"
-    pull_status=$?
-    set -e
-    printf '%s\n' "${pull_out}"
-    [[ "${pull_status}" -eq 0 ]] || die "oras pull failed for ${ref} (exit ${pull_status})"
-    OS_ARTIFACT_SOURCE="registry"
-    OS_ARTIFACT_REF="${ref}"
-    OS_ARTIFACT_DIGEST="$(printf '%s\n' "${pull_out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1 || true)"
+  if [[ "${pull_status}" -ne 0 || ! -f "${catalog_dir}/catalog.tsv" ]]; then
+    log "  Catalog not available; using channel tag as fallback"
+    echo "${fallback_ref}"
+    return 0
   fi
 
+  # Catalog columns: channel created version variant target sku git_sha
+  #   platform_contract_digest k3s_version payload_sha256 artifact_digest pinned_ref
+  # pinned_ref is the last (13th) column; take the last matching row.
+  local pinned_ref
+  pinned_ref="$(awk -F'\t' -v ch="${channel}" \
+    'NR>1 && $1==ch {last=$(NF)} END{if(last!="")print last}' \
+    "${catalog_dir}/catalog.tsv" 2>/dev/null || true)"
+
+  if [[ -n "${pinned_ref}" && "${pinned_ref}" =~ @sha256:[0-9a-f]{64} ]]; then
+    log "  Catalog resolved '${channel}' → ${pinned_ref}"
+    echo "${pinned_ref}"
+  else
+    log "  Catalog has no valid entry for channel '${channel}'; using channel tag as fallback"
+    echo "${fallback_ref}"
+  fi
+}
+
+# _stage_embedded_payload — copy embedded payload from fat ISO into cache dir
+_stage_embedded_payload() {
+  local embedded="/cdrom/ourbox/payload/os-payload.tar.gz"
+  mkdir -p "${PAYLOAD_CACHE_DIR}"
+  cp "${embedded}" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
+  [[ -f "${embedded}.sha256" ]] && \
+    cp "${embedded}.sha256" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
+  [[ -f "/cdrom/ourbox/payload/payload.meta.env" ]] && \
+    cp "/cdrom/ourbox/payload/payload.meta.env" "${PAYLOAD_CACHE_DIR}/payload.meta.env"
+}
+
+# _verify_staged_payload — verify SHA256 and set OS_IMAGE_SHA256
+_verify_staged_payload() {
   [[ -f "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" ]] || \
     die "OS payload not staged: ${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
 
@@ -275,18 +286,21 @@ resolve_and_stage_os_artifact() {
     [[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os-payload.tar.gz.sha256"
     actual="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
     [[ "${expected}" == "${actual}" ]] || \
-      die "OS payload SHA256 mismatch (expected ${expected}, got ${actual})"
+      die "OS payload SHA256 mismatch
+  expected: ${expected}
+  actual:   ${actual}"
     OS_IMAGE_SHA256="${actual}"
     log "  SHA256 verified: ${actual}"
   else
     OS_IMAGE_SHA256="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
-    log "  SHA256: ${OS_IMAGE_SHA256} (no checksum file to verify against)"
+    log "  SHA256: ${OS_IMAGE_SHA256} (no checksum file; not verified against expected)"
   fi
+}
 
+# _show_artifact_panel — display the resolved artifact info before final confirmation
+_show_artifact_panel() {
   local meta_env="${PAYLOAD_CACHE_DIR}/payload.meta.env"
-  local payload_version="unknown"
-  local payload_variant="unknown"
-  local payload_contract_digest="unknown"
+  local payload_version="unknown" payload_variant="unknown" payload_contract_digest="unknown"
   if [[ -f "${meta_env}" ]]; then
     # shellcheck disable=SC1090
     source "${meta_env}"
@@ -301,21 +315,141 @@ resolve_and_stage_os_artifact() {
   echo "  =================================================================="
   echo "  Source   : ${OS_ARTIFACT_SOURCE}"
   echo "  Ref      : ${OS_ARTIFACT_REF}"
-  [[ -n "${OS_ARTIFACT_DIGEST}" && "${OS_ARTIFACT_DIGEST}" != "embedded" ]] && \
+  if [[ -n "${OS_ARTIFACT_DIGEST}" && "${OS_ARTIFACT_DIGEST}" != "embedded" ]]; then
     echo "  Digest   : ${OS_ARTIFACT_DIGEST}"
+  fi
   echo "  SHA256   : ${OS_IMAGE_SHA256}"
   echo "  Version  : ${payload_version}"
   echo "  Variant  : ${payload_variant}"
   echo "  Contract : ${payload_contract_digest}"
+  echo "  Defaults : ${INSTALL_DEFAULTS_SOURCE}"
   echo "  =================================================================="
   echo
+}
+
+resolve_and_stage_os_artifact() {
+  banner
+  echo "  Resolving OS artifact"
+  echo
+
+  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
+  # shellcheck disable=SC1090
+  source "${DEFAULTS_ENV}"
+
+  INSTALLER_ID="${INSTALLER_ID:-woodbox}"
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}"
+  OS_TARGET="${OS_TARGET:-x86}"
+  OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
+  OS_CATALOG_TAG="${OS_CATALOG_TAG:-x86-catalog}"
+  INSTALL_DEFAULTS_SOURCE="baked"
+  INSTALL_DEFAULTS_REF=""
+
+  mkdir -p "${PAYLOAD_CACHE_DIR}"
+
+  # --- Path A: embedded payload (fat ISO / offline) ---
+  # Takes precedence over all registry paths; no network needed.
+  local embedded_payload="/cdrom/ourbox/payload/os-payload.tar.gz"
+  if [[ -f "${embedded_payload}" ]]; then
+    log "  Embedded OS payload detected (fat-ISO / offline mode)"
+    _stage_embedded_payload
+    OS_ARTIFACT_SOURCE="embedded"
+    OS_ARTIFACT_REF="embedded"
+    OS_ARTIFACT_DIGEST="embedded"
+    _verify_staged_payload
+    _show_artifact_panel
+    return 0
+  fi
+
+  # --- All registry paths require ORAS ---
+  need_cmd oras
+
+  # --- Precedence 1: explicit operator override (override.env on USB) ---
+  # Operator can drop /cdrom/ourbox/installer/override.env with OURBOX_OS_ARTIFACT_REF=...
+  # to force a specific build without going through catalog/channel resolution.
+  local override_env="/cdrom/ourbox/installer/override.env"
+  local explicit_ref=""
+  if [[ -f "${override_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${override_env}"
+    explicit_ref="${OURBOX_OS_ARTIFACT_REF:-}"
+    if [[ -n "${explicit_ref}" ]]; then
+      log "  Operator override: OURBOX_OS_ARTIFACT_REF=${explicit_ref}"
+      INSTALL_DEFAULTS_SOURCE="override"
+      INSTALL_DEFAULTS_REF="${override_env}"
+    fi
+  fi
+
+  # --- Precedence 2 / 3: catalog resolution or channel tag fallback ---
+  local channel_tag_ref="${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}"
+  local selected_ref=""
+
+  if [[ -n "${explicit_ref}" ]]; then
+    selected_ref="${explicit_ref}"
+  elif [[ "${OS_CATALOG_ENABLED}" == "1" ]]; then
+    selected_ref="$(_try_catalog_resolve \
+      "${OS_REPO}" "${OS_CATALOG_TAG}" "${OS_CHANNEL}" "${channel_tag_ref}")"
+  else
+    selected_ref="${channel_tag_ref}"
+  fi
+
+  [[ -n "${selected_ref}" ]] || selected_ref="${channel_tag_ref}"
+
+  # --- Resolve floating ref to immutable digest ---
+  # Always pull by digest so the installed system has an exact artifact identity.
+  local pull_ref="${selected_ref}"
+  OS_ARTIFACT_DIGEST=""
+  if [[ "${selected_ref}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+    # Already digest-pinned — extract the digest component.
+    OS_ARTIFACT_DIGEST="${selected_ref##*@}"
+  else
+    log "  Resolving to immutable digest: ${selected_ref}"
+    local resolved_digest
+    set +e
+    resolved_digest="$(oras resolve "${selected_ref}" 2>/dev/null)"
+    local resolve_status=$?
+    set -e
+    if [[ "${resolve_status}" -eq 0 && "${resolved_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      OS_ARTIFACT_DIGEST="${resolved_digest}"
+      # Pull by digest for immutability; keep original ref for provenance display.
+      local repo_base="${selected_ref%%:*}"
+      pull_ref="${repo_base}@${resolved_digest}"
+      log "  Resolved: ${resolved_digest}"
+    else
+      log "  WARNING: oras resolve failed; pulling by tag (digest will not be captured before pull)"
+      pull_ref="${selected_ref}"
+    fi
+  fi
+
+  OS_ARTIFACT_SOURCE="registry"
+  OS_ARTIFACT_REF="${selected_ref}"
+
+  echo "  Pulling OS artifact:"
+  echo "    ${pull_ref}"
+  echo
+
+  local pull_out pull_status
+  set +e
+  pull_out="$(oras pull "${pull_ref}" -o "${PAYLOAD_CACHE_DIR}" 2>&1)"
+  pull_status=$?
+  set -e
+  printf '%s\n' "${pull_out}"
+  [[ "${pull_status}" -eq 0 ]] || die "oras pull failed for ${pull_ref} (exit ${pull_status})"
+
+  # If digest was not captured via oras resolve, try to parse from pull output as a last resort.
+  if [[ -z "${OS_ARTIFACT_DIGEST}" ]]; then
+    OS_ARTIFACT_DIGEST="$(printf '%s\n' "${pull_out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1 || true)"
+  fi
+
+  _verify_staged_payload
+  _show_artifact_panel
 }
 
 write_install_provenance() {
   local cache_dir="/opt/ourbox/installer/cache"
   mkdir -p "${cache_dir}"
 
-  # Write env file for the late-commands append-provenance.sh script
+  # Write env file consumed by the late-commands append-provenance.sh script.
   cat > "${cache_dir}/install-provenance.env" <<EOF
 INSTALLER_ID=${INSTALLER_ID:-woodbox}
 OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
@@ -323,11 +457,13 @@ OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
 OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
 RELEASE_CHANNEL=${OS_CHANNEL:-unknown}
+INSTALL_DEFAULTS_SOURCE=${INSTALL_DEFAULTS_SOURCE:-baked}
+INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
 EOF
 
   # Write the provenance-append script called by autoinstall.tpl late-commands.
-  # Uses single-quoted heredoc so the variable references are literal in the script
-  # and expand when the script runs (after sourcing install-provenance.env).
+  # Single-quoted heredoc: variable references are literal in the script body
+  # and expand at runtime (after sourcing install-provenance.env).
   cat > "${cache_dir}/append-provenance.sh" <<'SCRIPT'
 #!/bin/sh
 set -e
@@ -346,6 +482,8 @@ OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
 OURBOX_OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
 OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-unknown}
+OURBOX_INSTALL_DEFAULTS_SOURCE=${INSTALL_DEFAULTS_SOURCE:-baked}
+OURBOX_INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
 EOT
 SCRIPT
   chmod +x "${cache_dir}/append-provenance.sh"

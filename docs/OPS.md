@@ -12,7 +12,7 @@ This will:
 
 1. Prompt you to select a target USB disk (interactive)
 2. Bootstrap host dependencies (ORAS, xorriso, etc.)
-3. Pull the official installer ISO from GHCR (`x86-installer-stable` channel by default)
+3. Pull the official installer ISO from GHCR (channel `stable`, tag `x86-installer-stable`, by default)
 4. Flash the ISO to the selected USB disk
 
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
@@ -43,8 +43,8 @@ This will:
 # Pull a specific installer ref by digest or tag
 ./tools/prepare-installer-media.sh --installer-ref ghcr.io/techofourown/ourbox-woodbox-installer@sha256:...
 
-# Pull from a specific channel (e.g., nightly)
-./tools/prepare-installer-media.sh --installer-channel x86-installer-nightly
+# Pull from a specific channel (short name: stable or nightly)
+./tools/prepare-installer-media.sh --installer-channel nightly
 ```
 
 ---
@@ -111,7 +111,8 @@ sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.)
 
 # Pull OS payload or installer ISO from registry
 ./tools/pull-os-artifact.sh ghcr.io/techofourown/ourbox-woodbox-os:x86-stable
-./tools/pull-installer-artifact.sh --channel x86-installer-stable
+# Channel arg is the short channel name (stable|nightly); the x86-installer- prefix is added automatically
+./tools/pull-installer-artifact.sh --channel stable
 ```
 
 ---
