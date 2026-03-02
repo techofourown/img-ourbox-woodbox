@@ -1,3 +1,11 @@
+## [0.2.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.0...v0.2.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* align sanitization checks with Matchbox — ban centroid and ops-private ref ([e820820](https://github.com/techofourown/img-ourbox-woodbox/commit/e8208202463a0e0b8533c176f80f06e1c0f4a9a7))
+* reclaim workspace ownership before checkout in official workflows ([fc980bd](https://github.com/techofourown/img-ourbox-woodbox/commit/fc980bd04626368e26c42298a69c8e3adcac75cc))
+
 # [0.2.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.1.0...v0.2.0) (2026-03-02)
 
 
