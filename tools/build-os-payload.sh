@@ -19,6 +19,9 @@ source "${ROOT}/tools/lib.sh"
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
+# shellcheck disable=SC1091
+# Official pinned inputs take precedence over versions.env defaults.
+[ -f "${ROOT}/release/official-inputs.env" ] && source "${ROOT}/release/official-inputs.env"
 
 need_cmd tar
 need_cmd rsync
@@ -153,6 +156,13 @@ tar -czf "${OUT_TAR}" -C "${PAYLOAD_DIR}" .
 
 log "Computing sha256"
 ( cd "$(dirname "${OUT_TAR}")" && sha256sum "$(basename "${OUT_TAR}")" > "$(basename "${OUT_SHA}")" )
+
+# Write a deploy-side metadata sidecar for use by publish-os-artifact.sh and
+# build-installer-iso.sh (embedded-payload path). This duplicates the fields
+# in payload.meta.env but lives next to the tarball in deploy/, not inside it.
+OUT_META="${ROOT}/deploy/${BASE}.meta.env"
+cp "${PAYLOAD_DIR}/payload.meta.env" "${OUT_META}"
+log "Metadata sidecar: ${OUT_META}"
 
 log "OS payload ready: ${OUT_TAR}"
 log "SHA256: ${OUT_SHA}"

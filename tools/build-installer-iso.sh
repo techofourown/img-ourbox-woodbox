@@ -23,6 +23,9 @@ source "${ROOT}/tools/lib.sh"
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
+# shellcheck disable=SC1091
+# Official pinned inputs take precedence over versions.env defaults.
+[ -f "${ROOT}/release/official-inputs.env" ] && source "${ROOT}/release/official-inputs.env"
 
 need_cmd curl
 need_cmd xorriso
@@ -34,11 +37,20 @@ need_cmd sed
 need_cmd awk
 
 EMBED_PAYLOAD=""
+# OS_CHANNEL controls the default channel baked into the installer defaults.
+# For nightly installer builds, set OS_CHANNEL=nightly so that the baked
+# fallback points at the nightly OS lane rather than stable.
+: "${OS_CHANNEL:=stable}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --embed-payload)
       [[ $# -ge 2 ]] || die "--embed-payload requires a path"
       EMBED_PAYLOAD="$2"
+      shift 2
+      ;;
+    --os-channel)
+      [[ $# -ge 2 ]] || die "--os-channel requires a value"
+      OS_CHANNEL="$2"
       shift 2
       ;;
     *)
@@ -149,14 +161,22 @@ install -m 0644 "${ROOT}/tools/lib.sh" \
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
   "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
 
-# Bundle ORAS binary for use at install time (offline-capable)
-log "Bundling ORAS binary into installer"
-ORAS_BIN="$(command -v oras 2>/dev/null || true)"
-if [[ -z "${ORAS_BIN}" ]]; then
-  die "oras not found — run ./tools/bootstrap-host.sh first"
-fi
-install -m 0755 "${ORAS_BIN}" "${ISO_DIR}/ourbox/tools/oras"
-log "  oras: bundled from ${ORAS_BIN}"
+# Bundle the linux-amd64 ORAS binary for use at install time (offline-capable).
+# Always download the target-arch binary explicitly — never copy the host oras
+# binary, which may be arm64 if building on a non-x86 host.
+log "Bundling linux-amd64 ORAS binary into installer"
+: "${ORAS_VERSION:=1.3.0}"
+ORAS_LINUX_AMD64_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+ORAS_TMP="${WORKDIR}/oras-download"
+mkdir -p "${ORAS_TMP}"
+log "  Downloading ORAS ${ORAS_VERSION} linux-amd64"
+curl -fsSL --retry 3 --retry-delay 2 \
+  -o "${ORAS_TMP}/oras.tar.gz" \
+  "${ORAS_LINUX_AMD64_URL}"
+tar -xzf "${ORAS_TMP}/oras.tar.gz" -C "${ORAS_TMP}" oras
+[[ -f "${ORAS_TMP}/oras" ]] || die "oras binary not found after extraction"
+install -m 0755 "${ORAS_TMP}/oras" "${ISO_DIR}/ourbox/tools/oras"
+log "  oras: ${ORAS_VERSION} linux-amd64 bundled"
 
 # Stage installer defaults (baked fallback for offline operation)
 log "Staging installer defaults"
@@ -164,17 +184,39 @@ mkdir -p "${ISO_DIR}/ourbox/installer"
 
 OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 
-# Build the baked defaults.env for the installer
+# Build the baked defaults.env for the installer.
+# This is the local fallback loaded by ourbox-preinstall when the remote
+# install-defaults bundle cannot be fetched (offline/degraded-network mode).
+# OS_CHANNEL must reflect the build context: stable for release, nightly for
+# nightly builds (so the baked fallback points at the correct OS lane).
+#
+# INSTALL_DEFAULTS_REF resolution:
+#   1. INSTALL_DEFAULTS_REF env var (set in release/official-inputs.env or by caller)
+#   2. contracts/install-defaults.ref legacy fallback
+#   3. empty (no remote defaults bundle configured)
+INSTALL_DEFAULTS_REF_BAKED="${INSTALL_DEFAULTS_REF:-}"
+if [[ -z "${INSTALL_DEFAULTS_REF_BAKED}" ]]; then
+  _idr_file="${ROOT}/contracts/install-defaults.ref"
+  if [[ -f "${_idr_file}" ]]; then
+    # Read first non-comment non-blank line
+    _idr_val="$(grep -v '^[[:space:]]*#' "${_idr_file}" | grep -v '^[[:space:]]*$' | head -n1 || true)"
+    INSTALL_DEFAULTS_REF_BAKED="${_idr_val:-}"
+    unset _idr_val
+  fi
+  unset _idr_file
+fi
 cat > "${ISO_DIR}/ourbox/installer/defaults.env" <<EOT
 # OurBox Woodbox installer baked defaults.
-# These are loaded by ourbox-preinstall as the local fallback.
-# Remote defaults (from sw-ourbox-os install-defaults) may override these.
+# Remote install-defaults (INSTALL_DEFAULTS_REF) override these at install time
+# if the registry is reachable. This file is the offline/no-network fallback.
 INSTALLER_ID=woodbox
 OS_REPO=${OFFICIAL_OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}
 OS_TARGET=${OURBOX_TARGET}
-OS_CHANNEL=stable
+OS_CHANNEL=${OS_CHANNEL}
+OS_DEFAULT_REF=
 OS_CATALOG_ENABLED=1
 OS_CATALOG_TAG=${OURBOX_TARGET}-catalog
+INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF_BAKED}
 OS_ORAS_VERSION=${ORAS_VERSION:-1.3.0}
 INSTALLER_VERSION=${OURBOX_VERSION}
 INSTALLER_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
