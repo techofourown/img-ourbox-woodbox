@@ -223,12 +223,13 @@ OS_CHANNEL="stable"
 INSTALL_DEFAULTS_SOURCE="baked"
 INSTALL_DEFAULTS_REF=""
 
-# _try_catalog_resolve REPO CATALOG_TAG CHANNEL FALLBACK_REF
-# If the catalog TSV is available and has an entry for CHANNEL, print the
-# pinned_ref (last column) for the most-recent matching row. Otherwise print
-# FALLBACK_REF. Always succeeds (never exits non-zero).
+# _try_catalog_resolve REPO CATALOG_TAG CHANNEL
+# If the catalog TSV is available and has a digest-pinned entry for CHANNEL,
+# print the pinned_ref (last column) for the most-recent matching row and
+# return 0. If the catalog is unavailable or has no valid entry, print nothing
+# and return 1. The caller handles the fallback and tracks the source.
 _try_catalog_resolve() {
-  local repo="$1" catalog_tag="$2" channel="$3" fallback_ref="$4"
+  local repo="$1" catalog_tag="$2" channel="$3"
   local catalog_dir
   catalog_dir="$(mktemp -d)"
   # shellcheck disable=SC2064
@@ -240,14 +241,13 @@ _try_catalog_resolve() {
   set -e
 
   if [[ "${pull_status}" -ne 0 || ! -f "${catalog_dir}/catalog.tsv" ]]; then
-    log "  Catalog not available; using channel tag as fallback"
-    echo "${fallback_ref}"
-    return 0
+    log "  Catalog not available"
+    return 1
   fi
 
   # Catalog columns: channel created version variant target sku git_sha
   #   platform_contract_digest k3s_version payload_sha256 artifact_digest pinned_ref
-  # pinned_ref is the last (13th) column; take the last matching row.
+  # Channel column uses short names (stable, nightly). pinned_ref is last column.
   local pinned_ref
   pinned_ref="$(awk -F'\t' -v ch="${channel}" \
     'NR>1 && $1==ch {last=$(NF)} END{if(last!="")print last}' \
@@ -256,9 +256,10 @@ _try_catalog_resolve() {
   if [[ -n "${pinned_ref}" && "${pinned_ref}" =~ @sha256:[0-9a-f]{64} ]]; then
     log "  Catalog resolved '${channel}' → ${pinned_ref}"
     echo "${pinned_ref}"
+    return 0
   else
-    log "  Catalog has no valid entry for channel '${channel}'; using channel tag as fallback"
-    echo "${fallback_ref}"
+    log "  Catalog has no valid digest-pinned entry for channel '${channel}'"
+    return 1
   fi
 }
 
@@ -340,10 +341,11 @@ resolve_and_stage_os_artifact() {
   OS_CHANNEL="${OS_CHANNEL:-stable}"
   OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}"
   OS_TARGET="${OS_TARGET:-x86}"
+  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
   OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
   OS_CATALOG_TAG="${OS_CATALOG_TAG:-x86-catalog}"
   INSTALL_DEFAULTS_SOURCE="baked"
-  INSTALL_DEFAULTS_REF=""
+  INSTALL_DEFAULTS_REF="${INSTALL_DEFAULTS_REF:-}"
 
   mkdir -p "${PAYLOAD_CACHE_DIR}"
 
@@ -364,19 +366,47 @@ resolve_and_stage_os_artifact() {
   # --- All registry paths require ORAS ---
   need_cmd oras
 
-  # --- Precedence 1: explicit operator override (override.env on USB) ---
-  # Operator can drop /cdrom/ourbox/installer/override.env with OURBOX_OS_ARTIFACT_REF=...
-  # to force a specific build without going through catalog/channel resolution.
-  local override_env="/cdrom/ourbox/installer/override.env"
+  # --- Remote install-defaults bundle (optional, overlays baked defaults) ---
+  # If INSTALL_DEFAULTS_REF is set in baked defaults, try to pull the remote
+  # install-defaults bundle. On success, overlay its values on top of the baked
+  # defaults (remote wins). On failure, fall through cleanly to baked values.
+  # The bundle is an OCI artifact containing install-defaults.env.
+  if [[ -n "${INSTALL_DEFAULTS_REF}" ]]; then
+    log "  Fetching remote install-defaults: ${INSTALL_DEFAULTS_REF}"
+    local defaults_tmp defaults_pull_ok
+    defaults_tmp="$(mktemp -d)"
+    set +e
+    oras pull "${INSTALL_DEFAULTS_REF}" -o "${defaults_tmp}" >/dev/null 2>&1
+    defaults_pull_ok=$?
+    set -e
+    if [[ "${defaults_pull_ok}" -eq 0 && -f "${defaults_tmp}/install-defaults.env" ]]; then
+      log "  Remote install-defaults pulled; overlaying on baked defaults"
+      # shellcheck disable=SC1091
+      source "${defaults_tmp}/install-defaults.env"
+      INSTALL_DEFAULTS_SOURCE="remote"
+      # INSTALL_DEFAULTS_REF stays as the OCI ref used
+    else
+      log "  WARNING: Remote install-defaults pull failed; using baked fallback"
+      INSTALL_DEFAULTS_SOURCE="baked"
+    fi
+    rm -rf "${defaults_tmp}"
+  fi
+
+  # Re-apply defaults that may have been updated by remote install-defaults:
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
+
+  # --- Precedence 1: OS_DEFAULT_REF (baked or remote) ---
+  # If a pinned OS artifact ref is already known (from baked or remote defaults),
+  # use it directly — skip catalog and channel resolution entirely.
   local explicit_ref=""
-  if [[ -f "${override_env}" ]]; then
-    # shellcheck disable=SC1090
-    source "${override_env}"
-    explicit_ref="${OURBOX_OS_ARTIFACT_REF:-}"
-    if [[ -n "${explicit_ref}" ]]; then
-      log "  Operator override: OURBOX_OS_ARTIFACT_REF=${explicit_ref}"
-      INSTALL_DEFAULTS_SOURCE="override"
-      INSTALL_DEFAULTS_REF="${override_env}"
+  if [[ -n "${OS_DEFAULT_REF}" ]]; then
+    explicit_ref="${OS_DEFAULT_REF}"
+    log "  OS_DEFAULT_REF set: ${explicit_ref}"
+    if [[ "${INSTALL_DEFAULTS_SOURCE}" == "remote" ]]; then
+      : # INSTALL_DEFAULTS_SOURCE already correct
+    else
+      INSTALL_DEFAULTS_SOURCE="baked-pinned"
     fi
   fi
 
@@ -387,13 +417,51 @@ resolve_and_stage_os_artifact() {
   if [[ -n "${explicit_ref}" ]]; then
     selected_ref="${explicit_ref}"
   elif [[ "${OS_CATALOG_ENABLED}" == "1" ]]; then
-    selected_ref="$(_try_catalog_resolve \
-      "${OS_REPO}" "${OS_CATALOG_TAG}" "${OS_CHANNEL}" "${channel_tag_ref}")"
+    local catalog_result
+    set +e
+    catalog_result="$(_try_catalog_resolve \
+      "${OS_REPO}" "${OS_CATALOG_TAG}" "${OS_CHANNEL}")"
+    local catalog_ok=$?
+    set -e
+    if [[ "${catalog_ok}" -eq 0 && -n "${catalog_result}" ]]; then
+      selected_ref="${catalog_result}"
+      if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+        INSTALL_DEFAULTS_SOURCE="catalog"
+      fi
+    else
+      selected_ref="${channel_tag_ref}"
+      if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+        INSTALL_DEFAULTS_SOURCE="tag"
+      fi
+      log "  Using channel tag fallback: ${channel_tag_ref}"
+    fi
   else
     selected_ref="${channel_tag_ref}"
+    if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+      INSTALL_DEFAULTS_SOURCE="tag"
+    fi
   fi
 
-  [[ -n "${selected_ref}" ]] || selected_ref="${channel_tag_ref}"
+  [[ -n "${selected_ref}" ]] || { selected_ref="${channel_tag_ref}"; INSTALL_DEFAULTS_SOURCE="tag"; }
+
+  # --- Operator interactive override ---
+  # Show the resolved ref and offer the operator a chance to substitute an exact
+  # ref without requiring ISO remastering. Pressing Enter accepts the resolved ref.
+  echo
+  echo "  =================================================================="
+  echo "  Resolved OS artifact ref:"
+  echo "    ${selected_ref}"
+  echo "  Source: ${INSTALL_DEFAULTS_SOURCE}"
+  echo "  =================================================================="
+  echo
+  local override_input=""
+  read -r -p "  Override ref (press Enter to accept, or type an exact ref/digest): " override_input
+  if [[ -n "${override_input}" ]]; then
+    log "  Operator supplied override ref: ${override_input}"
+    selected_ref="${override_input}"
+    INSTALL_DEFAULTS_SOURCE="operator-override"
+    INSTALL_DEFAULTS_REF=""
+  fi
 
   # --- Resolve floating ref to immutable digest ---
   # Always pull by digest so the installed system has an exact artifact identity.
@@ -449,6 +517,14 @@ write_install_provenance() {
   local cache_dir="/opt/ourbox/installer/cache"
   mkdir -p "${cache_dir}"
 
+  # RELEASE_CHANNEL is only meaningful for moving-channel resolution.
+  # For embedded payloads and explicit-ref overrides, record empty string
+  # rather than claiming a channel that wasn't actually used for selection.
+  local release_channel=""
+  if [[ "${INSTALL_DEFAULTS_SOURCE}" == "catalog" || "${INSTALL_DEFAULTS_SOURCE}" == "tag" ]]; then
+    release_channel="${OS_CHANNEL:-unknown}"
+  fi
+
   # Write env file consumed by the late-commands append-provenance.sh script.
   cat > "${cache_dir}/install-provenance.env" <<EOF
 INSTALLER_ID=${INSTALLER_ID:-woodbox}
@@ -456,7 +532,7 @@ OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
 OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
 OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
 OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
-RELEASE_CHANNEL=${OS_CHANNEL:-unknown}
+RELEASE_CHANNEL=${release_channel}
 INSTALL_DEFAULTS_SOURCE=${INSTALL_DEFAULTS_SOURCE:-baked}
 INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
 EOF
