@@ -39,9 +39,9 @@ mkdir -p "${ROOT}/deploy"
 : "${OURBOX_VERSION:=dev}"
 
 # Slugs for filenames
-OURBOX_TARGET_SLUG="$(echo "${OURBOX_TARGET}" | tr 'A-Z' 'a-z')"
-OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr 'A-Z' 'a-z')"
-OURBOX_VARIANT_SLUG="$(echo "${OURBOX_VARIANT}" | tr 'A-Z' 'a-z')"
+OURBOX_TARGET_SLUG="$(echo "${OURBOX_TARGET}" | tr '[:upper:]' '[:lower:]')"
+OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr '[:upper:]' '[:lower:]')"
+OURBOX_VARIANT_SLUG="$(echo "${OURBOX_VARIANT}" | tr '[:upper:]' '[:lower:]')"
 
 BASE="os-payload-${OURBOX_PRODUCT}-${OURBOX_DEVICE}-${OURBOX_TARGET_SLUG}-${OURBOX_SKU_SLUG}-${OURBOX_VARIANT_SLUG}-${OURBOX_VERSION}"
 OUT_TAR="${ROOT}/deploy/${BASE}.tar.gz"

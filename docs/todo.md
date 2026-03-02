@@ -1,10 +1,5 @@
 # OurBox Woodbox — Installer TODO / Scratch
 
-## TODO: Remove all references to "forge" from the codebase
-
-The "forge" target name appears in filenames, variable names, and comments but
-serves no purpose. Clean it up.
-
 ## TODO: Installer USB must require user interaction before touching any disk
 
 A USB stick that silently erases a computer's data on boot — with no interaction

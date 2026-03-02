@@ -78,9 +78,9 @@ mkdir -p "${ROOT}/deploy" "${ROOT}/artifacts"
 : "${OURBOX_VERSION:=dev}"
 
 # Slugs for filenames
-OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr 'A-Z' 'a-z')"
-OURBOX_VARIANT_SLUG="$(echo "${OURBOX_VARIANT}" | tr 'A-Z' 'a-z')"
-OURBOX_TARGET_SLUG="$(echo "${OURBOX_TARGET}" | tr 'A-Z' 'a-z')"
+OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr '[:upper:]' '[:lower:]')"
+OURBOX_VARIANT_SLUG="$(echo "${OURBOX_VARIANT}" | tr '[:upper:]' '[:lower:]')"
+OURBOX_TARGET_SLUG="$(echo "${OURBOX_TARGET}" | tr '[:upper:]' '[:lower:]')"
 
 OUT_ISO="${ROOT}/deploy/installer-${OURBOX_PRODUCT}-${OURBOX_DEVICE}-${OURBOX_TARGET_SLUG}-${OURBOX_SKU_SLUG}-${OURBOX_VARIANT_SLUG}-${OURBOX_VERSION}.iso"
 OUT_SHA="${OUT_ISO}.sha256"
@@ -137,6 +137,7 @@ export OURBOX_PRODUCT OURBOX_DEVICE OURBOX_TARGET OURBOX_SKU OURBOX_VARIANT OURB
 : "${OURBOX_PASSWORD_HASH:=}"
 export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 
+# shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
 SEED_SUBST_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
 envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
 envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl"  > "${ISO_DIR}/nocloud/meta-data"
@@ -144,6 +145,7 @@ cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
 # Pass-1 substitution of runtime autoinstall template.
 mkdir -p "${ISO_DIR}/ourbox"
+# shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
 RUNTIME_TPL_SUBST='${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
 envsubst "${RUNTIME_TPL_SUBST}" \
   < "${ROOT}/installer/autoinstall/autoinstall.tpl" \

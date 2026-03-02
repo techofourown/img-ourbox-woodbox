@@ -28,10 +28,11 @@ bootstrap contract, OCI artifact model) Woodbox now conforms to the same pattern
 
 | Field | Before | After |
 |---|---|---|
-| `OURBOX_TARGET` | `forge` (legacy) | `x86` |
-| `OURBOX_SKU` trim | `FORGE` | `BASE` |
+| `OURBOX_TARGET` | (old legacy value) | `x86` |
+| `OURBOX_SKU` trim | (old legacy value) | `BASE` |
 
-The legacy "forge" model name is banned. `check-public-sanitization.sh` enforces this.
+The old legacy target name has been removed. `check-public-sanitization.sh` enforces that it
+does not reappear.
 
 ### New files and scripts
 

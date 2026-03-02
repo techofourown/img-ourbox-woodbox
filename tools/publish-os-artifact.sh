@@ -156,7 +156,7 @@ update_catalog() {
   # target-qualified tags (x86-stable). The target is already encoded in the
   # artifact repository and tag. Installers query by short channel name.
   local channel
-  channel="${channel_tag#${OURBOX_TARGET}-}"
+  channel="${channel_tag#"${OURBOX_TARGET}"-}"
   channel="${channel:-custom}"
   awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
     NR == 1 { print; next }

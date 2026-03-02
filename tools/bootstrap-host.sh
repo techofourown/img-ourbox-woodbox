@@ -102,10 +102,10 @@ main() {
   install_oras
 
   log "Installed:"
-  command -v podman >/dev/null 2>&1 && log "  podman: $(podman --version || true)" || true
-  command -v xorriso >/dev/null 2>&1 && log "  xorriso: $(xorriso -version 2>/dev/null | head -n1 || true)" || true
-  command -v envsubst >/dev/null 2>&1 && log "  envsubst: OK" || true
-  command -v oras >/dev/null 2>&1 && log "  oras: $(oras version 2>/dev/null | awk '/^Version:/{print $2; exit}' || true)" || true
+  if command -v podman >/dev/null 2>&1; then log "  podman: $(podman --version 2>/dev/null || true)"; fi
+  if command -v xorriso >/dev/null 2>&1; then log "  xorriso: $(xorriso -version 2>/dev/null | head -n1 || true)"; fi
+  if command -v envsubst >/dev/null 2>&1; then log "  envsubst: OK"; fi
+  if command -v oras >/dev/null 2>&1; then log "  oras: $(oras version 2>/dev/null | awk '/^Version:/{print $2; exit}' || true)"; fi
 
   log "Bootstrap complete."
 }
