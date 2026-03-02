@@ -18,6 +18,8 @@ need_cmd sed
 
 AUTOINSTALL_TPL="/cdrom/ourbox/autoinstall.tpl"
 AUTOINSTALL_OUT="/autoinstall.yaml"
+DEFAULTS_ENV="/cdrom/ourbox/installer/defaults.env"
+PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -208,6 +210,387 @@ select_data_disk() {
 }
 
 # ---------------------------------------------------------------------------
+# OS artifact resolution — Matchbox-style install defaults / catalog lane
+# ---------------------------------------------------------------------------
+
+# Globals set by resolve_and_stage_os_artifact:
+OS_ARTIFACT_SOURCE=""
+OS_ARTIFACT_REF=""
+OS_ARTIFACT_DIGEST=""
+OS_IMAGE_SHA256=""
+INSTALLER_ID="woodbox"
+OS_CHANNEL="stable"
+INSTALL_DEFAULTS_SOURCE="baked"
+INSTALL_DEFAULTS_REF=""
+
+# _try_catalog_resolve REPO CATALOG_TAG CHANNEL
+# If the catalog TSV is available and has a digest-pinned entry for CHANNEL,
+# print the pinned_ref (last column) for the most-recent matching row and
+# return 0. If the catalog is unavailable or has no valid entry, print nothing
+# and return 1. The caller handles the fallback and tracks the source.
+_try_catalog_resolve() {
+  local repo="$1" catalog_tag="$2" channel="$3"
+  local catalog_dir
+  catalog_dir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '${catalog_dir}'" RETURN
+
+  set +e
+  oras pull "${repo}:${catalog_tag}" -o "${catalog_dir}" >/dev/null 2>&1
+  local pull_status=$?
+  set -e
+
+  if [[ "${pull_status}" -ne 0 || ! -f "${catalog_dir}/catalog.tsv" ]]; then
+    log "  Catalog not available"
+    return 1
+  fi
+
+  # Catalog columns: channel created version variant target sku git_sha
+  #   platform_contract_digest k3s_version payload_sha256 artifact_digest pinned_ref
+  # Channel column uses short names (stable, nightly). pinned_ref is last column.
+  local pinned_ref
+  pinned_ref="$(awk -F'\t' -v ch="${channel}" \
+    'NR>1 && $1==ch {last=$(NF)} END{if(last!="")print last}' \
+    "${catalog_dir}/catalog.tsv" 2>/dev/null || true)"
+
+  if [[ -n "${pinned_ref}" && "${pinned_ref}" =~ @sha256:[0-9a-f]{64} ]]; then
+    log "  Catalog resolved '${channel}' → ${pinned_ref}"
+    echo "${pinned_ref}"
+    return 0
+  else
+    log "  Catalog has no valid digest-pinned entry for channel '${channel}'"
+    return 1
+  fi
+}
+
+# _stage_embedded_payload — copy embedded payload from fat ISO into cache dir
+_stage_embedded_payload() {
+  local embedded="/cdrom/ourbox/payload/os-payload.tar.gz"
+  mkdir -p "${PAYLOAD_CACHE_DIR}"
+  cp "${embedded}" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
+  [[ -f "${embedded}.sha256" ]] && \
+    cp "${embedded}.sha256" "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
+  [[ -f "/cdrom/ourbox/payload/payload.meta.env" ]] && \
+    cp "/cdrom/ourbox/payload/payload.meta.env" "${PAYLOAD_CACHE_DIR}/payload.meta.env"
+}
+
+# _verify_staged_payload — verify SHA256 and set OS_IMAGE_SHA256
+_verify_staged_payload() {
+  [[ -f "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" ]] || \
+    die "OS payload not staged: ${PAYLOAD_CACHE_DIR}/os-payload.tar.gz"
+
+  local sha256_file="${PAYLOAD_CACHE_DIR}/os-payload.tar.gz.sha256"
+  if [[ -f "${sha256_file}" ]]; then
+    local expected actual
+    expected="$(awk 'NF>=1 {print $1; exit}' "${sha256_file}")"
+    expected="${expected,,}"
+    [[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in os-payload.tar.gz.sha256"
+    actual="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
+    [[ "${expected}" == "${actual}" ]] || \
+      die "OS payload SHA256 mismatch
+  expected: ${expected}
+  actual:   ${actual}"
+    OS_IMAGE_SHA256="${actual}"
+    log "  SHA256 verified: ${actual}"
+  else
+    OS_IMAGE_SHA256="$(sha256sum "${PAYLOAD_CACHE_DIR}/os-payload.tar.gz" | awk '{print $1}')"
+    log "  SHA256: ${OS_IMAGE_SHA256} (no checksum file; not verified against expected)"
+  fi
+}
+
+# _show_artifact_panel — display the resolved artifact info before final confirmation
+_show_artifact_panel() {
+  local meta_env="${PAYLOAD_CACHE_DIR}/payload.meta.env"
+  local payload_version="unknown" payload_variant="unknown" payload_contract_digest="unknown"
+  if [[ -f "${meta_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${meta_env}"
+    payload_version="${OURBOX_VERSION:-unknown}"
+    payload_variant="${OURBOX_VARIANT:-unknown}"
+    payload_contract_digest="${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  fi
+
+  echo
+  echo "  =================================================================="
+  echo "  OS Artifact"
+  echo "  =================================================================="
+  echo "  Source   : ${OS_ARTIFACT_SOURCE}"
+  echo "  Ref      : ${OS_ARTIFACT_REF}"
+  if [[ -n "${OS_ARTIFACT_DIGEST}" && "${OS_ARTIFACT_DIGEST}" != "embedded" ]]; then
+    echo "  Digest   : ${OS_ARTIFACT_DIGEST}"
+  fi
+  echo "  SHA256   : ${OS_IMAGE_SHA256}"
+  echo "  Version  : ${payload_version}"
+  echo "  Variant  : ${payload_variant}"
+  echo "  Contract : ${payload_contract_digest}"
+  echo "  Defaults : ${INSTALL_DEFAULTS_SOURCE}"
+  echo "  =================================================================="
+  echo
+}
+
+resolve_and_stage_os_artifact() {
+  banner
+  echo "  Resolving OS artifact"
+  echo
+
+  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
+  # shellcheck disable=SC1090
+  source "${DEFAULTS_ENV}"
+
+  INSTALLER_ID="${INSTALLER_ID:-woodbox}"
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_REPO="${OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}"
+  OS_TARGET="${OS_TARGET:-x86}"
+  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
+  OS_CATALOG_ENABLED="${OS_CATALOG_ENABLED:-1}"
+  OS_CATALOG_TAG="${OS_CATALOG_TAG:-x86-catalog}"
+  INSTALL_DEFAULTS_SOURCE="baked"
+  INSTALL_DEFAULTS_REF="${INSTALL_DEFAULTS_REF:-}"
+
+  mkdir -p "${PAYLOAD_CACHE_DIR}"
+
+  # --- Path A: embedded payload (fat ISO / offline) ---
+  # Takes precedence over all registry paths; no network needed.
+  local embedded_payload="/cdrom/ourbox/payload/os-payload.tar.gz"
+  if [[ -f "${embedded_payload}" ]]; then
+    log "  Embedded OS payload detected (fat-ISO / offline mode)"
+    _stage_embedded_payload
+    OS_ARTIFACT_SOURCE="embedded"
+    OS_ARTIFACT_REF="embedded"
+    OS_ARTIFACT_DIGEST="embedded"
+    _verify_staged_payload
+    _show_artifact_panel
+    return 0
+  fi
+
+  # --- All registry paths require ORAS ---
+  need_cmd oras
+
+  # --- Remote install-defaults bundle (optional, overlays baked defaults) ---
+  # If INSTALL_DEFAULTS_REF is set in baked defaults, try to pull the remote
+  # install-defaults bundle. On success, overlay its values on top of the baked
+  # defaults (remote wins). On failure, fall through cleanly to baked values.
+  # The bundle is an OCI artifact containing install-defaults.env.
+  if [[ -n "${INSTALL_DEFAULTS_REF}" ]]; then
+    log "  Fetching remote install-defaults: ${INSTALL_DEFAULTS_REF}"
+    local defaults_tmp defaults_pull_ok
+    defaults_tmp="$(mktemp -d)"
+    set +e
+    oras pull "${INSTALL_DEFAULTS_REF}" -o "${defaults_tmp}" >/dev/null 2>&1
+    defaults_pull_ok=$?
+    set -e
+    if [[ "${defaults_pull_ok}" -eq 0 && -f "${defaults_tmp}/install-defaults.env" ]]; then
+      log "  Remote install-defaults pulled; overlaying on baked defaults"
+      # shellcheck disable=SC1091
+      source "${defaults_tmp}/install-defaults.env"
+      INSTALL_DEFAULTS_SOURCE="remote"
+      # INSTALL_DEFAULTS_REF stays as the OCI ref used
+    else
+      log "  WARNING: Remote install-defaults pull failed; using baked fallback"
+      INSTALL_DEFAULTS_SOURCE="baked"
+    fi
+    rm -rf "${defaults_tmp}"
+  fi
+
+  # Re-apply defaults that may have been updated by remote install-defaults:
+  OS_CHANNEL="${OS_CHANNEL:-stable}"
+  OS_DEFAULT_REF="${OS_DEFAULT_REF:-}"
+
+  # --- Precedence 1: OS_DEFAULT_REF (baked or remote) ---
+  # If a pinned OS artifact ref is already known (from baked or remote defaults),
+  # use it directly — skip catalog and channel resolution entirely.
+  local explicit_ref=""
+  if [[ -n "${OS_DEFAULT_REF}" ]]; then
+    explicit_ref="${OS_DEFAULT_REF}"
+    log "  OS_DEFAULT_REF set: ${explicit_ref}"
+    if [[ "${INSTALL_DEFAULTS_SOURCE}" == "remote" ]]; then
+      : # INSTALL_DEFAULTS_SOURCE already correct
+    else
+      INSTALL_DEFAULTS_SOURCE="baked-pinned"
+    fi
+  fi
+
+  # --- Precedence 2 / 3: catalog resolution or channel tag fallback ---
+  local channel_tag_ref="${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}"
+  local selected_ref=""
+
+  if [[ -n "${explicit_ref}" ]]; then
+    selected_ref="${explicit_ref}"
+  elif [[ "${OS_CATALOG_ENABLED}" == "1" ]]; then
+    local catalog_result
+    set +e
+    catalog_result="$(_try_catalog_resolve \
+      "${OS_REPO}" "${OS_CATALOG_TAG}" "${OS_CHANNEL}")"
+    local catalog_ok=$?
+    set -e
+    if [[ "${catalog_ok}" -eq 0 && -n "${catalog_result}" ]]; then
+      selected_ref="${catalog_result}"
+      if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+        INSTALL_DEFAULTS_SOURCE="catalog"
+      fi
+    else
+      selected_ref="${channel_tag_ref}"
+      if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+        INSTALL_DEFAULTS_SOURCE="tag"
+      fi
+      log "  Using channel tag fallback: ${channel_tag_ref}"
+    fi
+  else
+    selected_ref="${channel_tag_ref}"
+    if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
+      INSTALL_DEFAULTS_SOURCE="tag"
+    fi
+  fi
+
+  [[ -n "${selected_ref}" ]] || { selected_ref="${channel_tag_ref}"; INSTALL_DEFAULTS_SOURCE="tag"; }
+
+  # --- Operator interactive override ---
+  # Show the resolved ref and offer the operator a chance to substitute an exact
+  # ref without requiring ISO remastering. Pressing Enter accepts the resolved ref.
+  echo
+  echo "  =================================================================="
+  echo "  Resolved OS artifact ref:"
+  echo "    ${selected_ref}"
+  echo "  Source: ${INSTALL_DEFAULTS_SOURCE}"
+  echo "  =================================================================="
+  echo
+  local override_input=""
+  read -r -p "  Override ref (press Enter to accept, or type an exact ref/digest): " override_input
+  if [[ -n "${override_input}" ]]; then
+    log "  Operator supplied override ref: ${override_input}"
+    selected_ref="${override_input}"
+    INSTALL_DEFAULTS_SOURCE="operator-override"
+    INSTALL_DEFAULTS_REF=""
+  fi
+
+  # --- Resolve floating ref to immutable digest ---
+  # Always pull by digest so the installed system has an exact artifact identity.
+  local pull_ref="${selected_ref}"
+  OS_ARTIFACT_DIGEST=""
+  if [[ "${selected_ref}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+    # Already digest-pinned — extract the digest component.
+    OS_ARTIFACT_DIGEST="${selected_ref##*@}"
+  else
+    log "  Resolving to immutable digest: ${selected_ref}"
+    local resolved_digest
+    set +e
+    resolved_digest="$(oras resolve "${selected_ref}" 2>/dev/null)"
+    local resolve_status=$?
+    set -e
+    if [[ "${resolve_status}" -eq 0 && "${resolved_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      OS_ARTIFACT_DIGEST="${resolved_digest}"
+      # Pull by digest for immutability; keep original ref for provenance display.
+      # Strip the tag suffix (last colon onwards) to get the repo+name without tag.
+      # Use % (shortest suffix match) not %% (longest) so that refs containing
+      # a port (e.g. localhost:5000/repo/image:tag) are handled correctly.
+      local repo_base="${selected_ref%:*}"
+      pull_ref="${repo_base}@${resolved_digest}"
+      log "  Resolved: ${resolved_digest}"
+    else
+      # oras resolve failed: artifact identity cannot be established before pull.
+      # By default this is a hard failure — pulling by a floating tag installs an
+      # unverified artifact whose identity cannot be recorded in provenance.
+      # Set OURBOX_ALLOW_UNRESOLVED_PULL=1 only for development / testing.
+      if [[ "${OURBOX_ALLOW_UNRESOLVED_PULL:-0}" == "1" ]]; then
+        log "  WARNING: oras resolve failed; pulling by tag (OURBOX_ALLOW_UNRESOLVED_PULL=1)"
+        log "  WARNING: artifact identity will not be captured in provenance"
+        pull_ref="${selected_ref}"
+      else
+        die "Cannot establish artifact identity: oras resolve failed for ${selected_ref}
+  The installer requires a digest-pinned artifact ref to ensure provenance.
+  Options:
+    1. Use a digest-pinned ref (catalog or OS_DEFAULT_REF usually provides this)
+    2. Check registry connectivity and retry
+    3. Set OURBOX_ALLOW_UNRESOLVED_PULL=1 to skip this check (dev/testing only)"
+      fi
+    fi
+  fi
+
+  OS_ARTIFACT_SOURCE="registry"
+  OS_ARTIFACT_REF="${selected_ref}"
+
+  echo "  Pulling OS artifact:"
+  echo "    ${pull_ref}"
+  echo
+
+  local pull_out pull_status
+  set +e
+  pull_out="$(oras pull "${pull_ref}" -o "${PAYLOAD_CACHE_DIR}" 2>&1)"
+  pull_status=$?
+  set -e
+  printf '%s\n' "${pull_out}"
+  [[ "${pull_status}" -eq 0 ]] || die "oras pull failed for ${pull_ref} (exit ${pull_status})"
+
+  # OS_ARTIFACT_DIGEST is set from oras resolve (or from an @sha256: pinned ref).
+  # In OURBOX_ALLOW_UNRESOLVED_PULL=1 mode it is still empty — mark it explicitly
+  # so provenance records the ambiguous state rather than silently recording empty.
+  if [[ -z "${OS_ARTIFACT_DIGEST}" ]]; then
+    OS_ARTIFACT_DIGEST="unresolved"
+  fi
+
+  _verify_staged_payload
+  _show_artifact_panel
+}
+
+write_install_provenance() {
+  local cache_dir="/opt/ourbox/installer/cache"
+  mkdir -p "${cache_dir}"
+
+  # RELEASE_CHANNEL is only meaningful for moving-channel resolution.
+  # For embedded payloads and explicit-ref overrides, record empty string
+  # rather than claiming a channel that wasn't actually used for selection.
+  local release_channel=""
+  if [[ "${INSTALL_DEFAULTS_SOURCE}" == "catalog" || "${INSTALL_DEFAULTS_SOURCE}" == "tag" ]]; then
+    release_channel="${OS_CHANNEL:-unknown}"
+  fi
+
+  # Write env file consumed by the late-commands append-provenance.sh script.
+  # INSTALLER_VERSION and INSTALLER_GIT_HASH come from defaults.env (baked at
+  # ISO build time); they uniquely identify the installer artifact that ran.
+  cat > "${cache_dir}/install-provenance.env" <<EOF
+INSTALLER_ID=${INSTALLER_ID:-woodbox}
+INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
+INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
+OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
+OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
+OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
+OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
+RELEASE_CHANNEL=${release_channel}
+INSTALL_DEFAULTS_SOURCE=${INSTALL_DEFAULTS_SOURCE:-baked}
+INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
+EOF
+
+  # Write the provenance-append script called by autoinstall.tpl late-commands.
+  # Single-quoted heredoc: variable references are literal in the script body
+  # and expand at runtime (after sourcing install-provenance.env).
+  cat > "${cache_dir}/append-provenance.sh" <<'SCRIPT'
+#!/bin/sh
+set -e
+PROV="/opt/ourbox/installer/cache/install-provenance.env"
+TARGET="${1:-/target}"
+if [ ! -f "${PROV}" ]; then
+  echo "append-provenance.sh: ${PROV} not found, skipping" >&2
+  exit 0
+fi
+# shellcheck disable=SC1090
+. "${PROV}"
+cat >> "${TARGET}/etc/ourbox/release" <<EOT
+OURBOX_INSTALLER_ID=${INSTALLER_ID:-woodbox}
+OURBOX_INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
+OURBOX_INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
+OURBOX_OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
+OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
+OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
+OURBOX_OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
+OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-unknown}
+OURBOX_INSTALL_DEFAULTS_SOURCE=${INSTALL_DEFAULTS_SOURCE:-baked}
+OURBOX_INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF:-}
+EOT
+SCRIPT
+  chmod +x "${cache_dir}/append-provenance.sh"
+}
+
+# ---------------------------------------------------------------------------
 # identity
 # ---------------------------------------------------------------------------
 
@@ -247,7 +630,7 @@ main() {
   udevadm settle --timeout=10 || true
 
   # --- Step 1: OS disk ---
-  echo "  Step 1 of 4: Select the OS disk"
+  echo "  Step 1 of 5: Select the OS disk"
   echo "  This disk will be ERASED and OurBox Woodbox OS installed on it."
   echo "  Showing NVMe disks only."
 
@@ -262,7 +645,7 @@ main() {
 
   # --- Step 2: DATA disk ---
   banner
-  echo "  Step 2 of 4: Select the DATA disk"
+  echo "  Step 2 of 5: Select the DATA disk"
   echo "  This disk will be formatted as the OurBox data volume."
   echo "  Showing all non-OS, non-removable disks."
 
@@ -273,9 +656,17 @@ main() {
   echo "  DATA disk   : ${DATA_DISK}"
   echo
 
-  # --- Step 3: Identity ---
+  # --- Step 3: OS artifact ---
   banner
-  echo "  Step 3 of 4: Set identity for the installed system"
+  echo "  Step 3 of 5: Resolve OS artifact"
+  echo "  Checking for embedded payload or pulling from registry..."
+  echo
+  resolve_and_stage_os_artifact
+  write_install_provenance
+
+  # --- Step 4: Identity ---
+  banner
+  echo "  Step 4 of 5: Set identity for the installed system"
   echo "  (You can change hostname and password later.)"
   echo
 
@@ -286,14 +677,16 @@ main() {
   echo "  Set the login password for ${OURBOX_USERNAME}:"
   OURBOX_PASSWORD_HASH="$(prompt_password_hash)"
 
-  # --- Step 4: Summary + final confirmation ---
+  # --- Step 5: Summary + final confirmation ---
   banner
-  echo "  Step 4 of 4: Confirm and install"
+  echo "  Step 5 of 5: Confirm and install"
   echo
   echo "  OS disk      : ${TARGET_DISK}"
   [[ -n "${TARGET_DISK_SERIAL}" ]] && \
     echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
   echo "  DATA disk    : ${DATA_DISK}"
+  echo "  OS artifact  : ${OS_ARTIFACT_REF}"
+  echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
   echo "  Hostname     : ${OURBOX_HOSTNAME}"
   echo "  Username     : ${OURBOX_USERNAME}"
   echo
@@ -315,6 +708,7 @@ main() {
 
   [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
 
+  # shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
   RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH} ${OURBOX_DATA_DISK}'
   envsubst "${RUNTIME_VARS}" < "${AUTOINSTALL_TPL}" > "${AUTOINSTALL_OUT}"
 

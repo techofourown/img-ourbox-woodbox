@@ -4,117 +4,109 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
-# shellcheck disable=SC1091
-[ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
 
-need_cmd curl
-need_cmd chmod
-need_cmd sed
+need_cmd tar
+need_cmd oras
+need_cmd find
 
-cd "${ROOT}"
-
-: "${K3S_VERSION:=}"
-: "${NGINX_IMAGE:=docker.io/library/nginx:1.27-alpine}"
-: "${DUFS_IMAGE:=docker.io/sigoden/dufs:v0.42.0}"
-: "${FLATNOTES_IMAGE:=docker.io/dullage/flatnotes:v5.0.0}"
-
-[[ -n "${K3S_VERSION}" ]] || die "K3S_VERSION not set (edit tools/versions.env)"
-
-NGINX_IMAGE="$(canonicalize_image_ref "${NGINX_IMAGE}")"
-DUFS_IMAGE="$(canonicalize_image_ref "${DUFS_IMAGE}")"
-FLATNOTES_IMAGE="$(canonicalize_image_ref "${FLATNOTES_IMAGE}")"
-
-log "Using K3S_VERSION=${K3S_VERSION}"
-log "Using NGINX_IMAGE=${NGINX_IMAGE}"
-log "Using DUFS_IMAGE=${DUFS_IMAGE}"
-log "Using FLATNOTES_IMAGE=${FLATNOTES_IMAGE}"
-
-OUT="artifacts/airgap"
-
-# Preflight: refuse to overwrite unless confirmed
-blocking=()
-[[ -f "${OUT}/k3s/k3s" ]] && blocking+=("${OUT}/k3s/k3s")
-[[ -f "${OUT}/k3s/k3s-airgap-images-amd64.tar" ]] && blocking+=("${OUT}/k3s/k3s-airgap-images-amd64.tar")
-[[ -d "${OUT}/platform/images" ]] && blocking+=("${OUT}/platform/images")
-[[ -d "${OUT}/platform/todo-bloom" ]] && blocking+=("${OUT}/platform/todo-bloom")
-
-if (( ${#blocking[@]} > 0 )); then
-  log "Existing artifacts detected (refusing to overwrite):"
-  for f in "${blocking[@]}"; do
-    echo "  ${f}"
-  done
-  echo
-  read -r -p "Type REMOVE to delete artifacts/airgap and continue, or anything else to abort: " confirm
-  [[ "${confirm}" == "REMOVE" ]] || die "Fetch aborted"
-  rm -rf "${OUT}"
+# Resolve airgap platform ref.
+# Priority: OURBOX_AIRGAP_PLATFORM_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
+if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
+  REF="${OURBOX_AIRGAP_PLATFORM_REF}"
+else
+  INPUTS_ENV="${ROOT}/release/official-inputs.env"
+  if [[ -f "${INPUTS_ENV}" ]]; then
+    # shellcheck disable=SC1090
+    source "${INPUTS_ENV}"
+    [[ -n "${AIRGAP_PLATFORM_REF:-}" ]] || die "AIRGAP_PLATFORM_REF not set in ${INPUTS_ENV}"
+    REF="${AIRGAP_PLATFORM_REF}"
+  else
+    # Legacy fallback: contracts/airgap-platform.ref (deprecated — use release/official-inputs.env)
+    REF_FILE="${ROOT}/contracts/airgap-platform.ref"
+    [[ -f "${REF_FILE}" ]] || die "Missing ${INPUTS_ENV} and no legacy ${REF_FILE} found"
+    REF="$(cat "${REF_FILE}")"
+  fi
 fi
 
-mkdir -p "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/platform/todo-bloom"
+OUT="${ROOT}/artifacts/airgap"
+PULL_DIR="${ROOT}/artifacts/.airgap-platform-pull"
+META_DIR="${ROOT}/artifacts/.airgap-platform-meta"
 
-log "Fetch k3s binary (amd64) @ ${K3S_VERSION}"
-curl -fsSL -o "${OUT}/k3s/k3s" \
-  "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s"
-chmod +x "${OUT}/k3s/k3s"
+log "Using airgap platform ref: ${REF}"
 
-log "Fetch k3s airgap images (amd64) @ ${K3S_VERSION}"
-curl -fsSL -o "${OUT}/k3s/k3s-airgap-images-amd64.tar" \
-  "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s-airgap-images-amd64.tar"
+# Enforce digest pinning in official builds.
+# Nightly: warn (non-reproducible but permitted for bootstrap).
+# Release: hard fail (release artifacts must be reproducible).
+if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
+  if [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
+    die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
+  Release builds require @sha256: refs to ensure reproducibility.
+  Update AIRGAP_PLATFORM_REF in release/official-inputs.env:
+    oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64"
+  elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
+    log "WARNING: AIRGAP_PLATFORM_REF is not digest-pinned — nightly build will not be reproducible"
+    log "  Update AIRGAP_PLATFORM_REF in release/official-inputs.env once the amd64 digest is available"
+  fi
+fi
 
-CLI="$(pick_container_cli)"
-log "Using container CLI: ${CLI}"
+# In CI, skip the interactive confirmation and auto-remove stale artifacts.
+# Locally, prompt before removing existing artifacts.
+if [[ -d "${OUT}" ]] && find "${OUT}" -mindepth 1 -print -quit >/dev/null 2>&1; then
+  if [[ -n "${GITHUB_ACTIONS:-}" || "${CI:-}" == "1" ]]; then
+    log "CI mode: removing existing artifacts in ${OUT}"
+    rm -rf "${OUT}" || die "Failed to remove ${OUT}"
+  else
+    log "ERROR: Existing artifacts detected in ${OUT} (refusing to overwrite)"
+    find "${OUT}" -maxdepth 2 -type f -print | sed 's/^/  /'
+    echo
+    log "You can remove them manually, or allow this script to remove them."
+    read -r -p "Type REMOVE to delete ${OUT} and continue, or anything else to abort: " confirm
+    if [[ "${confirm}" != "REMOVE" ]]; then
+      die "Fetch aborted; existing artifacts not removed"
+    fi
+    log "WARNING: About to remove ${OUT}"
+    if [[ -w "${OUT}" ]]; then
+      rm -rf "${OUT}" || die "Failed to remove ${OUT}"
+    else
+      need_cmd sudo
+      sudo rm -rf "${OUT}" || die "Failed to remove ${OUT} (sudo)"
+    fi
+  fi
+fi
 
-NGINX_TAR="$(echo "${NGINX_IMAGE}" | sed 's|/|_|g; s|:|_|g').tar"
-DUFS_TAR="$(echo "${DUFS_IMAGE}" | sed 's|/|_|g; s|:|_|g').tar"
-FLATNOTES_TAR="$(echo "${FLATNOTES_IMAGE}" | sed 's|/|_|g; s|:|_|g').tar"
+rm -rf "${PULL_DIR}" "${META_DIR}"
+mkdir -p "${PULL_DIR}" "${META_DIR}" "${OUT}"
 
-save_image_amd64() {
-  local image="$1" tarfile="$2"
-  case "$(cli_base "${CLI}")" in
-    docker|nerdctl)
-      # shellcheck disable=SC2086
-      ${CLI} pull --platform=linux/amd64 "${image}"
-      if [[ "$(cli_base "${CLI}")" == "nerdctl" ]]; then
-        # shellcheck disable=SC2086
-        ${CLI} save --platform=linux/amd64 -o "${tarfile}" "${image}"
-      else
-        # shellcheck disable=SC2086
-        ${CLI} save -o "${tarfile}" "${image}"
-      fi
-      ;;
-    podman)
-      # shellcheck disable=SC2086
-      ${CLI} pull --arch=amd64 --os=linux "${image}"
-      # shellcheck disable=SC2086
-      ${CLI} save -o "${tarfile}" "${image}"
-      ;;
-    *)
-      die "Unsupported container CLI: ${CLI}"
-      ;;
-  esac
+log "Pulling airgap platform bundle (amd64)"
+oras pull "${REF}" -o "${PULL_DIR}" | tee "${META_DIR}/oras.pull.log"
+
+TARBALL="${PULL_DIR}/dist/airgap-platform.tar.gz"
+[[ -f "${TARBALL}" ]] || {
+  echo "Expected ${TARBALL} not found. Pulled files:" >&2
+  find "${PULL_DIR}" -maxdepth 4 -type f -print >&2 || true
+  exit 1
 }
 
-log "Pull + save (amd64): ${NGINX_IMAGE}"
-save_image_amd64 "${NGINX_IMAGE}" "${OUT}/platform/images/${NGINX_TAR}"
+log "Extracting bundle into ${OUT}"
+tar -xzf "${TARBALL}" -C "${OUT}"
 
-log "Pull + save (amd64): ${DUFS_IMAGE}"
-save_image_amd64 "${DUFS_IMAGE}" "${OUT}/platform/images/${DUFS_TAR}"
+# Basic validation
+[[ -x "${OUT}/k3s/k3s" ]] || die "Missing k3s binary in ${OUT}/k3s/k3s"
+[[ -f "${OUT}/manifest.env" ]] || die "Missing manifest.env in ${OUT}"
 
-log "Pull + save (amd64): ${FLATNOTES_IMAGE}"
-save_image_amd64 "${FLATNOTES_IMAGE}" "${OUT}/platform/images/${FLATNOTES_TAR}"
+shopt -s nullglob
+k3s_tars=("${OUT}/k3s/k3s-airgap-images-"*.tar)
+platform_tars=("${OUT}/platform/images/"*.tar)
+shopt -u nullglob
 
-TODO_BLOOM_REPO="https://raw.githubusercontent.com/EverybodyCode/todo/main"
-log "Fetch Todo Bloom static files from ${TODO_BLOOM_REPO}"
-curl -fsSL -o "${OUT}/platform/todo-bloom/index.html" "${TODO_BLOOM_REPO}/index.html"
-curl -fsSL -o "${OUT}/platform/todo-bloom/app.js"     "${TODO_BLOOM_REPO}/app.js"
-curl -fsSL -o "${OUT}/platform/todo-bloom/styles.css" "${TODO_BLOOM_REPO}/styles.css"
-
-log "Writing airgap manifest"
-cat > "${OUT}/manifest.env" <<EOF_MANIFEST
-K3S_VERSION=${K3S_VERSION}
-NGINX_IMAGE=${NGINX_IMAGE}
-DUFS_IMAGE=${DUFS_IMAGE}
-FLATNOTES_IMAGE=${FLATNOTES_IMAGE}
-EOF_MANIFEST
+(( ${#k3s_tars[@]} > 0 )) || die "No k3s airgap image tar found in ${OUT}/k3s"
+(( ${#platform_tars[@]} > 0 )) || die "No platform image tars found in ${OUT}/platform/images"
 
 log "Artifacts created:"
-ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/platform/todo-bloom" "${OUT}/manifest.env"
+ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/manifest.env"
+
+log "Fetching pinned platform contract (OCI artifact)"
+"${ROOT}/tools/fetch-platform-contract.sh"
+
+log "Syncing pinned platform contract into installer tree"
+"${ROOT}/tools/sync-platform-contract-into-installer.sh"

@@ -1,0 +1,15 @@
+# Revalidation trigger for OurBox Woodbox.
+#
+# Touching this file (updating its content) in a PR and merging to main
+# triggers a new official-nightly build and publish without requiring a
+# substantive source change. Use this after infrastructure maintenance,
+# runner migrations, or when you need a fresh official artifact.
+#
+# Procedure:
+#   1. Open a PR with a one-line change to this file (e.g., bump the date below).
+#   2. Merge the PR to main.
+#   3. The official-nightly workflow will trigger and publish new artifacts.
+#
+# This file is intentionally not in the paths-ignore list of official-nightly.yml.
+#
+# Last triggered: (not yet triggered)

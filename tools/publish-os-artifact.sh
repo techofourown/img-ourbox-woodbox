@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "${ROOT}/tools/lib.sh"
+# shellcheck disable=SC1091
+source "${ROOT}/tools/registry.sh"
+
+need_cmd oras
+need_cmd sha256sum
+need_cmd date
+
+DEPLOY_DIR="${1:-deploy}"
+: "${OURBOX_TARGET:=x86}"
+: "${OURBOX_VARIANT:=prod}"
+: "${OURBOX_VERSION:=dev}"
+: "${OURBOX_SKU:=TOO-OBX-WBX-BASE-JU3XK8}"
+: "${OS_REPO:=ghcr.io/techofourown/ourbox-woodbox-os}"
+: "${OS_ARTIFACT_TYPE:=application/vnd.techofourown.ourbox.woodbox.os-payload.v1}"
+: "${OS_CATALOG_TAG:=${OURBOX_TARGET}-catalog}"
+: "${OS_CHANNEL_TAGS:=${OURBOX_TARGET}-stable}"
+: "${OS_REGISTRY_USERNAME:=}"
+: "${OS_REGISTRY_PASSWORD:=}"
+: "${OS_INCLUDE_BUILD_LOG:=0}"
+CATALOG_HEADER=$'channel\ttag\tcreated\tversion\tvariant\ttarget\tsku\tgit_sha\tplatform_contract_digest\tk3s_version\tpayload_sha256\tartifact_digest\tpinned_ref'
+
+# shellcheck disable=SC2012
+PAYLOAD_TAR="$(ls -1t "${DEPLOY_DIR}"/os-payload-ourbox-woodbox-"${OURBOX_TARGET,,}"-*.tar.gz 2>/dev/null | head -n 1 || true)"
+if [[ -z "${PAYLOAD_TAR}" || ! -f "${PAYLOAD_TAR}" ]]; then
+  die "No ${DEPLOY_DIR}/os-payload-ourbox-woodbox-${OURBOX_TARGET,,}-*.tar.gz found. Did the build finish?"
+fi
+
+BASE="$(basename "${PAYLOAD_TAR}" .tar.gz)"
+OS_IMMUTABLE_TAG="${OS_IMMUTABLE_TAG:-${BASE}}"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "${TMP}"' EXIT
+
+log "Preparing OS artifact payload for ${OS_REPO}"
+
+cp "${PAYLOAD_TAR}" "${TMP}/os-payload.tar.gz"
+SHA256="$(sha256sum "${TMP}/os-payload.tar.gz" | awk '{print $1}')"
+SIZE_BYTES="$(stat -c%s "${TMP}/os-payload.tar.gz")"
+cat > "${TMP}/os-payload.tar.gz.sha256" <<EOF
+${SHA256}  os-payload.tar.gz
+EOF
+
+# Read provenance from the meta.env file alongside the payload
+META_ENV="${DEPLOY_DIR}/${BASE}.meta.env"
+# Fallback: try without meta suffix
+[[ -f "${META_ENV}" ]] || META_ENV="${PAYLOAD_TAR%.tar.gz}.meta.env"
+
+CONTRACT_DIGEST="unknown"
+K3S_VERSION="unknown"
+if [[ -f "${META_ENV}" ]]; then
+  # shellcheck disable=SC1090
+  source "${META_ENV}"
+  CONTRACT_DIGEST="${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  K3S_VERSION="${K3S_VERSION:-unknown}"
+fi
+
+GIT_SHA="$(git -C "${ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+cat > "${TMP}/os.meta.env" <<EOF
+OS_PAYLOAD_BASENAME=${BASE}
+OS_PAYLOAD_SHA256=${SHA256}
+OS_PAYLOAD_SIZE_BYTES=${SIZE_BYTES}
+OS_ARTIFACT_TYPE=${OS_ARTIFACT_TYPE}
+OURBOX_TARGET=${OURBOX_TARGET}
+OURBOX_VARIANT=${OURBOX_VARIANT}
+OURBOX_VERSION=${OURBOX_VERSION}
+OURBOX_SKU=${OURBOX_SKU}
+BUILD_TS=${BUILD_TS}
+GIT_SHA=${GIT_SHA}
+OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
+OURBOX_PLATFORM_CONTRACT_SOURCE=${OURBOX_PLATFORM_CONTRACT_SOURCE:-unknown}
+OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
+OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
+K3S_VERSION=${K3S_VERSION}
+GITHUB_WORKFLOW=${GITHUB_WORKFLOW:-}
+GITHUB_RUN_ID=${GITHUB_RUN_ID:-}
+GITHUB_RUN_ATTEMPT=${GITHUB_RUN_ATTEMPT:-}
+EOF
+
+push_ref() {
+  local tag="$1"
+  local ref="${OS_REPO}:${tag}"
+  log ">> Pushing ${ref}"
+  local args=(
+    "${ref}"
+    --artifact-type "${OS_ARTIFACT_TYPE}"
+    --annotation "org.opencontainers.image.source=https://github.com/techofourown/img-ourbox-woodbox"
+    --annotation "org.opencontainers.image.revision=${GIT_SHA}"
+    --annotation "org.opencontainers.image.version=${OURBOX_VERSION}"
+    --annotation "org.opencontainers.image.created=${BUILD_TS}"
+    --annotation "techofourown.artifact.kind=os-payload"
+    --annotation "techofourown.target=${OURBOX_TARGET}"
+    --annotation "techofourown.variant=${OURBOX_VARIANT}"
+    --annotation "techofourown.sku=${OURBOX_SKU}"
+    --annotation "techofourown.platform-contract.digest=${CONTRACT_DIGEST}"
+    --annotation "techofourown.build.workflow=${GITHUB_WORKFLOW:-local}"
+    --annotation "techofourown.build.run-id=${GITHUB_RUN_ID:-local}"
+    --annotation "techofourown.build.run-attempt=${GITHUB_RUN_ATTEMPT:-1}"
+    "os-payload.tar.gz:application/octet-stream"
+    "os-payload.tar.gz.sha256:text/plain"
+    "os.meta.env:text/plain"
+  )
+  local out status digest
+  set +e
+  out="$(cd "${TMP}" && oras push "${args[@]}" 2>&1)"
+  status=$?
+  set -e
+  printf '%s\n' "${out}"
+  if [[ "${status}" -ne 0 ]]; then
+    die "oras push failed for ${ref} (exit ${status})"
+  fi
+  digest="$(printf '%s\n' "${out}" | grep -Eo 'sha256:[0-9a-f]{64}' | tail -n1)"
+  [[ -n "${digest}" ]] || die "Failed to capture digest from oras output for ${ref}"
+  LAST_PUSH_DIGEST="${digest}"
+  log ">> Digest ${tag}: ${digest}"
+}
+
+maybe_login() {
+  if [[ -n "${OS_REGISTRY_USERNAME}" ]]; then
+    local registry="${OS_REPO%%/*}"
+    log "Logging into ${registry} for publish"
+    oras login "${registry}" -u "${OS_REGISTRY_USERNAME}" --password "${OS_REGISTRY_PASSWORD:-}"
+  fi
+}
+
+update_catalog() {
+  local channel_tag="$1" immutable_tag="$2" immutable_digest="$3"
+  local catalog_tmp="${TMP}/catalog"
+  local catalog_file="${catalog_tmp}/catalog.tsv"
+  local pinned_ref="${OS_REPO}@${immutable_digest}"
+  rm -rf "${catalog_tmp}"
+  mkdir -p "${catalog_tmp}"
+
+  local catalog_ref="${OS_REPO}:${OS_CATALOG_TAG}"
+  if oras pull "${catalog_ref}" -o "${catalog_tmp}" >/dev/null 2>&1; then
+    log "Catalog pulled: ${catalog_ref}"
+  else
+    printf '%s\n' "${CATALOG_HEADER}" > "${catalog_file}"
+  fi
+
+  [[ -f "${catalog_file}" ]] || printf '%s\n' "${CATALOG_HEADER}" > "${catalog_file}"
+  {
+    printf '%s\n' "${CATALOG_HEADER}"
+    tail -n +2 "${catalog_file}" 2>/dev/null || true
+  } > "${catalog_file}.tmp"
+  mv "${catalog_file}.tmp" "${catalog_file}"
+
+  # Catalog channel column uses short names (stable, nightly, beta, …) — not
+  # target-qualified tags (x86-stable). The target is already encoded in the
+  # artifact repository and tag. Installers query by short channel name.
+  local channel
+  channel="${channel_tag#"${OURBOX_TARGET}"-}"
+  channel="${channel:-custom}"
+  awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
+    NR == 1 { print; next }
+    !($1 == ch && $2 == tag) { print }
+  ' "${catalog_file}" > "${catalog_file}.tmp"
+  mv "${catalog_file}.tmp" "${catalog_file}"
+
+  echo -e "${channel}\t${immutable_tag}\t${BUILD_TS}\t${OURBOX_VERSION}\t${OURBOX_VARIANT}\t${OURBOX_TARGET}\t${OURBOX_SKU}\t${GIT_SHA}\t${CONTRACT_DIGEST}\t${K3S_VERSION}\t${SHA256}\t${immutable_digest}\t${pinned_ref}" >> "${catalog_file}"
+
+  log ">> Updating catalog: ${catalog_ref}"
+  (cd "${catalog_tmp}" && oras push "${catalog_ref}" \
+    --artifact-type "application/vnd.techofourown.ourbox.woodbox.os-catalog.v1" \
+    "catalog.tsv:text/tab-separated-values")
+}
+
+maybe_login
+LAST_PUSH_DIGEST=""
+push_ref "${OS_IMMUTABLE_TAG}"
+IMMUTABLE_DIGEST="${LAST_PUSH_DIGEST}"
+IMMUTABLE_PINNED_REF="${OS_REPO}@${IMMUTABLE_DIGEST}"
+echo "${OS_REPO}:${OS_IMMUTABLE_TAG}" > "${DEPLOY_DIR}/os-artifact.ref"
+echo "${IMMUTABLE_PINNED_REF}" > "${DEPLOY_DIR}/os-artifact.pinned.ref"
+echo "${IMMUTABLE_DIGEST}" > "${DEPLOY_DIR}/os-artifact.digest"
+
+for ch in ${OS_CHANNEL_TAGS}; do
+  push_ref "${ch}"
+  update_catalog "${ch}" "${OS_IMMUTABLE_TAG}" "${IMMUTABLE_DIGEST}"
+done
+
+log "DONE: published ${OS_IMMUTABLE_TAG} (and channels: ${OS_CHANNEL_TAGS:-none}) to ${OS_REPO}"

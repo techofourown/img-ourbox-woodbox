@@ -1,0 +1,74 @@
+name: Smoke Build — OS (Self-hosted, non-publishing)
+# Manual build-only workflow for on-demand verification that an OS payload build
+# succeeds on a real x86 build host. Does NOT publish to GHCR.
+# Official publication is done by official-nightly.yml and official-release.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target (for example x86)"
+        required: true
+        default: "x86"
+        type: string
+      variant:
+        description: "Variant label (for example prod/dev)"
+        required: true
+        default: "prod"
+        type: string
+      version:
+        description: "Version label embedded in metadata"
+        required: true
+        default: "dev"
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: smoke-build-os-${{ inputs.target }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  smoke-build:
+    runs-on: [self-hosted, ourbox-builder, x86-build]
+    timeout-minutes: 120
+    env:
+      OURBOX_TARGET: ${{ inputs.target }}
+      OURBOX_VARIANT: ${{ inputs.variant }}
+      OURBOX_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bootstrap host dependencies
+        run: sudo ./tools/bootstrap-host.sh
+
+      - name: Fetch pinned upstream inputs
+        run: ./tools/fetch-airgap-platform.sh
+
+      - name: Build OS payload
+        run: ./tools/build-os-payload.sh
+
+      - name: Verify build output exists
+        run: |
+          set -euo pipefail
+          TAR="$(ls -1t deploy/os-payload-ourbox-woodbox-"${OURBOX_TARGET,,}"-*.tar.gz 2>/dev/null | head -n1 || true)"
+          if [[ -z "${TAR}" ]]; then
+            echo "ERROR: no deploy/os-payload-ourbox-woodbox-${OURBOX_TARGET,,}-*.tar.gz found" >&2
+            exit 1
+          fi
+          echo "OS payload: ${TAR} ($(du -h "${TAR}" | cut -f1))"
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-os-build-${{ github.run_id }}
+          path: |
+            deploy/*.sha256
+            deploy/os-artifact.digest
+          if-no-files-found: warn

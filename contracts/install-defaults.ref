@@ -1,0 +1,3 @@
+# Install-defaults OCI ref for local/dev builds.
+# For official builds, INSTALL_DEFAULTS_REF in release/official-inputs.env takes precedence.
+# Set to empty until sw-ourbox-os publishes install-defaults artifacts for x86.
