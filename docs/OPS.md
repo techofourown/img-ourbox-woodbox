@@ -1,35 +1,71 @@
 # OPS — OurBox Woodbox
 
-## Build + flash installer media (interactive)
+## Quick start: prepare installer media
+
+### Default path (recommended): pull official installer from registry
 
 ```bash
 ./tools/prepare-installer-media.sh
 ```
 
-What it does:
+This will:
 
-1. Installs host dependencies (podman/docker + xorriso + basics)
-2. Downloads Ubuntu Server ISO (pinned in `tools/versions.env`)
-3. Fetches airgap payloads (k3s + image tars)
-4. Builds a custom installer ISO that contains:
-   - NoCloud autoinstall config
-   - OurBox rootfs overlay
-   - Airgap artifacts
-5. Flashes the ISO to a selected USB disk (destructive)
+1. Prompt you to select a target USB disk (interactive)
+2. Bootstrap host dependencies (ORAS, xorriso, etc.)
+3. Pull the official installer ISO from GHCR (`x86-installer-stable` channel by default)
+4. Flash the ISO to the selected USB disk
+
+Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
+prompts, wait for the machine to power off, remove USB, boot from NVMe.
+
+---
+
+### Local source-build path
+
+```bash
+./tools/prepare-installer-media.sh --build-local
+```
+
+This will:
+
+1. Prompt you to select a target USB disk
+2. Bootstrap host dependencies
+3. Fetch upstream platform bundle (k3s + images + platform contract) via ORAS
+4. Build OS payload locally
+5. Build a fat installer ISO with the OS payload embedded (no network pull at install time)
+6. Flash the ISO
+
+---
+
+### Other installer options
+
+```bash
+# Pull a specific installer ref by digest or tag
+./tools/prepare-installer-media.sh --installer-ref ghcr.io/techofourown/ourbox-woodbox-installer@sha256:...
+
+# Pull from a specific channel (e.g., nightly)
+./tools/prepare-installer-media.sh --installer-channel x86-installer-nightly
+```
+
+---
 
 ## Boot + install on Woodbox
 
-- Boot from the USB installer
-- The installer will prompt you to:
-  - choose hostname/username/password
-  - choose the **SYSTEM** disk (NVMe)
-  - choose/format the **DATA** disk and ensure it is `ext4` labeled `OURBOX_DATA`
+The installer is interactive. It will prompt for:
 
-After installation completes:
+1. **OS disk selection** — the NVMe disk to install onto (will be erased)
+2. **DATA disk selection** — the disk to format as `OURBOX_DATA` (ext4)
+3. **OS artifact** — pulled from registry or used from embedded payload; displayed with SHA-256
+4. **Hostname, username, password** — for the installed system
+5. **INSTALL confirmation** — type `INSTALL` to begin
 
-- Remove USB media
+After confirmation, the installer runs unattended (~10–15 minutes). When the machine powers off:
+
+- Remove the USB stick
 - Boot from NVMe
 - Wait for first-boot bootstrap (several minutes)
+
+---
 
 ## Post-boot checks
 
@@ -47,3 +83,131 @@ If ready, you should be able to reach:
 - `http://notes.<hostname>.local`
 - `http://todo.<hostname>.local`
 
+---
+
+## Individual build steps
+
+```bash
+sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.) — idempotent
+
+./tools/fetch-airgap-platform.sh       # Pull pinned airgap bundle + platform contract via ORAS
+
+./tools/build-os-payload.sh            # Build OS payload tarball (rootfs overlay + airgap)
+
+./tools/build-installer-iso.sh         # Build thin installer ISO (no payload embedded)
+
+# Or: build fat ISO with embedded OS payload (for offline operation)
+./tools/build-installer-iso.sh --embed-payload deploy/os-payload-ourbox-woodbox-x86-*.tar.gz
+```
+
+---
+
+## Registry operations
+
+```bash
+# Publish OS payload and installer ISO after building
+./tools/publish-os-artifact.sh deploy
+./tools/publish-installer-artifact.sh deploy
+
+# Pull OS payload or installer ISO from registry
+./tools/pull-os-artifact.sh ghcr.io/techofourown/ourbox-woodbox-os:x86-stable
+./tools/pull-installer-artifact.sh --channel x86-installer-stable
+```
+
+---
+
+## Updating upstream platform inputs
+
+When `sw-ourbox-os` publishes new `platform-contract` or `airgap-platform` bundles:
+
+```bash
+# 1. Resolve new digests
+oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge
+oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64
+
+# 2. Update release/official-inputs.env with the new digest-pinned refs
+
+# 3. Pull and sync
+./tools/fetch-airgap-platform.sh
+
+# 4. Rebuild OS payload + installer; verify; open a PR
+```
+
+---
+
+## Verify /etc/ourbox/release on an installed device
+
+```bash
+cat /etc/ourbox/release
+```
+
+Expected fields include: `OURBOX_PRODUCT`, `OURBOX_DEVICE`, `OURBOX_TARGET`, `OURBOX_SKU`,
+`OURBOX_VARIANT`, `OURBOX_VERSION`, `OURBOX_RECIPE_GIT_HASH`, platform contract provenance
+(`OURBOX_PLATFORM_CONTRACT_DIGEST`, etc.), and install-time provenance (`OURBOX_INSTALLER_ID`,
+`OURBOX_OS_ARTIFACT_REF`, `OURBOX_OS_IMAGE_SHA256`, etc.).
+
+---
+
+## Troubleshooting
+
+### k3s fails to start — memory cgroup
+
+If `/sys/fs/cgroup/cgroup.controllers` does not include `memory`, k3s will fail:
+
+```
+failed to find memory cgroup (v2)
+```
+
+This is a kernel cmdline issue. Ubuntu 24.04 LTS enables cgroup v2 by default on modern kernels;
+if you see this, check that GRUB passes the correct cgroup flags. This should not occur on stock
+Ubuntu 24.04 with the default kernel.
+
+### DATA disk not mounted at /var/lib/ourbox
+
+Check the label:
+```bash
+lsblk -o NAME,LABEL,FSTYPE,MOUNTPOINTS
+```
+
+If the data disk is not labeled `OURBOX_DATA`, relabel it (destructive to the filesystem):
+```bash
+sudo tune2fs -L OURBOX_DATA /dev/sdX1
+```
+
+If it needs to be reformatted:
+```bash
+sudo /cdrom/ourbox/tools/format-data-disk.sh /dev/sdX
+```
+
+### Verify artifact provenance at install time
+
+During installation (`ourbox-preinstall` step 3 output):
+- Source: `registry` or `embedded`
+- Ref: the ORAS ref used
+- SHA-256: the tarball SHA-256
+
+After installation:
+```bash
+cat /etc/ourbox/release | grep OURBOX_OS_
+```
+
+---
+
+## ADR-0008 revalidation
+
+To trigger an official republish after infrastructure maintenance without a source change,
+touch `release/REVALIDATION_TRIGGER` in a PR. See that file for the documented procedure.
+
+To run a non-publishing revalidation build:
+- Use GitHub Actions → `revalidate-woodbox-build.yml` → Run workflow
+
+---
+
+## Reference
+
+- `docs/ARTIFACT_PROVENANCE.md` — official artifact types, channels, and provenance requirements
+- `docs/reference/contracts.md` — host contracts (release metadata, storage, installer, k3s)
+- `docs/reference/installer.md` — installer defaults, artifact contract, UX flow
+- `docs/reference/platform-contract.md` — upstream platform contract consumption
+- `release/official-artifacts.env` — official GHCR namespaces and channel tags
+- `release/official-inputs.env` — digest-pinned upstream refs for official builds

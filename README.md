@@ -1,28 +1,84 @@
 # img-ourbox-woodbox
 
-Build repository for **OurBox Woodbox** OS installer media targeting **Woodbox hardware** (x86-64, NVMe system disk + SATA data disk).
+Build repository for **OurBox Woodbox** — a local-first x86-64 appliance running the OurBox
+software platform. This repo produces a bootable USB installer and distributable OS payload
+artifacts for Woodbox hardware.
 
-This repo produces a bootable USB installer that installs Ubuntu Server LTS, mounts `/var/lib/ourbox` on the SATA data disk, and boots into an airgapped single-node k3s runtime via `ourbox-bootstrap`.
+**Hardware**: x86-64 desktop-class PC, UEFI, NVMe system disk, SATA data disk
+**OS base**: Ubuntu Server LTS 24.04 (x86-64), autoinstall via cloud-init
+**Runtime**: airgapped single-node k3s, deployed from OCI platform bundle
 
-## Identifiers used by this repo
+## Identifiers
 
-- **Model ID**: `TOO-OBX-WBX` (physical device class)
-- **Default SKU (part number)**: `TOO-OBX-WBX-BASE-001` (exact BOM/software build)
+- **Model ID**: `TOO-OBX-WBX` (Woodbox hardware class)
+- **Default SKU**: `TOO-OBX-WBX-BASE-JU3XK8`
+- **Build target**: `x86`
 
-Model identifies the physical hardware class; SKU identifies the exact bill-of-materials and software configuration.
+## Quick start
 
-## Docs
-
-- Operator runbook: [`docs/OPS.md`](./docs/OPS.md)
-
-## Happy path (build host → USB installer → Woodbox install)
+### Prepare and flash an installer USB (default: pull from registry)
 
 ```bash
-cd ~
-git clone --recurse-submodules https://github.com/techofourown/img-ourbox-woodbox.git
+git clone https://github.com/techofourown/img-ourbox-woodbox.git
 cd img-ourbox-woodbox
 ./tools/prepare-installer-media.sh
-# plug USB into Woodbox, boot, follow prompts, device powers off, remove USB, boot from NVMe
 ```
 
-The installer requires a keyboard and monitor on the Woodbox at install time. It will prompt for OS disk selection, DATA disk selection, hostname, username, and password before writing anything to disk.
+This pulls the official installer artifact from GHCR, flashes it to a USB disk you select, then:
+
+1. Plug USB into Woodbox, boot from USB (UEFI boot menu)
+2. Installer prompts: OS disk, DATA disk, OS artifact (auto-resolved), hostname/username/password
+3. Type `INSTALL` to begin — runs unattended (~10–15 minutes)
+4. Machine powers off — remove USB, boot from NVMe
+
+### Prepare a fully offline USB (local source build)
+
+```bash
+./tools/prepare-installer-media.sh --build-local
+```
+
+Builds the OS payload and installer ISO locally from source, then flashes. No network access
+required at install time.
+
+## Operator runbook
+
+See [`docs/OPS.md`](./docs/OPS.md) for the full operator runbook including:
+- Individual build steps
+- Registry operations (publish/pull)
+- Post-boot verification
+- Updating upstream platform inputs
+- Troubleshooting
+
+## Artifact model
+
+Woodbox produces two distributable artifacts:
+
+| Artifact | ORAS artifact type | Registry |
+|---|---|---|
+| OS payload (`.tar.gz`) | `application/vnd.techofourown.ourbox.woodbox.os-payload.v1` | `ghcr.io/techofourown/ourbox-woodbox-os` |
+| Installer ISO (`.iso`) | `application/vnd.techofourown.ourbox.woodbox.installer.v1` | `ghcr.io/techofourown/ourbox-woodbox-installer` |
+
+Official channel tags: `x86-stable`, `x86-nightly`, `x86-installer-stable`, `x86-installer-nightly`
+
+See [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) for the full provenance model
+and official release policy.
+
+## Official build posture
+
+Official artifacts are produced by organization-controlled build infrastructure per
+[ADR-0008](https://github.com/techofourown/org-techofourown/blob/main/docs/decisions/ADR-0008-adopt-organization-controlled-build-infrastructure-for-heavy-artifacts.md).
+
+- Official nightly: triggered by push to `main` via `.github/workflows/official-nightly.yml`
+- Official release: triggered by `v*` tag push via `.github/workflows/official-release.yml`
+- Runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [`docs/OPS.md`](./docs/OPS.md) | Operator runbook |
+| [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) | Artifact provenance and release policy |
+| [`docs/reference/contracts.md`](./docs/reference/contracts.md) | Host contracts (release metadata, storage, installer) |
+| [`docs/reference/installer.md`](./docs/reference/installer.md) | Installer reference (defaults, UX flow, artifact contract) |
+| [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md) | Platform contract consumption from sw-ourbox-os |
+| [`docs/decisions/`](./docs/decisions/) | Architectural Decision Records |
