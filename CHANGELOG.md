@@ -1,3 +1,24 @@
+# [0.2.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.1.0...v0.2.0) (2026-03-02)
+
+
+### Bug Fixes
+
+* address PR review blockers — channel semantics, catalog lane, provenance ([be692f2](https://github.com/techofourown/img-ourbox-woodbox/commit/be692f2f1fa547ae36200b6c1ce839d8c875de50))
+* config.env must not clobber CI-provided environment variables ([4fe6e9b](https://github.com/techofourown/img-ourbox-woodbox/commit/4fe6e9b7fd13d78c8e7cc179d13e2416652b9f05))
+* deploy sidecar, official-inputs wiring, catalog short-names, ORAS arch ([5b4e245](https://github.com/techofourown/img-ourbox-woodbox/commit/5b4e2455ee6171aba078334d76637402c287b76c))
+* digest ref parsing for port registries; idempotent payload staging ([5392c83](https://github.com/techofourown/img-ourbox-woodbox/commit/5392c834c86e850adbc1cdae4e87a31525830987))
+* disable SC2016 for intentional single-quoted envsubst vars in preinstall ([7040e48](https://github.com/techofourown/img-ourbox-woodbox/commit/7040e48779103ed3484b4edace02b5e24a1175aa))
+* remote install-defaults lane, OS_DEFAULT_REF, interactive override ([af57f55](https://github.com/techofourown/img-ourbox-woodbox/commit/af57f5553abb332c1cf57f156593b88a00d3feb7))
+* resolve CI sanitization and shellcheck failures ([43ff9a1](https://github.com/techofourown/img-ourbox-woodbox/commit/43ff9a1154224557dee102dff928db42e8369f01))
+* runnable official workflows — bootstrap order, CI mode, workspace cleanup ([3b102e3](https://github.com/techofourown/img-ourbox-woodbox/commit/3b102e392b48d4f4776ed47923309e1793dafd1e))
+* set executable bit on 7 scripts invoked as executables in workflows ([52f2b76](https://github.com/techofourown/img-ourbox-woodbox/commit/52f2b7613c074f62b919ad1965bcb8837b7f3fc1))
+* strict artifact identity, installer provenance, ORAS checksum ([24b3813](https://github.com/techofourown/img-ourbox-woodbox/commit/24b3813f6cf936b3efd17b396665ca00dc661136))
+
+
+### Features
+
+* adopt OCI artifact model for Woodbox OS payload and installer ([3fe4f45](https://github.com/techofourown/img-ourbox-woodbox/commit/3fe4f45cc2cbd160749ce5ce5110bb7cc055a139))
+
 # [0.1.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.0.0...v0.1.0) (2026-02-27)
 
 
