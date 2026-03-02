@@ -50,6 +50,7 @@ ${OURBOX_STORAGE_MATCH}
     # Extract staged OS payload (rootfs overlay + airgap artifacts).
     # Payload staged by ourbox-preinstall from embedded ISO or pulled from registry.
     - curtin in-target --target=/target -- /bin/bash -lc 'echo "==> Extracting staged OS payload"'
+    - rm -rf /opt/ourbox/installer/cache/payload-staging
     - mkdir -p /opt/ourbox/installer/cache/payload-staging
     - tar -xzf /opt/ourbox/installer/cache/payload/os-payload.tar.gz -C /opt/ourbox/installer/cache/payload-staging
     - cp -a /opt/ourbox/installer/cache/payload-staging/rootfs/. /target/

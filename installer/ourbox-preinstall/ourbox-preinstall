@@ -480,7 +480,10 @@ resolve_and_stage_os_artifact() {
     if [[ "${resolve_status}" -eq 0 && "${resolved_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
       OS_ARTIFACT_DIGEST="${resolved_digest}"
       # Pull by digest for immutability; keep original ref for provenance display.
-      local repo_base="${selected_ref%%:*}"
+      # Strip the tag suffix (last colon onwards) to get the repo+name without tag.
+      # Use % (shortest suffix match) not %% (longest) so that refs containing
+      # a port (e.g. localhost:5000/repo/image:tag) are handled correctly.
+      local repo_base="${selected_ref%:*}"
       pull_ref="${repo_base}@${resolved_digest}"
       log "  Resolved: ${resolved_digest}"
     else
