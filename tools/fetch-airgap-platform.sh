@@ -34,34 +34,43 @@ META_DIR="${ROOT}/artifacts/.airgap-platform-meta"
 
 log "Using airgap platform ref: ${REF}"
 
-# Enforce digest pinning in official builds (GITHUB_ACTIONS + official workflow context).
-# If AIRGAP_PLATFORM_REF is a floating tag, official artifacts are non-reproducible.
-if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${GITHUB_WORKFLOW:-}" =~ [Oo]fficial ]]; then
-  if [[ "${REF}" != *"@sha256:"* ]]; then
+# Enforce digest pinning in official builds.
+# Nightly: warn (non-reproducible but permitted for bootstrap).
+# Release: hard fail (release artifacts must be reproducible).
+if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
+  if [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
-  Official builds require @sha256: refs to ensure reproducibility.
+  Release builds require @sha256: refs to ensure reproducibility.
   Update AIRGAP_PLATFORM_REF in release/official-inputs.env:
     oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64"
+  elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
+    log "WARNING: AIRGAP_PLATFORM_REF is not digest-pinned — nightly build will not be reproducible"
+    log "  Update AIRGAP_PLATFORM_REF in release/official-inputs.env once the amd64 digest is available"
   fi
 fi
 
-# Refuse to overwrite existing artifacts unless operator confirms
+# In CI, skip the interactive confirmation and auto-remove stale artifacts.
+# Locally, prompt before removing existing artifacts.
 if [[ -d "${OUT}" ]] && find "${OUT}" -mindepth 1 -print -quit >/dev/null 2>&1; then
-  log "ERROR: Existing artifacts detected in ${OUT} (refusing to overwrite)"
-  find "${OUT}" -maxdepth 2 -type f -print | sed 's/^/  /'
-  echo
-  log "You can remove them manually, or allow this script to remove them."
-  read -r -p "Type REMOVE to delete ${OUT} and continue, or anything else to abort: " confirm
-  if [[ "${confirm}" != "REMOVE" ]]; then
-    die "Fetch aborted; existing artifacts not removed"
-  fi
-
-  log "WARNING: About to remove ${OUT}"
-  if [[ -w "${OUT}" ]]; then
+  if [[ -n "${GITHUB_ACTIONS:-}" || "${CI:-}" == "1" ]]; then
+    log "CI mode: removing existing artifacts in ${OUT}"
     rm -rf "${OUT}" || die "Failed to remove ${OUT}"
   else
-    need_cmd sudo
-    sudo rm -rf "${OUT}" || die "Failed to remove ${OUT} (sudo)"
+    log "ERROR: Existing artifacts detected in ${OUT} (refusing to overwrite)"
+    find "${OUT}" -maxdepth 2 -type f -print | sed 's/^/  /'
+    echo
+    log "You can remove them manually, or allow this script to remove them."
+    read -r -p "Type REMOVE to delete ${OUT} and continue, or anything else to abort: " confirm
+    if [[ "${confirm}" != "REMOVE" ]]; then
+      die "Fetch aborted; existing artifacts not removed"
+    fi
+    log "WARNING: About to remove ${OUT}"
+    if [[ -w "${OUT}" ]]; then
+      rm -rf "${OUT}" || die "Failed to remove ${OUT}"
+    else
+      need_cmd sudo
+      sudo rm -rf "${OUT}" || die "Failed to remove ${OUT} (sudo)"
+    fi
   fi
 fi
 

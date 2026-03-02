@@ -23,11 +23,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Bootstrap host dependencies
+        run: sudo ./tools/bootstrap-host.sh
+
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Bootstrap host dependencies
-        run: sudo ./tools/bootstrap-host.sh
+      - name: Clean stale workspace artifacts
+        run: |
+          rm -rf artifacts/ deploy/
+          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/manifests
+          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/landing
+          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/todo-bloom
 
       - name: Preflight build host
         run: ./tools/preflight-build-host.sh
