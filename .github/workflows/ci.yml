@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sanitization:
+    name: Public repo sanitization check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for forbidden internal infrastructure details
+        run: bash tools/check-public-sanitization.sh
+
+  shellcheck:
+    name: Shell script lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: Run shellcheck on build/publish scripts
+        run: shellcheck tools/*.sh
+
+      - name: Run shellcheck on installer scripts
+        run: |
+          shellcheck installer/ourbox-preinstall/ourbox-preinstall
+          shellcheck installer/ourbox-preinstall/format-data-disk.sh
+
+      - name: Check shell syntax (bash -n)
+        run: |
+          for f in tools/*.sh; do
+            bash -n "${f}" && echo "OK: ${f}"
+          done
+          bash -n installer/ourbox-preinstall/ourbox-preinstall && echo "OK: ourbox-preinstall"
+          bash -n installer/ourbox-preinstall/format-data-disk.sh && echo "OK: format-data-disk.sh"
+
+  workflow-safety:
+    name: Workflow trust boundary check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check workflow trust boundaries
+        run: bash tools/check-workflow-safety.sh
