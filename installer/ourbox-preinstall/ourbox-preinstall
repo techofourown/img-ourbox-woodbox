@@ -708,6 +708,7 @@ main() {
 
   [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
 
+  # shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
   RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH} ${OURBOX_DATA_DISK}'
   envsubst "${RUNTIME_VARS}" < "${AUTOINSTALL_TPL}" > "${AUTOINSTALL_OUT}"
 
