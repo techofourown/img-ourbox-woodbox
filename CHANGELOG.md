@@ -1,3 +1,11 @@
+## [0.2.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.3...v0.2.4) (2026-03-03)
+
+
+### Bug Fixes
+
+* switch official-release trigger to release:published ([8c72e90](https://github.com/techofourown/img-ourbox-woodbox/commit/8c72e90e3d348cb9581f48172790fb0baea0e999))
+* tighten rule 4 — require exactly types:[published], nothing else ([d37b27b](https://github.com/techofourown/img-ourbox-woodbox/commit/d37b27b75a4d9ab8d8bf615bff09b9e34603b612))
+
 ## [0.2.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.2...v0.2.3) (2026-03-03)
 
 
