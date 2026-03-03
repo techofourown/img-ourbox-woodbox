@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.2...v0.2.3) (2026-03-03)
+
+
+### Bug Fixes
+
+* quote GITHUB_WORKFLOW in meta.env writes to survive spaces ([c806a42](https://github.com/techofourown/img-ourbox-woodbox/commit/c806a427399bfe7241c64c04b9607001625cd6e1))
+
 ## [0.2.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.1...v0.2.2) (2026-03-03)
 
 
