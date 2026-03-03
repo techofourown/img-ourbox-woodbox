@@ -1,3 +1,11 @@
+## [0.2.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.1...v0.2.2) (2026-03-03)
+
+
+### Bug Fixes
+
+* correct Ubuntu 24.04.3 ISO SHA256 ([f3d1ad5](https://github.com/techofourown/img-ourbox-woodbox/commit/f3d1ad518369b675c9fd71ff91d6b782bf4d2873))
+* sanitize CHANGELOG entry containing banned term ([c783827](https://github.com/techofourown/img-ourbox-woodbox/commit/c78382765893563e92f5a6ec638dc3dace21440e))
+
 ## [0.2.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.0...v0.2.1) (2026-03-02)
 
 
