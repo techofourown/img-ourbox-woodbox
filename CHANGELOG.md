@@ -1,3 +1,10 @@
+## [0.2.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.5...v0.2.6) (2026-03-03)
+
+
+### Bug Fixes
+
+* pin airgap-platform to digest for release builds ([9e5f8c0](https://github.com/techofourown/img-ourbox-woodbox/commit/9e5f8c0ae3aa0328e53605f94a327fcfdf9a50b5))
+
 ## [0.2.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.4...v0.2.5) (2026-03-03)
 
 
