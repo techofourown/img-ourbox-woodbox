@@ -162,6 +162,8 @@ install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
   "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-monitor.py" \
+  "${ISO_DIR}/ourbox/tools/ourbox-installer-monitor.py"
 
 # Bundle the linux-amd64 ORAS binary for use at install time (offline-capable).
 # Always download the target-arch binary explicitly — never copy the host oras

@@ -4,6 +4,12 @@
 # writes /autoinstall.yaml, then exits so Subiquity can run fully automated.
 set -euo pipefail
 
+# Tee all output to the installer log so the network monitor can broadcast it.
+# The monitor (ourbox-installer-monitor.py) tails this file and rebroadcasts
+# each line via UDP and an HTTP viewer on port 8888.
+INSTALLER_LOG="/run/ourbox-installer.log"
+exec > >(tee -a "${INSTALLER_LOG}") 2>&1
+
 # shellcheck disable=SC1091
 source /cdrom/ourbox/tools/lib.sh
 
@@ -26,10 +32,19 @@ PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
 # ---------------------------------------------------------------------------
 
 banner() {
+  local ip
+  ip="$(ip route get 10.255.255.255 2>/dev/null | awk '/src/ {print $7; exit}' || true)"
   clear
   echo
   echo "  =================================================================="
   echo "  OurBox Woodbox — Installer"
+  echo "  =================================================================="
+  if [[ -n "${ip}" ]]; then
+    echo "  Network monitoring:"
+    echo "    SSH     : ssh ubuntu@${ip}   (password: ourbox-install)"
+    echo "    Browser : http://${ip}:8888/"
+    echo "    UDP     : socat UDP-RECV:9999,reuseaddr -"
+  fi
   echo "  =================================================================="
   echo
 }
