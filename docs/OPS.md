@@ -16,7 +16,7 @@ This will:
 4. Flash the ISO to the selected USB disk
 
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
-prompts, wait for the machine to power off, remove USB, boot from NVMe.
+prompts, wait for the machine to power off, remove USB, boot from the selected OS disk.
 
 ---
 
@@ -53,7 +53,7 @@ This will:
 
 The installer is interactive. It will prompt for:
 
-1. **OS disk selection** — the NVMe disk to install onto (will be erased)
+1. **OS disk selection** — any non-removable non-USB disk to install onto (will be erased; SSD/NVMe recommended)
 2. **DATA disk selection** — the disk to format as `OURBOX_DATA` (ext4)
 3. **OS artifact** — pulled from registry or used from embedded payload; displayed with SHA-256
 4. **Hostname, username, password** — for the installed system
@@ -62,7 +62,7 @@ The installer is interactive. It will prompt for:
 After confirmation, the installer runs unattended (~10–15 minutes). When the machine powers off:
 
 - Remove the USB stick
-- Boot from NVMe
+- Boot from the selected OS disk
 - Wait for first-boot bootstrap (several minutes)
 
 ---

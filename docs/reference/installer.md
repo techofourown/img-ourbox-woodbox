@@ -46,7 +46,7 @@ Key variables:
 
 The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 
-1. **Step 1**: Operator selects the OS disk (NVMe only)
+1. **Step 1**: Operator selects the OS disk (any non-removable non-USB disk)
 2. **Step 2**: Operator selects the DATA disk (all non-removable non-OS disks)
 3. **Step 3**: Resolves OS artifact
    - Checks for embedded payload at `/cdrom/ourbox/payload/os-payload.tar.gz` (fat ISO)
