@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.8...v0.3.0) (2026-03-04)
+
+
+### Features
+
+* broadcast installer events over network for zero-config monitoring ([5d849fa](https://github.com/techofourown/img-ourbox-woodbox/commit/5d849fa4b40eec5faeaa5fbe21bb88c3d487d02a))
+
 ## [0.2.8](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.7...v0.2.8) (2026-03-04)
 
 
