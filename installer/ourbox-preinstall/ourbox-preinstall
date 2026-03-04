@@ -713,9 +713,29 @@ main() {
 
   echo
   echo "  =================================================================="
-  echo "  OurBox Woodbox is now installing."
+  echo "  Handoff summary"
+  echo "  =================================================================="
+  echo "  OS disk       : ${TARGET_DISK} (${TARGET_DISK_REAL})"
+  echo "  DATA disk     : ${DATA_DISK}"
+  echo "  OS artifact   : ${OS_ARTIFACT_REF}"
+  echo "  OS SHA256     : ${OS_IMAGE_SHA256}"
+  echo "  Hostname      : ${OURBOX_HOSTNAME}"
+  echo "  Username      : ${OURBOX_USERNAME}"
+  echo "  Autoinstall   : ${AUTOINSTALL_OUT}"
+  echo "  =================================================================="
+  echo
+  echo "  Handing off to Subiquity. Ubuntu base install begins now."
+  echo
+  echo "  Progress is shown below as Subiquity runs."
+  echo "  The machine will POWER OFF when installation is complete."
   echo "  Do NOT remove the USB stick until the machine powers off."
-  echo "  Installation takes approximately 10-15 minutes."
+  echo "  When power is off: remove USB, then press power button to boot."
+  echo
+  echo "  To diagnose issues during this phase (on another TTY):"
+  echo "    Alt-F2  : open a shell"
+  echo "    cat /run/ourbox-bootcmd.log     (bootcmd drop-in log)"
+  echo "    cat ${AUTOINSTALL_OUT}   (config Subiquity is using)"
+  echo "    journalctl -fu ourbox-preinstall.service"
   echo "  =================================================================="
   echo
 }
