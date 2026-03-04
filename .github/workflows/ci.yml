@@ -45,6 +45,29 @@ jobs:
           bash -n installer/ourbox-preinstall/ourbox-preinstall && echo "OK: ourbox-preinstall"
           bash -n installer/ourbox-preinstall/format-data-disk.sh && echo "OK: format-data-disk.sh"
 
+  commitlint:
+    name: Commit message lint
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install commitlint
+        run: npm install --no-save @commitlint/cli @commitlint/config-conventional
+
+      - name: Lint PR commits
+        run: |
+          npx commitlint \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to   ${{ github.event.pull_request.head.sha }} \
+            --verbose
+
   workflow-safety:
     name: Workflow trust boundary check
     runs-on: ubuntu-latest
