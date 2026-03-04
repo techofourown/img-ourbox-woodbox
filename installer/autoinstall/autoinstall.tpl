@@ -59,12 +59,12 @@ ${OURBOX_STORAGE_MATCH}
     #       Payload staged by ourbox-preinstall from embedded ISO or registry.
     # -----------------------------------------------------------------------
     - echo "==> [1/8] Extracting OS payload"
-    - echo "==>       payload: $(ls -lh /opt/ourbox/installer/cache/payload/os-payload.tar.gz 2>/dev/null || echo NOT FOUND)"
+    - 'echo "==>       payload: $(ls -lh /opt/ourbox/installer/cache/payload/os-payload.tar.gz 2>/dev/null || echo NOT FOUND)"'
     - rm -rf /opt/ourbox/installer/cache/payload-staging
     - mkdir -p /opt/ourbox/installer/cache/payload-staging
     - tar -xzf /opt/ourbox/installer/cache/payload/os-payload.tar.gz -C /opt/ourbox/installer/cache/payload-staging
     - echo "==>       payload extracted OK"
-    - echo "==>       rootfs entries: $(ls /opt/ourbox/installer/cache/payload-staging/rootfs/ 2>/dev/null | head -5 | tr '\n' ' ')"
+    - 'echo "==>       rootfs entries: $(ls /opt/ourbox/installer/cache/payload-staging/rootfs/ 2>/dev/null | head -5 | tr "\n" " ")"'
     - cp -a /opt/ourbox/installer/cache/payload-staging/rootfs/. /target/
     - mkdir -p /target/opt/ourbox/airgap
     - cp -a /opt/ourbox/installer/cache/payload-staging/airgap/. /target/opt/ourbox/airgap/
@@ -75,7 +75,7 @@ ${OURBOX_STORAGE_MATCH}
     # -----------------------------------------------------------------------
     - echo "==> [2/8] Installing k3s binary"
     - install -D -m 0755 /opt/ourbox/installer/cache/payload-staging/airgap/k3s/k3s /target/usr/local/bin/k3s
-    - echo "==>       k3s installed: $(ls -lh /target/usr/local/bin/k3s 2>/dev/null)"
+    - 'echo "==>       k3s installed: $(ls -lh /target/usr/local/bin/k3s 2>/dev/null)"'
 
     # -----------------------------------------------------------------------
     # [3/8] Append install-time provenance to /etc/ourbox/release
@@ -113,7 +113,7 @@ ${OURBOX_STORAGE_MATCH}
     # -----------------------------------------------------------------------
     # [7/8] Format the operator-selected DATA disk as OURBOX_DATA.
     # -----------------------------------------------------------------------
-    - echo "==> [7/8] Formatting DATA disk: ${OURBOX_DATA_DISK}"
+    - 'echo "==> [7/8] Formatting DATA disk: ${OURBOX_DATA_DISK}"'
     - '/bin/bash /cdrom/ourbox/tools/format-data-disk.sh ${OURBOX_DATA_DISK}'
     - echo "==>       DATA disk formatted"
 
@@ -137,5 +137,5 @@ ${OURBOX_STORAGE_MATCH}
 
     - echo "==> =================================================================="
     - echo "==> OurBox late-commands complete. Machine powering off."
-    - echo "==> When power is off: remove USB, then press power button to boot."
+    - 'echo "==> When power is off: remove USB, then press power button to boot."'
     - echo "==> =================================================================="
