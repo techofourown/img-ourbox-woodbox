@@ -18,10 +18,11 @@ autoinstall:
     variant: ''
 
   # Target the specific disk the operator selected.
-  # ourbox-preinstall sets OURBOX_STORAGE_MATCH to "        path: /dev/nvme0n1"
-  # (or whichever device the operator picked).  Path matching is used instead
-  # of serial because Subiquity's prober reads serials from sysfs verbatim,
-  # including trailing spaces that lsblk strips, making serial matches fail.
+  # ourbox-preinstall sets OURBOX_STORAGE_MATCH to e.g. "        path: /dev/sda"
+  # or "        path: /dev/nvme0n1" depending on the operator's selection.
+  # Path matching is used instead of serial because Subiquity's prober reads
+  # serials from sysfs verbatim, including trailing spaces that lsblk strips,
+  # making serial matches fail.
   storage:
     layout:
       name: lvm
