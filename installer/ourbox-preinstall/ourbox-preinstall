@@ -57,17 +57,15 @@ installer_disk() {
   fi
 }
 
-# OS disk candidates: NVMe, non-removable, not the installer USB.
+# OS disk candidates: any non-removable disk except the installer USB.
 candidate_disks() {
   local installer
   installer="$(installer_disk)"
   lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}' | while read -r disk; do
     [[ "${disk}" != "${installer}" ]] || continue
-    local rm tran
+    local rm
     rm="$(lsblk -dn -o RM "${disk}" 2>/dev/null | tr -d '[:space:]')"
     [[ "${rm}" != "1" ]] || continue
-    tran="$(lsblk -dn -o TRAN "${disk}" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
-    [[ "${tran}" == "nvme" ]] || continue
     echo "${disk}"
   done
 }
@@ -136,8 +134,8 @@ select_disk() {
 
     if (( ${#disks[@]} == 0 )); then
       echo
-      echo "  No NVMe disks found (non-removable)."
-      echo "  Make sure the NVMe drive is seated, then rescan."
+      echo "  No OS disk candidates found (non-removable, non-USB)."
+      echo "  Make sure a target disk is connected, then rescan."
       read -r -p "  Press ENTER to rescan, or q to quit: " _ans
       [[ "${_ans}" == "q" || "${_ans}" == "Q" ]] && die "operator quit"
       continue
@@ -632,7 +630,8 @@ main() {
   # --- Step 1: OS disk ---
   echo "  Step 1 of 5: Select the OS disk"
   echo "  This disk will be ERASED and OurBox Woodbox OS installed on it."
-  echo "  Showing NVMe disks only."
+  echo "  Showing all non-removable, non-USB disks."
+  echo "  Recommendation: use a faster SSD/NVMe drive for best performance."
 
   TARGET_DISK=""
   TARGET_DISK_SERIAL=""
@@ -697,7 +696,7 @@ main() {
   # --- generate autoinstall.yaml ---
   export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH OURBOX_DATA_DISK="${DATA_DISK}"
 
-  # Match by device path (/dev/nvme0n1) rather than serial number.
+  # Match by device path (for example /dev/nvme0n1 or /dev/sda) rather than serial number.
   # Subiquity's prober reads the serial directly from sysfs, which includes
   # trailing spaces (e.g. "794PCBKPPQKN        ").  lsblk strips those spaces,
   # so a serial-based match always fails.  Path matching is unambiguous and
