@@ -33,18 +33,18 @@ bootcmd:
   - "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true"
   - "sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config 2>/dev/null || true"
   - "echo 'ubuntu:ourbox-install' | chpasswd 2>/dev/null || true"
-  - "systemctl start ssh 2>/dev/null || systemctl start openssh-server 2>/dev/null || true"
-  - "echo '[ourbox-bootcmd] SSH enabled (ubuntu / ourbox-install)' >> /run/ourbox-installer.log"
+  - "systemctl --no-block start ssh 2>/dev/null || systemctl --no-block start openssh-server 2>/dev/null || true"
+  - "echo '[ourbox-bootcmd] SSH start queued (ubuntu / ourbox-install)' >> /run/ourbox-installer.log"
 
   # Start avahi-daemon if available for mDNS (.local) discoverability.
-  - "systemctl start avahi-daemon 2>/dev/null || true"
-  - "echo '[ourbox-bootcmd] avahi-daemon start attempted' >> /run/ourbox-installer.log"
+  - "systemctl --no-block start avahi-daemon 2>/dev/null || true"
+  - "echo '[ourbox-bootcmd] avahi-daemon start queued' >> /run/ourbox-installer.log"
 
   # Copy and launch the network monitor (UDP broadcast + HTTP log server).
   # Runs in the background; tails /run/ourbox-installer.log and rebroadcasts.
-  - cp /cdrom/ourbox/tools/ourbox-installer-monitor.py /run/ourbox-installer-monitor.py
+  - "cp /cdrom/ourbox/tools/ourbox-installer-monitor.py /run/ourbox-installer-monitor.py 2>/dev/null || true"
   - "python3 /run/ourbox-installer-monitor.py >> /run/ourbox-installer.log 2>&1 &"
-  - "echo '[ourbox-bootcmd] network monitor started' >> /run/ourbox-installer.log"
+  - "echo '[ourbox-bootcmd] network monitor launch requested' >> /run/ourbox-installer.log"
   # --- End network monitoring setup ----------------------------------------
 
   # Make ORAS available to ourbox-preinstall for installer-time artifact pulls
