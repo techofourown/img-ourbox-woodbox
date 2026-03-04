@@ -1,3 +1,10 @@
+## [0.3.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.0...v0.3.1) (2026-03-04)
+
+
+### Bug Fixes
+
+* **installer:** avoid bootcmd blocking service starts ([cab91ee](https://github.com/techofourown/img-ourbox-woodbox/commit/cab91eedd4fddb3caedcde853eb04a1562f5f04d))
+
 # [0.3.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.8...v0.3.0) (2026-03-04)
 
 
