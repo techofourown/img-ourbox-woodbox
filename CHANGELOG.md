@@ -1,3 +1,11 @@
+## [0.2.8](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.7...v0.2.8) (2026-03-04)
+
+
+### Bug Fixes
+
+* power off after install and add installer observability ([4c30a3b](https://github.com/techofourown/img-ourbox-woodbox/commit/4c30a3b80fd5f2e7b49c83727a195fff21733c78))
+* quote late-commands containing colon-space to prevent YAML parse error ([4a0fc3e](https://github.com/techofourown/img-ourbox-woodbox/commit/4a0fc3e909ae521a36e6fb6d6b76cce5b241e4be)), closes [#15](https://github.com/techofourown/img-ourbox-woodbox/issues/15)
+
 ## [0.2.7](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.2.6...v0.2.7) (2026-03-04)
 
 
