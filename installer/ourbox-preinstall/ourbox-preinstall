@@ -236,6 +236,23 @@ OS_CHANNEL="stable"
 INSTALL_DEFAULTS_SOURCE="baked"
 INSTALL_DEFAULTS_REF=""
 
+# Any helper used inside command substitution must keep stdout machine-readable.
+# Human-readable logs belong on stderr, or captured values can be contaminated.
+_is_clean_single_line_ref() {
+  local ref="$1"
+  [[ -n "${ref}" ]] || return 1
+  [[ "${ref}" != *$'\n'* && "${ref}" != *$'\r'* ]] || return 1
+  [[ ! "${ref}" =~ [[:space:]] ]] || return 1
+  return 0
+}
+
+_is_digest_pinned_ref() {
+  local ref="$1"
+  _is_clean_single_line_ref "${ref}" || return 1
+  [[ "${ref}" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]] || return 1
+  return 0
+}
+
 # _try_catalog_resolve REPO CATALOG_TAG CHANNEL
 # If the catalog TSV is available and has a digest-pinned entry for CHANNEL,
 # print the pinned_ref (last column) for the most-recent matching row and
@@ -254,7 +271,7 @@ _try_catalog_resolve() {
   set -e
 
   if [[ "${pull_status}" -ne 0 || ! -f "${catalog_dir}/catalog.tsv" ]]; then
-    log "  Catalog not available"
+    log "  Catalog not available" >&2
     return 1
   fi
 
@@ -266,12 +283,12 @@ _try_catalog_resolve() {
     'NR>1 && $1==ch {last=$(NF)} END{if(last!="")print last}' \
     "${catalog_dir}/catalog.tsv" 2>/dev/null || true)"
 
-  if [[ -n "${pinned_ref}" && "${pinned_ref}" =~ @sha256:[0-9a-f]{64} ]]; then
-    log "  Catalog resolved '${channel}' → ${pinned_ref}"
+  if _is_digest_pinned_ref "${pinned_ref}"; then
+    log "  Catalog resolved '${channel}' → ${pinned_ref}" >&2
     echo "${pinned_ref}"
     return 0
   else
-    log "  Catalog has no valid digest-pinned entry for channel '${channel}'"
+    log "  Catalog has no valid digest-pinned entry for channel '${channel}'" >&2
     return 1
   fi
 }
@@ -431,17 +448,23 @@ resolve_and_stage_os_artifact() {
     selected_ref="${explicit_ref}"
   elif [[ "${OS_CATALOG_ENABLED}" == "1" ]]; then
     local catalog_result
+    local catalog_result_q=""
     set +e
     catalog_result="$(_try_catalog_resolve \
       "${OS_REPO}" "${OS_CATALOG_TAG}" "${OS_CHANNEL}")"
     local catalog_ok=$?
     set -e
-    if [[ "${catalog_ok}" -eq 0 && -n "${catalog_result}" ]]; then
+    if [[ "${catalog_ok}" -eq 0 ]] && _is_digest_pinned_ref "${catalog_result}"; then
       selected_ref="${catalog_result}"
       if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
         INSTALL_DEFAULTS_SOURCE="catalog"
       fi
     else
+      if [[ "${catalog_ok}" -eq 0 ]]; then
+        printf -v catalog_result_q '%q' "${catalog_result}"
+        log "  WARNING: Catalog output was invalid or contaminated; falling back to channel tag"
+        log "  Raw catalog output (shell-escaped): ${catalog_result_q}"
+      fi
       selected_ref="${channel_tag_ref}"
       if [[ "${INSTALL_DEFAULTS_SOURCE}" == "baked" ]]; then
         INSTALL_DEFAULTS_SOURCE="tag"
@@ -474,6 +497,12 @@ resolve_and_stage_os_artifact() {
     selected_ref="${override_input}"
     INSTALL_DEFAULTS_SOURCE="operator-override"
     INSTALL_DEFAULTS_REF=""
+  fi
+
+  local selected_ref_q=""
+  if ! _is_clean_single_line_ref "${selected_ref}"; then
+    printf -v selected_ref_q '%q' "${selected_ref}"
+    die "invalid selected OS artifact ref (must be non-empty, single-line, no whitespace): ${selected_ref_q}"
   fi
 
   # --- Resolve floating ref to immutable digest ---
