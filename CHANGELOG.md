@@ -1,3 +1,10 @@
+## [0.3.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.1...v0.3.2) (2026-03-05)
+
+
+### Bug Fixes
+
+* **installer:** keep resolver output machine-readable and reject contaminated refs ([991aa75](https://github.com/techofourown/img-ourbox-woodbox/commit/991aa750ab03669f7ec26c0e137cd9150507ca33))
+
 ## [0.3.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.0...v0.3.1) (2026-03-04)
 
 
