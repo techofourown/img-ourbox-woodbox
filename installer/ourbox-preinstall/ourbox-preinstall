@@ -254,7 +254,7 @@ _try_catalog_resolve() {
   set -e
 
   if [[ "${pull_status}" -ne 0 || ! -f "${catalog_dir}/catalog.tsv" ]]; then
-    log "  Catalog not available"
+    log "  Catalog not available" >&2
     return 1
   fi
 
@@ -267,11 +267,11 @@ _try_catalog_resolve() {
     "${catalog_dir}/catalog.tsv" 2>/dev/null || true)"
 
   if [[ -n "${pinned_ref}" && "${pinned_ref}" =~ @sha256:[0-9a-f]{64} ]]; then
-    log "  Catalog resolved '${channel}' → ${pinned_ref}"
+    log "  Catalog resolved '${channel}' → ${pinned_ref}" >&2
     echo "${pinned_ref}"
     return 0
   else
-    log "  Catalog has no valid digest-pinned entry for channel '${channel}'"
+    log "  Catalog has no valid digest-pinned entry for channel '${channel}'" >&2
     return 1
   fi
 }
