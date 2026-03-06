@@ -1,3 +1,17 @@
+# [0.4.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.3...v0.4.0) (2026-03-06)
+
+
+### Bug Fixes
+
+* **build:** silence shellcheck on crypt hash literal ([d75e523](https://github.com/techofourown/img-ourbox-woodbox/commit/d75e523ad0fdeaa27024a3efc317ecc01bcb023a))
+* **installer-ssh:** avoid Match blocks and validate sshd config ([ec4b839](https://github.com/techofourown/img-ourbox-woodbox/commit/ec4b8397b343b8fdfe09c56127eeee05b772fafc))
+* **installer-ssh:** honor passwd home for authorized_keys path ([a820ed4](https://github.com/techofourown/img-ourbox-woodbox/commit/a820ed430c891fe10fc20d90f57579879bf4b820))
+
+
+### Features
+
+* **installer:** standardize installer SSH diagnostics contract ([e78de27](https://github.com/techofourown/img-ourbox-woodbox/commit/e78de2701ccb733f437f5e0df0089861b93875dc))
+
 ## [0.3.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.1...v0.3.2) (2026-03-05)
 
 
