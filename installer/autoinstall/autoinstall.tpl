@@ -7,7 +7,7 @@
 #                  OURBOX_VARIANT OURBOX_VERSION
 #   Pass 2 (install time, ourbox-preinstall):
 #     Substitutes: OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
-#                  OURBOX_STORAGE_MATCH OURBOX_DATA_DISK
+#                  OURBOX_STORAGE_MATCH
 
 autoinstall:
   version: 1
@@ -111,11 +111,12 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       netplan written"
 
     # -----------------------------------------------------------------------
-    # [7/8] Format the operator-selected DATA disk as OURBOX_DATA.
+    # [7/8] Verify DATA disk prepared in preinstall (non-destructive).
     # -----------------------------------------------------------------------
-    - 'echo "==> [7/8] Formatting DATA disk: ${OURBOX_DATA_DISK}"'
-    - '/bin/bash /cdrom/ourbox/tools/format-data-disk.sh ${OURBOX_DATA_DISK}'
-    - echo "==>       DATA disk formatted"
+    - 'echo "==> [7/8] Verifying DATA disk prepared in preinstall"'
+    - 'test -n "$(blkid -L OURBOX_DATA 2>/dev/null)"'
+    - 'echo "==>       OURBOX_DATA present on $(blkid -L OURBOX_DATA)"'
+    - 'lsblk -o NAME,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$(blkid -L OURBOX_DATA)" || true'
 
     # -----------------------------------------------------------------------
     # [8/8] Restore boot order. grub-install pushes itself to the front;
