@@ -104,11 +104,19 @@ bootcmd:
       mkdir -p /etc/ssh/sshd_config.d
       {
         if [[ "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" == "1" ]]; then
-          echo "PermitRootLogin yes"
+          if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+            echo "PermitRootLogin prohibit-password"
+          else
+            echo "PermitRootLogin yes"
+          fi
         else
           echo "PermitRootLogin no"
         fi
-        echo "PasswordAuthentication no"
+        if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+          echo "PasswordAuthentication yes"
+        else
+          echo "PasswordAuthentication no"
+        fi
         echo "PubkeyAuthentication yes"
         echo "KbdInteractiveAuthentication no"
         echo "X11Forwarding no"
@@ -126,20 +134,21 @@ bootcmd:
             echo "AllowUsers ${OURBOX_INSTALLER_SSH_USER}"
           fi
         fi
-        if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
-          echo
-          echo "Match User ${OURBOX_INSTALLER_SSH_USER}"
-          echo "  PasswordAuthentication yes"
-        fi
       } > /etc/ssh/sshd_config.d/60-ourbox-installer.conf
 
-      systemctl restart ssh >/dev/null 2>&1 \
-        || systemctl restart openssh-server >/dev/null 2>&1 \
-        || systemctl --no-block start ssh >/dev/null 2>&1 \
-        || systemctl --no-block start openssh-server >/dev/null 2>&1 \
-        || true
-
-      echo "[ourbox-bootcmd] SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT})" >> "${LOG_FILE}"
+      install -d -m 0755 /run/sshd
+      if sshd -t >/dev/null 2>&1; then
+        if systemctl restart ssh >/dev/null 2>&1 \
+          || systemctl restart openssh-server >/dev/null 2>&1 \
+          || systemctl --no-block start ssh >/dev/null 2>&1 \
+          || systemctl --no-block start openssh-server >/dev/null 2>&1; then
+          echo "[ourbox-bootcmd] SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT})" >> "${LOG_FILE}"
+        else
+          echo "[ourbox-bootcmd] ERROR: sshd config valid but ssh service restart/start failed" >> "${LOG_FILE}"
+        fi
+      else
+        echo "[ourbox-bootcmd] ERROR: sshd -t failed for /etc/ssh/sshd_config.d/60-ourbox-installer.conf" >> "${LOG_FILE}"
+      fi
       EOF
 
   # Start avahi-daemon if available for mDNS (.local) discoverability.
