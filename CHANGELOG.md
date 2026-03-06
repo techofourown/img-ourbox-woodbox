@@ -1,3 +1,12 @@
+## [0.4.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.3...v0.4.4) (2026-03-06)
+
+
+### Bug Fixes
+
+* **bootstrap:** reapply the platform contract when the shipped state changes ([2ba4370](https://github.com/techofourown/img-ourbox-woodbox/commit/2ba4370de41a43cd74a72b6d4a5d31aa7c5f8687))
+* **ci:** run installer smoke checks through bash ([ba5998c](https://github.com/techofourown/img-ourbox-woodbox/commit/ba5998c4e2bd91a4a1a35f47d04ea3ed897efcb1))
+* harden installer seed and smoke validation ([d5e3408](https://github.com/techofourown/img-ourbox-woodbox/commit/d5e3408b53cb1849149cdfac39aaee09b2ab1c06))
+
 ## [0.4.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.2...v0.4.3) (2026-03-06)
 
 
