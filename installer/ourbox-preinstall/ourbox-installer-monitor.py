@@ -28,7 +28,7 @@ HTTP log viewer (port 8888) — auto-refreshing browser page:
 
 SSH (port 22) — interactive live-env shell:
 
-  ssh ubuntu@<installer-ip>   (password: ourbox-install)
+  ssh ourbox-installer@<installer-ip>
   On the installer: journalctl -fu ourbox-preinstall.service
                     cat /autoinstall.yaml
                     cat /run/ourbox-bootcmd.log
@@ -107,7 +107,7 @@ class UDPBroadcaster:
             sep,
             "OurBox Woodbox Installer",
             f"  Host    : {hostname}.local  ({ip})",
-            f"  SSH     : ssh ubuntu@{ip}   password: ourbox-install",
+            f"  SSH     : ssh ourbox-installer@{ip}",
             f"  Browser : http://{ip}:{HTTP_PORT}/",
             f"  UDP     : listening on this port {BROADCAST_PORT}",
             sep,
@@ -174,7 +174,7 @@ def _make_handler(hostname: str):
 <body>
   <header>
     <h1>OurBox Woodbox Installer &mdash; {hostname} ({ip})</h1>
-    <p>SSH: <code>ssh ubuntu@{ip}</code> &nbsp; password: <code>ourbox-install</code></p>
+    <p>SSH: <code>ssh ourbox-installer@{ip}</code></p>
     <p>UDP broadcast on port {BROADCAST_PORT} &nbsp;|&nbsp; Page auto-refreshes every 3 s</p>
   </header>
   <main><pre>{safe_log}</pre></main>
@@ -243,7 +243,7 @@ def main():
     _log(f"[monitor] network ready — ip={ip}")
     _log(f"[monitor] UDP broadcast on {BROADCAST_ADDR}:{BROADCAST_PORT}")
     _log(f"[monitor] HTTP log at http://{ip}:{HTTP_PORT}/")
-    _log(f"[monitor] SSH: ssh ubuntu@{ip}  password: ourbox-install")
+    _log(f"[monitor] SSH: ssh ourbox-installer@{ip}")
 
     broadcaster = UDPBroadcaster()
 
