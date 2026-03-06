@@ -734,8 +734,22 @@ main() {
   echo "  Username     : ${OURBOX_USERNAME}"
   echo
   echo "  WARNING: ALL DATA ON ${TARGET_DISK} AND ${DATA_DISK} WILL BE PERMANENTLY ERASED."
+  echo "  Old LVM/RAID/encrypted/swap/filesystem metadata on the DATA disk"
+  echo "  will be destroyed as part of DATA disk preparation."
   echo
   prompt_confirm_exact "INSTALL" "  Type INSTALL to begin (or Ctrl-C to abort):"
+
+  TARGET_DISK_REAL="$(readlink -f "${TARGET_DISK}")"
+  DATA_DISK_REAL="$(readlink -f "${DATA_DISK}")"
+
+  echo
+  echo "  Preparing DATA disk now..."
+  echo "  This may take a moment if the disk contains old LVM, RAID, or encrypted metadata."
+  echo
+  /bin/bash /cdrom/ourbox/tools/format-data-disk.sh "${DATA_DISK_REAL}" "${TARGET_DISK_REAL}"
+  echo
+  echo "  DATA disk prepared successfully."
+  echo
 
   # --- generate autoinstall.yaml ---
   export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH OURBOX_DATA_DISK="${DATA_DISK}"
@@ -745,7 +759,6 @@ main() {
   # trailing spaces (e.g. "794PCBKPPQKN        ").  lsblk strips those spaces,
   # so a serial-based match always fails.  Path matching is unambiguous and
   # requires no serial normalization.
-  TARGET_DISK_REAL="$(readlink -f "${TARGET_DISK}")"
   OURBOX_STORAGE_MATCH="        path: ${TARGET_DISK_REAL}"
   export OURBOX_STORAGE_MATCH
 

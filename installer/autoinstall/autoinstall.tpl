@@ -111,11 +111,12 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       netplan written"
 
     # -----------------------------------------------------------------------
-    # [7/8] Format the operator-selected DATA disk as OURBOX_DATA.
+    # [7/8] Verify the pre-installer prepared OURBOX_DATA.
     # -----------------------------------------------------------------------
-    - 'echo "==> [7/8] Formatting DATA disk: ${OURBOX_DATA_DISK}"'
-    - '/bin/bash /cdrom/ourbox/tools/format-data-disk.sh ${OURBOX_DATA_DISK}'
-    - echo "==>       DATA disk formatted"
+    - 'echo "==> [7/8] Verifying DATA disk prepared in preinstall"'
+    - 'test -n "$(blkid -L OURBOX_DATA 2>/dev/null)"'
+    - 'echo "==>       OURBOX_DATA present on $(blkid -L OURBOX_DATA)"'
+    - 'lsblk -o NAME,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$(blkid -L OURBOX_DATA)" || true'
 
     # -----------------------------------------------------------------------
     # [8/8] Restore boot order. grub-install pushes itself to the front;
