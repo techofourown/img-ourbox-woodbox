@@ -1,3 +1,11 @@
+## [0.4.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.0...v0.4.1) (2026-03-06)
+
+
+### Bug Fixes
+
+* **installer:** remove unused SSH status field in TTY script ([b5b4f36](https://github.com/techofourown/img-ourbox-woodbox/commit/b5b4f36f9347234899eb573f4f9d3ec7b23bb791)), closes [#27](https://github.com/techofourown/img-ourbox-woodbox/issues/27)
+* **installer:** restore truthful public installer SSH readiness ([d37f363](https://github.com/techofourown/img-ourbox-woodbox/commit/d37f3637c01ce427344b3c7cbcdf8306cfec016c))
+
 # [0.4.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.3.3...v0.4.0) (2026-03-06)
 
 
