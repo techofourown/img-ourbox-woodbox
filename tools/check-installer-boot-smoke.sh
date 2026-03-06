@@ -31,7 +31,6 @@ need_cmd qemu-img
 need_cmd ssh
 need_cmd sshpass
 need_cmd curl
-need_cmd nc
 need_cmd python3
 
 ISO_FILE="${1:-}"
@@ -104,21 +103,6 @@ ssh_opts=(
   -p "${VM_SSH_PORT}"
 )
 
-wait_for_port() {
-  local port="$1" timeout="$2"
-  local deadline
-  deadline=$((SECONDS + timeout))
-
-  while (( SECONDS < deadline )); do
-    if nc -z -w 2 127.0.0.1 "${port}" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-
-  return 1
-}
-
 wait_for_file_contains() {
   local file="$1" pattern="$2" timeout="$3"
   local deadline
@@ -131,6 +115,36 @@ wait_for_file_contains() {
     sleep 2
   done
 
+  return 1
+}
+
+wait_for_http_response_contains() {
+  local url="$1" timeout="$2" output_file="$3"
+  shift 3
+
+  local deadline tmp_output pattern found_all
+  deadline=$((SECONDS + timeout))
+  tmp_output="${output_file}.tmp"
+
+  while (( SECONDS < deadline )); do
+    if curl -fsS --max-time 5 "${url}" > "${tmp_output}" 2>/dev/null; then
+      found_all="1"
+      for pattern in "$@"; do
+        if ! grep -Fq "${pattern}" "${tmp_output}"; then
+          found_all="0"
+          break
+        fi
+      done
+
+      if [[ "${found_all}" == "1" ]]; then
+        mv "${tmp_output}" "${output_file}"
+        return 0
+      fi
+    fi
+    sleep 2
+  done
+
+  rm -f "${tmp_output}"
   return 1
 }
 
@@ -252,8 +266,8 @@ qemu-system-x86_64 \
   >/dev/null 2>&1 &
 QEMU_PID="$!"
 
-log "Waiting for live-installer SSH to become reachable"
-wait_for_port "${VM_SSH_PORT}" "${BOOT_TIMEOUT_SECS}" || die "timed out waiting for installer SSH on localhost:${VM_SSH_PORT}"
+log "Waiting for live-installer SSH login to become reachable"
+wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}" || die "timed out waiting for installer SSH login"
 
 log "Running SSH-level smoke assertions"
 ssh_smoke_env=(
@@ -309,12 +323,14 @@ if SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
   die "root password login unexpectedly succeeded in smoke VM"
 fi
 
-log "Waiting for installer monitor on port ${VM_HTTP_PORT}"
-wait_for_port "${VM_HTTP_PORT}" 120 || die "timed out waiting for installer HTTP monitor on localhost:${VM_HTTP_PORT}"
-curl -fsS "http://127.0.0.1:${VM_HTTP_PORT}/" > "${HTTP_BODY}"
-grep -Fq "OurBox Woodbox Installer" "${HTTP_BODY}" || die "installer HTTP monitor response did not contain the expected header"
-grep -Fq "ssh ${OURBOX_INSTALLER_SSH_USER}@" "${HTTP_BODY}" || \
-  die "installer HTTP monitor response did not advertise installer SSH"
+log "Waiting for installer monitor to serve the expected status page"
+wait_for_http_response_contains \
+  "http://127.0.0.1:${VM_HTTP_PORT}/" \
+  120 \
+  "${HTTP_BODY}" \
+  "OurBox Woodbox Installer" \
+  "ssh ${OURBOX_INSTALLER_SSH_USER}@" \
+  || die "timed out waiting for installer HTTP monitor content"
 
 log "Waiting for UDP monitor output on port ${VM_UDP_PORT}"
 wait_for_file_contains "${UDP_CAPTURE}" "OurBox Woodbox Installer" 120 \
