@@ -41,7 +41,7 @@ banner() {
   echo "  =================================================================="
   if [[ -n "${ip}" ]]; then
     echo "  Network monitoring:"
-    echo "    SSH     : ssh ubuntu@${ip}   (password: ourbox-install)"
+    echo "    SSH     : ssh ourbox-installer@${ip}"
     echo "    Browser : http://${ip}:8888/"
     echo "    UDP     : socat UDP-RECV:9999,reuseaddr -"
   fi
