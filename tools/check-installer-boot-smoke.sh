@@ -62,6 +62,11 @@ SERIAL_LOG="${TMP_DIR}/serial.log"
 UDP_CAPTURE="${TMP_DIR}/udp.log"
 OS_DISK="${TMP_DIR}/os-disk.qcow2"
 DATA_DISK="${TMP_DIR}/data-disk.qcow2"
+SSH_LAST_ERROR="${TMP_DIR}/ssh-last-error.log"
+SSH_BANNER_DIAG="${TMP_DIR}/ssh-banner-diag.log"
+HTTP_DIAG_HEADERS="${TMP_DIR}/http-diag.headers"
+HTTP_DIAG_BODY="${TMP_DIR}/http-diag.body"
+HTTP_DIAG_ERROR="${TMP_DIR}/http-diag.error"
 QEMU_PID=""
 UDP_LISTENER_PID=""
 HTTP_BODY="${TMP_DIR}/monitor.html"
@@ -83,11 +88,19 @@ cleanup() {
   if [[ "${exit_code}" != "0" ]]; then
     if [[ -f "${SERIAL_LOG}" ]]; then
       log "Smoke VM serial log tail:"
-      tail -n 80 "${SERIAL_LOG}" || true
+      if [[ -s "${SERIAL_LOG}" ]]; then
+        tail -n 80 "${SERIAL_LOG}" || true
+      else
+        printf '(serial log empty)\n'
+      fi
     fi
     if [[ -f "${UDP_CAPTURE}" ]]; then
       log "Smoke VM UDP capture tail:"
-      tail -n 80 "${UDP_CAPTURE}" || true
+      if [[ -s "${UDP_CAPTURE}" ]]; then
+        tail -n 80 "${UDP_CAPTURE}" || true
+      else
+        printf '(UDP capture empty)\n'
+      fi
     fi
   fi
 
@@ -148,6 +161,21 @@ wait_for_http_response_contains() {
   return 1
 }
 
+probe_installer_ssh() {
+  local remote_cmd="$1"
+  local stderr_file="${TMP_DIR}/ssh-probe.stderr"
+
+  if installer_ssh "${remote_cmd}" >/dev/null 2>"${stderr_file}"; then
+    rm -f "${stderr_file}"
+    return 0
+  fi
+
+  if [[ -s "${stderr_file}" ]]; then
+    cp "${stderr_file}" "${SSH_LAST_ERROR}"
+  fi
+  return 1
+}
+
 installer_ssh() {
   local remote_cmd="$1"
 
@@ -185,13 +213,85 @@ wait_for_remote_condition() {
   deadline=$((SECONDS + timeout))
 
   while (( SECONDS < deadline )); do
-    if installer_ssh "${remote_cmd}" >/dev/null 2>&1; then
+    if probe_installer_ssh "${remote_cmd}"; then
       return 0
     fi
     sleep 2
   done
 
   return 1
+}
+
+probe_ssh_banner() {
+  python3 - "${VM_SSH_PORT}" >"${SSH_BANNER_DIAG}" 2>&1 <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+
+try:
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.settimeout(5)
+        data = sock.recv(256)
+except TimeoutError:
+    print("timed out waiting for SSH banner")
+    raise SystemExit(1)
+except OSError as exc:
+    print(f"SSH banner probe failed: {exc}")
+    raise SystemExit(1)
+
+if not data:
+    print("SSH banner probe connected but received no data")
+    raise SystemExit(1)
+
+text = data.decode("utf-8", "replace").strip()
+print(text)
+if text.startswith("SSH-"):
+    raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+}
+
+capture_http_monitor_diagnostics() {
+  rm -f "${HTTP_DIAG_HEADERS}" "${HTTP_DIAG_BODY}" "${HTTP_DIAG_ERROR}"
+
+  if curl -sS --max-time 5 -D "${HTTP_DIAG_HEADERS}" \
+    "http://127.0.0.1:${VM_HTTP_PORT}/" >"${HTTP_DIAG_BODY}" 2>"${HTTP_DIAG_ERROR}"; then
+    return 0
+  fi
+
+  return 1
+}
+
+log_failure_diagnostics() {
+  log "Installer SSH readiness diagnostics:"
+
+  if [[ -s "${SSH_LAST_ERROR}" ]]; then
+    log "Last SSH client error:"
+    sed -n '1,20p' "${SSH_LAST_ERROR}" || true
+  else
+    log "No SSH client error text was captured."
+  fi
+
+  if probe_ssh_banner; then
+    log "Observed SSH banner during failure triage:"
+    sed -n '1,5p' "${SSH_BANNER_DIAG}" || true
+  else
+    log "No usable SSH banner during failure triage:"
+    sed -n '1,5p' "${SSH_BANNER_DIAG}" || true
+  fi
+
+  if capture_http_monitor_diagnostics; then
+    log "Installer HTTP monitor responded during failure triage:"
+    sed -n '1,10p' "${HTTP_DIAG_HEADERS}" || true
+    sed -n '1,40p' "${HTTP_DIAG_BODY}" || true
+  else
+    log "Installer HTTP monitor did not respond during failure triage."
+    if [[ -s "${HTTP_DIAG_ERROR}" ]]; then
+      sed -n '1,10p' "${HTTP_DIAG_ERROR}" || true
+    fi
+  fi
 }
 
 wait_for_cloud_init_healthy() {
@@ -266,7 +366,10 @@ qemu-system-x86_64 \
 QEMU_PID="$!"
 
 log "Waiting for live-installer SSH login to become reachable"
-wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}" || die "timed out waiting for installer SSH login"
+if ! wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer SSH login"
+fi
 
 log "Running SSH-level smoke assertions"
 ssh_smoke_env=(
