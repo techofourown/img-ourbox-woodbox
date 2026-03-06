@@ -121,12 +121,29 @@ ${OURBOX_STORAGE_MATCH}
     # -----------------------------------------------------------------------
     # [8/8] Restore boot order. grub-install pushes itself to the front;
     #       put USB first so it's skipped cleanly when absent, falling
-    #       through to the installed OS disk.
+    #       through to the installed OS disk. Run this inside /target
+    #       because efibootmgr is installed there during curtin curthooks,
+    #       not in the live installer environment.
     # -----------------------------------------------------------------------
     - echo "==> [8/8] Adjusting EFI boot order"
-    - efibootmgr
-    - 'CURRENT=$(efibootmgr | awk "/^BootCurrent:/ {print \$2}"); OTHERS=$(efibootmgr | awk -v c="$CURRENT" "/^Boot[0-9A-F]+[*]/ {match(\$1, /Boot([0-9A-F]+)/, m); if(m[1] != c) printf m[1]\",\"}" | sed "s/,$//"); if [ -n "$CURRENT" ]; then ORDER="$CURRENT"; [ -n "$OTHERS" ] && ORDER="$CURRENT,$OTHERS"; efibootmgr --bootorder "$ORDER"; fi'
-    - echo "==>       EFI boot order set (USB first, installed OS second)"
+    - |
+        curtin in-target --target=/target -- /bin/bash -lc '
+        if ! command -v efibootmgr >/dev/null 2>&1; then
+          echo "==>       efibootmgr not installed in target; skipping EFI boot order adjustment"
+          exit 0
+        fi
+        efibootmgr || true
+        CURRENT=$(efibootmgr | awk "/^BootCurrent:/ {print \$2}")
+        OTHERS=$(efibootmgr | awk -v c="$CURRENT" "/^Boot[0-9A-F]+[*]/ {match(\$1, /Boot([0-9A-F]+)/, m); if(m[1] != c) printf m[1]\",\"}" | sed "s/,$//")
+        if [ -z "$CURRENT" ]; then
+          echo "==>       BootCurrent unavailable; leaving existing EFI boot order unchanged"
+          exit 0
+        fi
+        ORDER="$CURRENT"
+        [ -n "$OTHERS" ] && ORDER="$CURRENT,$OTHERS"
+        efibootmgr --bootorder "$ORDER"
+        '
+    - echo "==>       EFI boot order adjusted when possible"
 
     # Clear static MOTD so only our dynamic status script runs
     - truncate -s 0 /target/etc/motd
