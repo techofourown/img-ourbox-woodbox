@@ -152,16 +152,15 @@ installer_ssh() {
   local remote_cmd="$1"
 
   if [[ -n "${OURBOX_INSTALLER_SSH_KEY}" ]]; then
-    ssh "${ssh_opts[@]}" -i "${OURBOX_INSTALLER_SSH_KEY}" \
+    ssh -o BatchMode=yes "${ssh_opts[@]}" -i "${OURBOX_INSTALLER_SSH_KEY}" \
       "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
       "${remote_cmd}"
-    return 0
+  else
+    SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
+      ssh "${ssh_opts[@]}" \
+      "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
+      "${remote_cmd}"
   fi
-
-  SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
-    ssh "${ssh_opts[@]}" \
-      "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
-      "${remote_cmd}"
 }
 
 installer_ssh_password_only() {
