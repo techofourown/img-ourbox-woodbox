@@ -105,7 +105,7 @@ jobs:
             echo "ERROR: smoke installer ISO not found" >&2
             exit 1
           fi
-          ./tools/check-installer-boot-smoke.sh "${ISO}"
+          bash ./tools/check-installer-boot-smoke.sh "${ISO}"
         env:
           OURBOX_INSTALLER_SSH_KEY: ${{ env.OURBOX_INSTALLER_SMOKE_KEY }}
           OURBOX_INSTALLER_SSH_PASSWORD_STATE: generated-console-only
