@@ -1,3 +1,10 @@
+## [0.4.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.2...v0.4.3) (2026-03-06)
+
+
+### Bug Fixes
+
+* **installer:** run EFI reorder in target context ([916fb69](https://github.com/techofourown/img-ourbox-woodbox/commit/916fb694fd95802bc781a709f569ab6c26296828))
+
 ## [0.4.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.1...v0.4.2) (2026-03-06)
 
 
