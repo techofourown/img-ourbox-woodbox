@@ -42,15 +42,10 @@ EMBED_PAYLOAD=""
 # fallback points at the nightly OS lane rather than stable.
 : "${OS_CHANNEL:=stable}"
 : "${OURBOX_VARIANT:=prod}"
-case "$(printf '%s' "${OURBOX_VARIANT}" | tr '[:upper:]' '[:lower:]')" in
-  dev|support|debug|diag|diagnostic|lab|labs) DEFAULT_INSTALLER_SSH_MODE="both" ;;
-  *) DEFAULT_INSTALLER_SSH_MODE="key" ;;
-esac
-# shellcheck disable=SC2016  # Literal crypt hash includes '$' separators.
-DEFAULT_INSTALLER_SSH_PASSWORD_HASH='$6$ourboxinstall$GgJGorVZ2X.yl0cQk8yIqYDawhEuB47d9m.k9t9HP1afvwC3ALmMxTDtKT2NjDBMqkUOVzvm7LK2ZHxBt2KxH1'
+: "${DEFAULT_INSTALLER_SSH_MODE:=both}"
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
 : "${OURBOX_INSTALLER_SSH_USER:=ourbox-installer}"
-: "${OURBOX_INSTALLER_SSH_PASSWORD_HASH:=${DEFAULT_INSTALLER_SSH_PASSWORD_HASH}}"
+: "${OURBOX_INSTALLER_SSH_PASSWORD_HASH:=}"
 : "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:=}"
 : "${OURBOX_INSTALLER_SSH_ALLOW_ROOT:=0}"
 while [[ $# -gt 0 ]]; do
@@ -70,6 +65,20 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "${OURBOX_INSTALLER_SSH_MODE}" in
+  off|key|password|both) ;;
+  *) die "invalid OURBOX_INSTALLER_SSH_MODE: ${OURBOX_INSTALLER_SSH_MODE}" ;;
+esac
+
+case "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" in
+  0|1) ;;
+  *) die "invalid OURBOX_INSTALLER_SSH_ALLOW_ROOT: ${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" ;;
+esac
+
+if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" && -z "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
+  die "OURBOX_INSTALLER_SSH_MODE=key requires OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS"
+fi
 
 if [[ -n "${EMBED_PAYLOAD}" ]]; then
   [[ -f "${EMBED_PAYLOAD}" ]] || die "embedded payload not found: ${EMBED_PAYLOAD}"
@@ -254,6 +263,8 @@ INSTALLER_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
 OURBOX_VARIANT='${OURBOX_VARIANT}'
 OURBOX_INSTALLER_SSH_MODE='${OURBOX_INSTALLER_SSH_MODE}'
 OURBOX_INSTALLER_SSH_USER='${OURBOX_INSTALLER_SSH_USER}'
+# Blank password hash means the live installer generates a one-time password
+# at boot and shows it only on the attached console.
 OURBOX_INSTALLER_SSH_PASSWORD_HASH='${OURBOX_INSTALLER_SSH_PASSWORD_HASH}'
 OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS='${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}'
 OURBOX_INSTALLER_SSH_ALLOW_ROOT='${OURBOX_INSTALLER_SSH_ALLOW_ROOT}'

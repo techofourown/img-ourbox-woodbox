@@ -28,7 +28,7 @@ HTTP log viewer (port 8888) — auto-refreshing browser page:
 
 SSH (port 22) — interactive live-env shell:
 
-  ssh ourbox-installer@<installer-ip>
+  Only advertised after the installer reports SSH ready.
   On the installer: journalctl -fu ourbox-preinstall.service
                     cat /autoinstall.yaml
                     cat /run/ourbox-bootcmd.log
@@ -44,6 +44,7 @@ import threading
 import time
 
 LOG_FILE = "/run/ourbox-installer.log"
+SSH_STATUS_FILE = "/run/ourbox-installer-ssh-status.env"
 BROADCAST_ADDR = "255.255.255.255"
 BROADCAST_PORT = 9999
 HTTP_PORT = 8888
@@ -81,6 +82,73 @@ def wait_for_network(timeout=30):
     return get_ip()
 
 
+def _unquote(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def read_ssh_status():
+    status = {
+        "OURBOX_INSTALLER_SSH_STATUS": "pending",
+        "OURBOX_INSTALLER_SSH_USER": "ourbox-installer",
+        "OURBOX_INSTALLER_SSH_MODE": "both",
+        "OURBOX_INSTALLER_SSH_ALLOW_ROOT": "0",
+        "OURBOX_INSTALLER_SSH_PASSWORD_STATE": "disabled",
+        "OURBOX_INSTALLER_SSH_KEY_STATE": "disabled",
+    }
+    try:
+        with open(SSH_STATUS_FILE, "r", errors="replace") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                status[key.strip()] = _unquote(value)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+    return status
+
+
+def describe_ssh(status, ip: str):
+    state = status.get("OURBOX_INSTALLER_SSH_STATUS", "pending")
+    user = status.get("OURBOX_INSTALLER_SSH_USER", "ourbox-installer")
+    mode = status.get("OURBOX_INSTALLER_SSH_MODE", "both")
+    password_state = status.get("OURBOX_INSTALLER_SSH_PASSWORD_STATE", "disabled")
+    key_state = status.get("OURBOX_INSTALLER_SSH_KEY_STATE", "disabled")
+
+    detail_parts = []
+    if state == "ready":
+        if password_state == "generated-console-only":
+            detail_parts.append("password shown on attached console")
+        elif password_state == "configured-hash":
+            detail_parts.append("preconfigured password required")
+
+        if key_state == "configured":
+            if mode == "key":
+                detail_parts.append("authorized key required")
+            else:
+                detail_parts.append("authorized keys accepted")
+        elif mode == "key":
+            detail_parts.append("authorized key required")
+
+        detail = "; ".join(detail_parts)
+        if detail:
+            return f"ssh {user}@{ip}", detail
+        return f"ssh {user}@{ip}", "live installer SSH ready"
+
+    if state == "disabled":
+        return "disabled by media config", "installer SSH is intentionally disabled"
+
+    if state == "error":
+        return "unavailable; see installer log", "installer SSH setup failed"
+
+    return f"pending (mode={mode})", "installer is still preparing SSH"
+
+
 # ---------------------------------------------------------------------------
 # UDP broadcaster
 # ---------------------------------------------------------------------------
@@ -102,12 +170,14 @@ class UDPBroadcaster:
 
     def announce(self, ip: str, hostname: str):
         sep = "=" * 62
+        ssh_cmd, ssh_detail = describe_ssh(read_ssh_status(), ip)
         lines = [
             "",
             sep,
             "OurBox Woodbox Installer",
             f"  Host    : {hostname}.local  ({ip})",
-            f"  SSH     : ssh ourbox-installer@{ip}",
+            f"  SSH     : {ssh_cmd}",
+            f"            {ssh_detail}",
             f"  Browser : http://{ip}:{HTTP_PORT}/",
             f"  UDP     : listening on this port {BROADCAST_PORT}",
             sep,
@@ -145,6 +215,7 @@ def _make_handler(hostname: str):
 
         def do_GET(self):
             ip = get_ip()
+            ssh_cmd, ssh_detail = describe_ssh(read_ssh_status(), ip)
             try:
                 with open(LOG_FILE, "r", errors="replace") as f:
                     log_text = f.read()
@@ -174,7 +245,8 @@ def _make_handler(hostname: str):
 <body>
   <header>
     <h1>OurBox Woodbox Installer &mdash; {hostname} ({ip})</h1>
-    <p>SSH: <code>ssh ourbox-installer@{ip}</code></p>
+    <p>SSH: <code>{html.escape(ssh_cmd)}</code></p>
+    <p>{html.escape(ssh_detail)}</p>
     <p>UDP broadcast on port {BROADCAST_PORT} &nbsp;|&nbsp; Page auto-refreshes every 3 s</p>
   </header>
   <main><pre>{safe_log}</pre></main>
@@ -230,6 +302,18 @@ def _advertise_mdns(hostname: str, ip: str):
         pass  # avahi-publish not available — mDNS advertisement skipped
 
 
+def _wait_for_ssh_ready_and_advertise(hostname: str):
+    while True:
+        status = read_ssh_status()
+        ssh_state = status.get("OURBOX_INSTALLER_SSH_STATUS", "pending")
+        if ssh_state == "ready":
+            _advertise_mdns(hostname, get_ip())
+            return
+        if ssh_state in ("disabled", "error"):
+            return
+        time.sleep(1)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -243,7 +327,8 @@ def main():
     _log(f"[monitor] network ready — ip={ip}")
     _log(f"[monitor] UDP broadcast on {BROADCAST_ADDR}:{BROADCAST_PORT}")
     _log(f"[monitor] HTTP log at http://{ip}:{HTTP_PORT}/")
-    _log(f"[monitor] SSH: ssh ourbox-installer@{ip}")
+    ssh_cmd, ssh_detail = describe_ssh(read_ssh_status(), ip)
+    _log(f"[monitor] SSH: {ssh_cmd} ({ssh_detail})")
 
     broadcaster = UDPBroadcaster()
 
@@ -254,7 +339,7 @@ def main():
 
     # mDNS advertisement (best-effort)
     threading.Thread(
-        target=_advertise_mdns, args=(hostname, ip), daemon=True
+        target=_wait_for_ssh_ready_and_advertise, args=(hostname,), daemon=True
     ).start()
 
     # Initial announce burst so late listeners catch it

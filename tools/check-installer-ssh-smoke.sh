@@ -32,7 +32,7 @@ host="${1:-}"
 }
 
 ssh_port="${SSH_PORT:-22}"
-ssh_mode="${OURBOX_INSTALLER_SSH_MODE:-key}"
+ssh_mode="${OURBOX_INSTALLER_SSH_MODE:-both}"
 installer_user="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
 installer_key="${OURBOX_INSTALLER_SSH_KEY:-}"
 installer_password="${OURBOX_INSTALLER_SSH_PASSWORD:-}"

@@ -38,6 +38,9 @@ jobs:
       OURBOX_TARGET: ${{ inputs.target }}
       OURBOX_VARIANT: ${{ inputs.variant }}
       OURBOX_VERSION: ${{ inputs.version }}
+      OURBOX_INSTALLER_SSH_MODE: both
+      OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
+      OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

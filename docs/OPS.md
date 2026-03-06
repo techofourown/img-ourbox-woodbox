@@ -18,6 +18,11 @@ This will:
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
 prompts, wait for the machine to power off, remove USB, boot from the selected OS disk.
 
+During live installation, official/public media exposes a dedicated installer SSH account:
+- user: `ourbox-installer`
+- readiness is shown truthfully in the TTY banner and installer monitor
+- when SSH is password-capable and no hash was baked, a one-time password is generated at boot and shown only on the attached console
+
 ---
 
 ### Local source-build path
@@ -34,6 +39,14 @@ This will:
 4. Build OS payload locally
 5. Build a fat installer ISO with the OS payload embedded (no network pull at install time)
 6. Flash the ISO
+
+Custom installer SSH posture can be set with environment overrides passed to `build-installer-iso.sh`, for example:
+
+```bash
+OURBOX_INSTALLER_SSH_MODE=key \
+OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)" \
+./tools/build-installer-iso.sh
+```
 
 ---
 
@@ -58,6 +71,11 @@ The installer is interactive. It will prompt for:
 3. **OS artifact** — pulled from registry or used from embedded payload; displayed with SHA-256
 4. **Hostname, username, password** — for the installed system
 5. **INSTALL confirmation** — type `INSTALL` to begin
+
+If installer SSH is ready, the banner/monitor will show:
+- `ssh ourbox-installer@<installer-ip>`
+
+For official/public media, the live-installer password is generated at boot and shown only on the attached console. It is not broadcast over UDP, HTTP, or the shared installer log.
 
 After confirmation, the installer runs unattended (~10–15 minutes). When the machine powers off:
 
