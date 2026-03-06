@@ -77,19 +77,27 @@ bootcmd:
           passwd -l "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1 || true
         fi
 
-        install -d -m 0700 "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh"
-        chown "${OURBOX_INSTALLER_SSH_USER}:${OURBOX_INSTALLER_SSH_USER}" "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh"
+        SSH_HOME="$(getent passwd "${OURBOX_INSTALLER_SSH_USER}" | awk -F: '{print $6}' | head -n1)"
+        if [[ -z "${SSH_HOME}" ]]; then
+          SSH_HOME="/home/${OURBOX_INSTALLER_SSH_USER}"
+        fi
+        SSH_GROUP="$(id -gn "${OURBOX_INSTALLER_SSH_USER}" 2>/dev/null || printf '%s' "${OURBOX_INSTALLER_SSH_USER}")"
+        SSH_DIR="${SSH_HOME}/.ssh"
+        SSH_AUTH_KEYS="${SSH_DIR}/authorized_keys"
+
+        install -d -m 0700 "${SSH_DIR}"
+        chown "${OURBOX_INSTALLER_SSH_USER}:${SSH_GROUP}" "${SSH_DIR}"
 
         if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
           if [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
-            printf '%s\n' "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" > "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys"
-            chown "${OURBOX_INSTALLER_SSH_USER}:${OURBOX_INSTALLER_SSH_USER}" "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys"
-            chmod 0600 "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys"
+            printf '%s\n' "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" > "${SSH_AUTH_KEYS}"
+            chown "${OURBOX_INSTALLER_SSH_USER}:${SSH_GROUP}" "${SSH_AUTH_KEYS}"
+            chmod 0600 "${SSH_AUTH_KEYS}"
           else
-            rm -f "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys"
+            rm -f "${SSH_AUTH_KEYS}"
           fi
         else
-          rm -f "/home/${OURBOX_INSTALLER_SSH_USER}/.ssh/authorized_keys"
+          rm -f "${SSH_AUTH_KEYS}"
         fi
       fi
 
