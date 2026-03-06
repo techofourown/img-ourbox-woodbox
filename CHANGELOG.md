@@ -1,3 +1,10 @@
+## [0.4.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.4...v0.4.5) (2026-03-06)
+
+
+### Bug Fixes
+
+* **ci:** wait for real installer readiness in smoke test ([a4fd2e4](https://github.com/techofourown/img-ourbox-woodbox/commit/a4fd2e46b60666987a6c75f81e6ae7eae72650c5))
+
 ## [0.4.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.3...v0.4.4) (2026-03-06)
 
 
