@@ -31,7 +31,7 @@ bootcmd:
   # Load optional overrides from /cdrom/ourbox/installer/defaults.env:
   #   OURBOX_INSTALLER_SSH_MODE=off|key|password|both
   #   OURBOX_INSTALLER_SSH_USER=ourbox-installer
-  #   OURBOX_INSTALLER_SSH_PASSWORD_HASH='$6$...'
+  #   OURBOX_INSTALLER_SSH_PASSWORD_HASH='$6$...' (blank => generated at boot)
   #   OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS='ssh-ed25519 AAAA...'
   #   OURBOX_INSTALLER_SSH_ALLOW_ROOT=0|1
   - |
@@ -40,28 +40,87 @@ bootcmd:
 
       LOG_FILE="/run/ourbox-installer.log"
       DEFAULTS_FILE="/cdrom/ourbox/installer/defaults.env"
+      STATUS_FILE="/run/ourbox-installer-ssh-status.env"
+      PASSWORD_FILE="/run/ourbox-installer-ssh-password.txt"
+
+      write_status_file() {
+        cat > "${STATUS_FILE}" <<STATUS
+OURBOX_INSTALLER_SSH_STATUS=${OURBOX_INSTALLER_SSH_STATUS}
+OURBOX_INSTALLER_SSH_USER=${OURBOX_INSTALLER_SSH_USER}
+OURBOX_INSTALLER_SSH_MODE=${OURBOX_INSTALLER_SSH_MODE}
+OURBOX_INSTALLER_SSH_ALLOW_ROOT=${OURBOX_INSTALLER_SSH_ALLOW_ROOT}
+OURBOX_INSTALLER_SSH_PASSWORD_STATE=${OURBOX_INSTALLER_SSH_PASSWORD_STATE}
+OURBOX_INSTALLER_SSH_KEY_STATE=${OURBOX_INSTALLER_SSH_KEY_STATE}
+STATUS
+        chmod 0600 "${STATUS_FILE}" >/dev/null 2>&1 || true
+      }
+
+      generate_installer_ssh_password() {
+        local generated_password generated_hash
+
+        generated_password="$(
+          openssl rand -base64 18 2>/dev/null \
+            | tr -d '\n' \
+            | tr '/+' '89' \
+            | cut -c1-20
+        )"
+        [[ -n "${generated_password}" ]] || return 1
+
+        generated_hash="$(printf '%s' "${generated_password}" | openssl passwd -6 -stdin 2>/dev/null)" || return 1
+        [[ -n "${generated_hash}" ]] || return 1
+
+        umask 077
+        printf '%s\n' "${generated_password}" > "${PASSWORD_FILE}" || return 1
+
+        OURBOX_INSTALLER_SSH_PASSWORD_HASH="${generated_hash}"
+        OURBOX_INSTALLER_SSH_PASSWORD_STATE="generated-console-only"
+        return 0
+      }
 
       if [[ -f "${DEFAULTS_FILE}" ]]; then
         # shellcheck disable=SC1090
         source "${DEFAULTS_FILE}"
       fi
 
-      if [[ -z "${OURBOX_INSTALLER_SSH_MODE:-}" ]]; then
-        case "$(printf '%s' "${OURBOX_VARIANT:-prod}" | tr '[:upper:]' '[:lower:]')" in
-          dev|support|debug|diag|diagnostic|lab|labs) OURBOX_INSTALLER_SSH_MODE="both" ;;
-          *) OURBOX_INSTALLER_SSH_MODE="key" ;;
-        esac
-      fi
+      OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE:-both}"
       OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
-      DEFAULT_INSTALLER_SSH_PASSWORD_HASH='$6$ourboxinstall$GgJGorVZ2X.yl0cQk8yIqYDawhEuB47d9m.k9t9HP1afvwC3ALmMxTDtKT2NjDBMqkUOVzvm7LK2ZHxBt2KxH1'
-      OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-${DEFAULT_INSTALLER_SSH_PASSWORD_HASH}}"
+      OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-}"
       OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
       OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+      OURBOX_INSTALLER_SSH_STATUS="pending"
+      OURBOX_INSTALLER_SSH_PASSWORD_STATE="disabled"
+      OURBOX_INSTALLER_SSH_KEY_STATE="disabled"
 
       case "${OURBOX_INSTALLER_SSH_MODE}" in
         off|key|password|both) ;;
-        *) OURBOX_INSTALLER_SSH_MODE="key" ;;
+        *)
+          echo "[ourbox-bootcmd] WARNING: invalid installer SSH mode '${OURBOX_INSTALLER_SSH_MODE}'; defaulting to both" >> "${LOG_FILE}"
+          OURBOX_INSTALLER_SSH_MODE="both"
+          ;;
       esac
+
+      rm -f "${PASSWORD_FILE}"
+
+      if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+        if [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
+          OURBOX_INSTALLER_SSH_KEY_STATE="configured"
+        else
+          OURBOX_INSTALLER_SSH_KEY_STATE="absent"
+        fi
+      fi
+
+      if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+        if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" ]]; then
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE="configured-hash"
+        elif command -v openssl >/dev/null 2>&1 && generate_installer_ssh_password; then
+          echo "[ourbox-bootcmd] installer SSH password generated for attached console" >> "${LOG_FILE}"
+        else
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
+          echo "[ourbox-bootcmd] ERROR: could not generate installer SSH password" >> "${LOG_FILE}"
+        fi
+      fi
+
+      write_status_file
 
       if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" ]]; then
         if ! id -u "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1; then
@@ -71,7 +130,10 @@ bootcmd:
 
         if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
           if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" ]]; then
-            echo "${OURBOX_INSTALLER_SSH_USER}:${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" | chpasswd -e >/dev/null 2>&1 || true
+            if ! echo "${OURBOX_INSTALLER_SSH_USER}:${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" | chpasswd -e >/dev/null 2>&1; then
+              OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
+              echo "[ourbox-bootcmd] ERROR: failed to apply installer SSH password hash" >> "${LOG_FILE}"
+            fi
           fi
         else
           passwd -l "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1 || true
@@ -99,6 +161,17 @@ bootcmd:
         else
           rm -f "${SSH_AUTH_KEYS}"
         fi
+      fi
+
+      HAS_USABLE_AUTH="0"
+      if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "configured-hash" || "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" ]]; then
+        HAS_USABLE_AUTH="1"
+      fi
+      if [[ "${OURBOX_INSTALLER_SSH_KEY_STATE}" == "configured" ]]; then
+        HAS_USABLE_AUTH="1"
+      fi
+      if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" && "${HAS_USABLE_AUTH}" != "1" ]]; then
+        echo "[ourbox-bootcmd] ERROR: installer SSH has no usable auth path (mode=${OURBOX_INSTALLER_SSH_MODE})" >> "${LOG_FILE}"
       fi
 
       mkdir -p /etc/ssh/sshd_config.d
@@ -137,18 +210,31 @@ bootcmd:
       } > /etc/ssh/sshd_config.d/60-ourbox-installer.conf
 
       install -d -m 0755 /run/sshd
-      if sshd -t >/dev/null 2>&1; then
+      ssh-keygen -A >> "${LOG_FILE}" 2>&1 || true
+      if sshd -t >> "${LOG_FILE}" 2>&1; then
         if systemctl restart ssh >/dev/null 2>&1 \
           || systemctl restart openssh-server >/dev/null 2>&1 \
           || systemctl --no-block start ssh >/dev/null 2>&1 \
           || systemctl --no-block start openssh-server >/dev/null 2>&1; then
-          echo "[ourbox-bootcmd] SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT})" >> "${LOG_FILE}"
+          if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "off" ]]; then
+            OURBOX_INSTALLER_SSH_STATUS="disabled"
+            echo "[ourbox-bootcmd] SSH disabled by installer media config" >> "${LOG_FILE}"
+          elif [[ "${HAS_USABLE_AUTH}" == "1" ]]; then
+            OURBOX_INSTALLER_SSH_STATUS="ready"
+            echo "[ourbox-bootcmd] SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT} password=${OURBOX_INSTALLER_SSH_PASSWORD_STATE} key=${OURBOX_INSTALLER_SSH_KEY_STATE})" >> "${LOG_FILE}"
+          else
+            OURBOX_INSTALLER_SSH_STATUS="error"
+            echo "[ourbox-bootcmd] ERROR: sshd started but installer SSH is not usable" >> "${LOG_FILE}"
+          fi
         else
+          OURBOX_INSTALLER_SSH_STATUS="error"
           echo "[ourbox-bootcmd] ERROR: sshd config valid but ssh service restart/start failed" >> "${LOG_FILE}"
         fi
       else
+        OURBOX_INSTALLER_SSH_STATUS="error"
         echo "[ourbox-bootcmd] ERROR: sshd -t failed for /etc/ssh/sshd_config.d/60-ourbox-installer.conf" >> "${LOG_FILE}"
       fi
+      write_status_file
       EOF
 
   # Start avahi-daemon if available for mDNS (.local) discoverability.

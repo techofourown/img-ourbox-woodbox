@@ -26,6 +26,8 @@ AUTOINSTALL_TPL="/cdrom/ourbox/autoinstall.tpl"
 AUTOINSTALL_OUT="/autoinstall.yaml"
 DEFAULTS_ENV="/cdrom/ourbox/installer/defaults.env"
 PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
+SSH_STATUS_FILE="/run/ourbox-installer-ssh-status.env"
+SSH_PASSWORD_FILE="/run/ourbox-installer-ssh-password.txt"
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -33,7 +35,11 @@ PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
 
 banner() {
   local ip
+  local ssh_cmd ssh_detail
   ip="$(ip route get 10.255.255.255 2>/dev/null | awk '/src/ {print $7; exit}' || true)"
+  _installer_ssh_banner_state
+  ssh_cmd="${INSTALLER_SSH_BANNER_CMD}"
+  ssh_detail="${INSTALLER_SSH_BANNER_DETAIL}"
   clear
   echo
   echo "  =================================================================="
@@ -41,18 +47,108 @@ banner() {
   echo "  =================================================================="
   if [[ -n "${ip}" ]]; then
     echo "  Network monitoring:"
-    echo "    SSH     : ssh ourbox-installer@${ip}"
+    echo "    SSH     : ${ssh_cmd//__IP__/${ip}}"
+    if [[ -n "${ssh_detail}" ]]; then
+      echo "              ${ssh_detail}"
+    fi
     echo "    Browser : http://${ip}:8888/"
     echo "    UDP     : socat UDP-RECV:9999,reuseaddr -"
   fi
   echo "  =================================================================="
   echo
+  _print_local_ssh_password_panel
 }
 
 prompt_confirm_exact() {
   local expected="$1" prompt="$2" ans=""
   read -r -p "${prompt} " ans
   [[ "${ans}" == "${expected}" ]] || die "confirmation did not match (expected: ${expected})"
+}
+
+_load_installer_ssh_status() {
+  OURBOX_INSTALLER_SSH_STATUS="pending"
+  OURBOX_INSTALLER_SSH_USER="ourbox-installer"
+  OURBOX_INSTALLER_SSH_MODE="both"
+  OURBOX_INSTALLER_SSH_PASSWORD_STATE="disabled"
+  OURBOX_INSTALLER_SSH_KEY_STATE="disabled"
+
+  if [[ -f "${SSH_STATUS_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${SSH_STATUS_FILE}"
+  fi
+}
+
+_installer_ssh_banner_state() {
+  _load_installer_ssh_status
+
+  case "${OURBOX_INSTALLER_SSH_STATUS}" in
+    ready)
+      INSTALLER_SSH_BANNER_CMD="ssh ${OURBOX_INSTALLER_SSH_USER}@__IP__"
+      INSTALLER_SSH_BANNER_DETAIL=""
+      if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" ]]; then
+        INSTALLER_SSH_BANNER_DETAIL="password shown on attached console only"
+      elif [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "configured-hash" ]]; then
+        INSTALLER_SSH_BANNER_DETAIL="preconfigured password required"
+      fi
+      if [[ "${OURBOX_INSTALLER_SSH_KEY_STATE}" == "configured" ]]; then
+        if [[ -n "${INSTALLER_SSH_BANNER_DETAIL}" ]]; then
+          INSTALLER_SSH_BANNER_DETAIL="${INSTALLER_SSH_BANNER_DETAIL}; authorized keys accepted"
+        elif [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" ]]; then
+          INSTALLER_SSH_BANNER_DETAIL="authorized key required"
+        else
+          INSTALLER_SSH_BANNER_DETAIL="authorized keys accepted"
+        fi
+      elif [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" ]]; then
+        INSTALLER_SSH_BANNER_DETAIL="authorized key required"
+      fi
+      ;;
+    disabled)
+      INSTALLER_SSH_BANNER_CMD="disabled by media config"
+      INSTALLER_SSH_BANNER_DETAIL="installer SSH is intentionally disabled"
+      ;;
+    error)
+      INSTALLER_SSH_BANNER_CMD="unavailable; see installer log"
+      INSTALLER_SSH_BANNER_DETAIL="installer SSH setup failed"
+      ;;
+    *)
+      INSTALLER_SSH_BANNER_CMD="pending (mode=${OURBOX_INSTALLER_SSH_MODE})"
+      INSTALLER_SSH_BANNER_DETAIL="installer is still preparing SSH"
+      ;;
+  esac
+}
+
+_print_local_ssh_password_panel() {
+  local password console=""
+
+  [[ -f "${SSH_PASSWORD_FILE}" ]] || return 0
+
+  password="$(tr -d '\r\n' < "${SSH_PASSWORD_FILE}")"
+  [[ -n "${password}" ]] || return 0
+
+  _load_installer_ssh_status
+  [[ "${OURBOX_INSTALLER_SSH_STATUS}" == "ready" ]] || return 0
+  [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" ]] || return 0
+
+  if [[ -w /dev/tty ]]; then
+    console="/dev/tty"
+  elif [[ -w /dev/tty1 ]]; then
+    console="/dev/tty1"
+  elif [[ -w /dev/console ]]; then
+    console="/dev/console"
+  else
+    return 0
+  fi
+
+  {
+    echo
+    echo "  ------------------------------------------------------------------"
+    echo "  Installer SSH password (local console only)"
+    echo "  ------------------------------------------------------------------"
+    printf '  User     : %s\n' "${OURBOX_INSTALLER_SSH_USER}"
+    printf '  Password : %s\n' "${password}"
+    echo "  ------------------------------------------------------------------"
+    echo
+  } > "${console}"
 }
 
 # ---------------------------------------------------------------------------

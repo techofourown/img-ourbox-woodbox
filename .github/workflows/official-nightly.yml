@@ -64,6 +64,9 @@ jobs:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
           OS_CHANNEL: nightly
+          OURBOX_INSTALLER_SSH_MODE: both
+          OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
+          OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
 
       - name: Publish OS artifact (official nightly)
         run: ./tools/publish-os-artifact-official.sh nightly

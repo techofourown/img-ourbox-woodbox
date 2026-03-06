@@ -29,6 +29,17 @@ Key variables:
 - `OS_ORAS_VERSION` — ORAS binary version bundled in the ISO
 - `INSTALLER_VERSION` — version label baked at ISO build time
 - `INSTALLER_GIT_HASH` — git SHA of this repo at ISO build time
+- `OURBOX_INSTALLER_SSH_MODE` — live-installer SSH mode (`off|key|password|both`)
+- `OURBOX_INSTALLER_SSH_USER` — dedicated live-installer SSH user (`ourbox-installer`)
+- `OURBOX_INSTALLER_SSH_PASSWORD_HASH` — optional pre-baked password hash; blank means generate a one-time password at boot
+- `OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS` — optional authorized key material for key-capable modes
+- `OURBOX_INSTALLER_SSH_ALLOW_ROOT` — root-login override (`0` by default)
+
+Official/public Woodbox media currently builds with:
+- `OURBOX_INSTALLER_SSH_MODE=both`
+- `OURBOX_INSTALLER_SSH_USER=ourbox-installer`
+- `OURBOX_INSTALLER_SSH_PASSWORD_HASH=''` (generated at boot; shown only on the attached console)
+- `OURBOX_INSTALLER_SSH_ALLOW_ROOT=0`
 
 ---
 
@@ -58,6 +69,22 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 
 After operator confirmation, `ourbox-preinstall` writes `/autoinstall.yaml` (filled from
 `/cdrom/ourbox/autoinstall.tpl`) and exits. Subiquity then runs fully automated.
+
+---
+
+## Live-installer SSH contract
+
+The live installer keeps a dedicated diagnostics account:
+- user: `ourbox-installer`
+- config surface: `/etc/ssh/sshd_config.d/60-ourbox-installer.conf`
+- status surface: `/run/ourbox-installer-ssh-status.env`
+
+Behavior:
+- host keys are generated before `sshd -t`
+- SSH is only advertised after validation and service startup succeed
+- official/public media is password-capable again by default
+- when no password hash is baked, the installer generates a one-time password at boot and shows it only on the attached console
+- HTTP/UDP monitor output never includes password material
 
 ---
 
