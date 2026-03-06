@@ -46,6 +46,7 @@ case "$(printf '%s' "${OURBOX_VARIANT}" | tr '[:upper:]' '[:lower:]')" in
   dev|support|debug|diag|diagnostic|lab|labs) DEFAULT_INSTALLER_SSH_MODE="both" ;;
   *) DEFAULT_INSTALLER_SSH_MODE="key" ;;
 esac
+# shellcheck disable=SC2016  # Literal crypt hash includes '$' separators.
 DEFAULT_INSTALLER_SSH_PASSWORD_HASH='$6$ourboxinstall$GgJGorVZ2X.yl0cQk8yIqYDawhEuB47d9m.k9t9HP1afvwC3ALmMxTDtKT2NjDBMqkUOVzvm7LK2ZHxBt2KxH1'
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
 : "${OURBOX_INSTALLER_SSH_USER:=ourbox-installer}"
