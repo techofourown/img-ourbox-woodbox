@@ -48,6 +48,9 @@ OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)" \
 ./tools/build-installer-iso.sh
 ```
 
+Both the default and `--build-local` paths converge on the same rendered NoCloud seed.
+`tools/build-installer-iso.sh` now validates that rendered seed as YAML before repacking the ISO.
+
 ---
 
 ### Other installer options
@@ -114,8 +117,17 @@ sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.)
 
 ./tools/build-installer-iso.sh         # Build thin installer ISO (no payload embedded)
 
+./tools/validate-installer-seed.sh     # Render + parse the NoCloud seed as YAML
+
 # Or: build fat ISO with embedded OS payload (for offline operation)
 ./tools/build-installer-iso.sh --embed-payload deploy/os-payload-ourbox-woodbox-x86-*.tar.gz
+```
+
+For an explicit boot-level check of the installer control plane on a development machine:
+
+```bash
+OURBOX_INSTALLER_SSH_PASSWORD='ourbox-smoke-pass' \
+./tools/check-installer-boot-smoke.sh deploy/installer-ourbox-woodbox-x86-*.iso
 ```
 
 ---

@@ -38,6 +38,17 @@ jobs:
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
 
+      - name: Install installer smoke dependencies
+        run: |
+          if command -v qemu-system-x86_64 >/dev/null 2>&1 \
+            && command -v qemu-img >/dev/null 2>&1 \
+            && command -v sshpass >/dev/null 2>&1 \
+            && command -v nc >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils sshpass netcat-openbsd
+
       - name: Preflight build host
         run: ./tools/preflight-build-host.sh
 
@@ -49,6 +60,49 @@ jobs:
         env:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
+
+      - name: Prepare installer smoke key
+        run: |
+          KEY_DIR="${RUNNER_TEMP}/installer-smoke-key"
+          KEY_FILE="${KEY_DIR}/id_ed25519"
+          mkdir -p "${KEY_DIR}"
+          rm -f "${KEY_FILE}" "${KEY_FILE}.pub"
+          ssh-keygen -q -t ed25519 -N '' -f "${KEY_FILE}"
+          printf 'OURBOX_INSTALLER_SMOKE_KEY=%s\n' "${KEY_FILE}" >> "${GITHUB_ENV}"
+          {
+            echo 'OURBOX_INSTALLER_SMOKE_PUBLIC_KEY<<EOF'
+            cat "${KEY_FILE}.pub"
+            echo 'EOF'
+          } >> "${GITHUB_ENV}"
+
+      - name: Build installer ISO (smoke)
+        run: ./tools/build-installer-iso.sh
+        env:
+          OURBOX_TARGET: x86
+          OURBOX_VARIANT: prod
+          OURBOX_VERSION: ${{ env.OURBOX_VERSION }}-smoke
+          OURBOX_INSTALLER_SSH_MODE: both
+          OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
+          OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS: ${{ env.OURBOX_INSTALLER_SMOKE_PUBLIC_KEY }}
+          OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
+          OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR: 10.0.2.2
+          OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: "19999"
+
+      - name: Boot installer ISO smoke test
+        run: |
+          set -euo pipefail
+          ISO="$(ls -1t deploy/installer-ourbox-woodbox-x86-*-smoke.iso 2>/dev/null | head -n1 || true)"
+          if [[ -z "${ISO}" ]]; then
+            echo "ERROR: smoke installer ISO not found" >&2
+            exit 1
+          fi
+          ./tools/check-installer-boot-smoke.sh "${ISO}"
+        env:
+          OURBOX_INSTALLER_SSH_KEY: ${{ env.OURBOX_INSTALLER_SMOKE_KEY }}
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE: generated-console-only
+          OURBOX_INSTALLER_SSH_MODE: both
+          OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
+          VM_UDP_PORT: "19999"
 
       - name: Build installer ISO
         run: ./tools/build-installer-iso.sh

@@ -23,6 +23,7 @@ pkg_install_apt() {
   apt-get update -y
   apt-get install -y \
     ca-certificates curl git openssl \
+    python3 python3-yaml \
     xz-utils \
     util-linux coreutils \
     e2fsprogs \
@@ -41,6 +42,7 @@ pkg_install_dnf() {
   log "Using dnf"
   dnf -y install \
     ca-certificates curl git openssl \
+    python3 python3-pyyaml \
     xz \
     util-linux coreutils \
     e2fsprogs \

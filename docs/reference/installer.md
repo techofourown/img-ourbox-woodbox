@@ -34,6 +34,8 @@ Key variables:
 - `OURBOX_INSTALLER_SSH_PASSWORD_HASH` — optional pre-baked password hash; blank means generate a one-time password at boot
 - `OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS` — optional authorized key material for key-capable modes
 - `OURBOX_INSTALLER_SSH_ALLOW_ROOT` — root-login override (`0` by default)
+- `OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR` — optional monitor UDP destination override (defaults to `255.255.255.255`)
+- `OURBOX_INSTALLER_MONITOR_BROADCAST_PORT` — optional monitor UDP destination port override (defaults to `9999`)
 
 Official/public Woodbox media currently builds with:
 - `OURBOX_INSTALLER_SSH_MODE=both`
@@ -78,13 +80,20 @@ The live installer keeps a dedicated diagnostics account:
 - user: `ourbox-installer`
 - config surface: `/etc/ssh/sshd_config.d/60-ourbox-installer.conf`
 - status surface: `/run/ourbox-installer-ssh-status.env`
+- bootstrap logic: `/cdrom/ourbox/tools/ourbox-installer-ssh-bootstrap.sh`
 
 Behavior:
+- `installer/autoinstall/user-data.tpl` stays a small cloud-config wrapper; the complex SSH bootstrap logic is staged into the ISO as a standalone shell script
 - host keys are generated before `sshd -t`
 - SSH is only advertised after validation and service startup succeed
 - official/public media is password-capable again by default
 - when no password hash is baked, the installer generates a one-time password at boot and shows it only on the attached console
 - HTTP/UDP monitor output never includes password material
+
+Validation:
+- `tools/validate-installer-seed.sh` renders and parses the NoCloud seed as YAML, asserts `bootcmd` exists, and optionally runs `cloud-init schema` when available
+- `tools/build-installer-iso.sh` runs the rendered-seed validator before repacking the ISO
+- official nightly/release/revalidation workflows boot a smoke ISO in QEMU before publishing or signing off on installer health
 
 ---
 

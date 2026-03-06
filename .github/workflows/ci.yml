@@ -35,6 +35,7 @@ jobs:
       - name: Run shellcheck on installer scripts
         run: |
           shellcheck installer/ourbox-preinstall/ourbox-preinstall
+          shellcheck installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh
           shellcheck installer/ourbox-preinstall/format-data-disk.sh
 
       - name: Check shell syntax (bash -n)
@@ -43,7 +44,21 @@ jobs:
             bash -n "${f}" && echo "OK: ${f}"
           done
           bash -n installer/ourbox-preinstall/ourbox-preinstall && echo "OK: ourbox-preinstall"
+          bash -n installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh && echo "OK: ourbox-installer-ssh-bootstrap.sh"
           bash -n installer/ourbox-preinstall/format-data-disk.sh && echo "OK: format-data-disk.sh"
+
+  installer-seed:
+    name: Installer seed validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install seed validator dependencies
+        run: sudo apt-get install -y --no-install-recommends python3-yaml
+
+      - name: Validate rendered installer seed
+        run: bash tools/validate-installer-seed.sh
 
   commitlint:
     name: Commit message lint
