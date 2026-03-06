@@ -31,7 +31,6 @@ SSH (port 22) — interactive live-env shell:
   Only advertised after the installer reports SSH ready.
   On the installer: journalctl -fu ourbox-preinstall.service
                     cat /autoinstall.yaml
-                    cat /run/ourbox-bootcmd.log
                     cat /run/ourbox-installer.log
 """
 
@@ -45,6 +44,9 @@ import time
 
 LOG_FILE = "/run/ourbox-installer.log"
 SSH_STATUS_FILE = "/run/ourbox-installer-ssh-status.env"
+DEFAULTS_FILE = "/cdrom/ourbox/installer/defaults.env"
+DEFAULT_BROADCAST_ADDR = "255.255.255.255"
+DEFAULT_BROADCAST_PORT = 9999
 BROADCAST_ADDR = "255.255.255.255"
 BROADCAST_PORT = 9999
 HTTP_PORT = 8888
@@ -89,28 +91,58 @@ def _unquote(value: str) -> str:
     return value
 
 
-def read_ssh_status():
-    status = {
-        "OURBOX_INSTALLER_SSH_STATUS": "pending",
-        "OURBOX_INSTALLER_SSH_USER": "ourbox-installer",
-        "OURBOX_INSTALLER_SSH_MODE": "both",
-        "OURBOX_INSTALLER_SSH_ALLOW_ROOT": "0",
-        "OURBOX_INSTALLER_SSH_PASSWORD_STATE": "disabled",
-        "OURBOX_INSTALLER_SSH_KEY_STATE": "disabled",
-    }
+def read_env_file(path: str, defaults=None):
+    values = dict(defaults or {})
     try:
-        with open(SSH_STATUS_FILE, "r", errors="replace") as f:
+        with open(path, "r", errors="replace") as f:
             for raw_line in f:
                 line = raw_line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, value = line.split("=", 1)
-                status[key.strip()] = _unquote(value)
+                values[key.strip()] = _unquote(value)
     except FileNotFoundError:
         pass
     except OSError:
         pass
-    return status
+    return values
+
+
+def read_ssh_status():
+    return read_env_file(
+        SSH_STATUS_FILE,
+        {
+            "OURBOX_INSTALLER_SSH_STATUS": "pending",
+            "OURBOX_INSTALLER_SSH_USER": "ourbox-installer",
+            "OURBOX_INSTALLER_SSH_MODE": "both",
+            "OURBOX_INSTALLER_SSH_ALLOW_ROOT": "0",
+            "OURBOX_INSTALLER_SSH_PASSWORD_STATE": "disabled",
+            "OURBOX_INSTALLER_SSH_KEY_STATE": "disabled",
+        },
+    )
+
+
+def load_monitor_settings():
+    global BROADCAST_ADDR, BROADCAST_PORT
+
+    settings = read_env_file(
+        DEFAULTS_FILE,
+        {
+            "OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR": DEFAULT_BROADCAST_ADDR,
+            "OURBOX_INSTALLER_MONITOR_BROADCAST_PORT": str(DEFAULT_BROADCAST_PORT),
+        },
+    )
+
+    addr = settings.get("OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR", DEFAULT_BROADCAST_ADDR).strip()
+    BROADCAST_ADDR = addr or DEFAULT_BROADCAST_ADDR
+
+    try:
+        port = int(settings.get("OURBOX_INSTALLER_MONITOR_BROADCAST_PORT", str(DEFAULT_BROADCAST_PORT)))
+    except ValueError:
+        port = DEFAULT_BROADCAST_PORT
+    if not 1 <= port <= 65535:
+        port = DEFAULT_BROADCAST_PORT
+    BROADCAST_PORT = port
 
 
 def describe_ssh(status, ip: str):
@@ -320,6 +352,7 @@ def _wait_for_ssh_ready_and_advertise(hostname: str):
 
 def main():
     hostname = socket.gethostname()
+    load_monitor_settings()
 
     _log(f"[monitor] starting — host={hostname}")
 

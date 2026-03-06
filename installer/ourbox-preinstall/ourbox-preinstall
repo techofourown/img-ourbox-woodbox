@@ -28,6 +28,7 @@ DEFAULTS_ENV="/cdrom/ourbox/installer/defaults.env"
 PAYLOAD_CACHE_DIR="/opt/ourbox/installer/cache/payload"
 SSH_STATUS_FILE="/run/ourbox-installer-ssh-status.env"
 SSH_PASSWORD_FILE="/run/ourbox-installer-ssh-password.txt"
+INSTALLER_MONITOR_BROADCAST_PORT="9999"
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -37,6 +38,7 @@ banner() {
   local ip
   local ssh_cmd ssh_detail
   ip="$(ip route get 10.255.255.255 2>/dev/null | awk '/src/ {print $7; exit}' || true)"
+  _load_installer_monitor_settings
   _installer_ssh_banner_state
   ssh_cmd="${INSTALLER_SSH_BANNER_CMD}"
   ssh_detail="${INSTALLER_SSH_BANNER_DETAIL}"
@@ -52,7 +54,7 @@ banner() {
       echo "              ${ssh_detail}"
     fi
     echo "    Browser : http://${ip}:8888/"
-    echo "    UDP     : socat UDP-RECV:9999,reuseaddr -"
+    echo "    UDP     : socat UDP-RECV:${INSTALLER_MONITOR_BROADCAST_PORT},reuseaddr -"
   fi
   echo "  =================================================================="
   echo
@@ -75,6 +77,19 @@ _load_installer_ssh_status() {
   if [[ -f "${SSH_STATUS_FILE}" ]]; then
     # shellcheck disable=SC1090
     source "${SSH_STATUS_FILE}"
+  fi
+}
+
+_load_installer_monitor_settings() {
+  INSTALLER_MONITOR_BROADCAST_PORT="9999"
+
+  if [[ -f "${DEFAULTS_ENV}" ]]; then
+    # shellcheck disable=SC1090
+    source "${DEFAULTS_ENV}"
+    if [[ "${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT:-}" =~ ^[0-9]+$ ]] \
+      && (( OURBOX_INSTALLER_MONITOR_BROADCAST_PORT >= 1 && OURBOX_INSTALLER_MONITOR_BROADCAST_PORT <= 65535 )); then
+      INSTALLER_MONITOR_BROADCAST_PORT="${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
+    fi
   fi
 }
 
@@ -888,7 +903,7 @@ main() {
   echo
   echo "  To diagnose issues during this phase (on another TTY):"
   echo "    Alt-F2  : open a shell"
-  echo "    cat /run/ourbox-bootcmd.log     (bootcmd drop-in log)"
+  echo "    cat /run/ourbox-installer.log   (bootcmd + installer log)"
   echo "    cat ${AUTOINSTALL_OUT}   (config Subiquity is using)"
   echo "    journalctl -fu ourbox-preinstall.service"
   echo "  =================================================================="

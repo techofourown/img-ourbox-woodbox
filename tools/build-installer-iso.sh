@@ -35,6 +35,7 @@ need_cmd sha256sum
 need_cmd envsubst
 need_cmd sed
 need_cmd awk
+need_cmd bash
 
 EMBED_PAYLOAD=""
 # OS_CHANNEL controls the default channel baked into the installer defaults.
@@ -48,6 +49,8 @@ EMBED_PAYLOAD=""
 : "${OURBOX_INSTALLER_SSH_PASSWORD_HASH:=}"
 : "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:=}"
 : "${OURBOX_INSTALLER_SSH_ALLOW_ROOT:=0}"
+: "${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR:=255.255.255.255}"
+: "${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT:=9999}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --embed-payload)
@@ -75,6 +78,13 @@ case "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" in
   0|1) ;;
   *) die "invalid OURBOX_INSTALLER_SSH_ALLOW_ROOT: ${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" ;;
 esac
+
+[[ -n "${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR}" ]] || die "OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR must not be empty"
+[[ "${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}" =~ ^[0-9]+$ ]] \
+  || die "invalid OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: ${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
+if (( OURBOX_INSTALLER_MONITOR_BROADCAST_PORT < 1 || OURBOX_INSTALLER_MONITOR_BROADCAST_PORT > 65535 )); then
+  die "OURBOX_INSTALLER_MONITOR_BROADCAST_PORT out of range: ${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
+fi
 
 if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" && -z "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
   die "OURBOX_INSTALLER_SSH_MODE=key requires OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS"
@@ -161,6 +171,7 @@ export OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
 # shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
 SEED_SUBST_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_PRODUCT} ${OURBOX_DEVICE} ${OURBOX_TARGET} ${OURBOX_SKU} ${OURBOX_VARIANT} ${OURBOX_VERSION}'
 envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/user-data.tpl" > "${ISO_DIR}/nocloud/user-data"
+bash "${ROOT}/tools/validate-installer-seed.sh" --rendered "${ISO_DIR}/nocloud/user-data"
 envsubst "${SEED_SUBST_VARS}" < "${ROOT}/installer/autoinstall/meta-data.tpl"  > "${ISO_DIR}/nocloud/meta-data"
 cp -f "${ISO_DIR}/nocloud/user-data" "${ISO_DIR}/autoinstall.yaml"
 
@@ -185,6 +196,8 @@ install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
   "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-monitor.py" \
   "${ISO_DIR}/ourbox/tools/ourbox-installer-monitor.py"
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh" \
+  "${ISO_DIR}/ourbox/tools/ourbox-installer-ssh-bootstrap.sh"
 
 # Bundle the linux-amd64 ORAS binary for use at install time (offline-capable).
 # Always download the target-arch binary explicitly — never copy the host oras
@@ -268,6 +281,8 @@ OURBOX_INSTALLER_SSH_USER='${OURBOX_INSTALLER_SSH_USER}'
 OURBOX_INSTALLER_SSH_PASSWORD_HASH='${OURBOX_INSTALLER_SSH_PASSWORD_HASH}'
 OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS='${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}'
 OURBOX_INSTALLER_SSH_ALLOW_ROOT='${OURBOX_INSTALLER_SSH_ALLOW_ROOT}'
+OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR='${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR}'
+OURBOX_INSTALLER_MONITOR_BROADCAST_PORT='${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}'
 EOT
 
 # If an OS payload is being embedded (local/offline build), stage it
