@@ -1,3 +1,10 @@
+## [0.4.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.1...v0.4.2) (2026-03-06)
+
+
+### Bug Fixes
+
+* **installer:** repair cloud-init SSH status seed ([0ba06e8](https://github.com/techofourown/img-ourbox-woodbox/commit/0ba06e8d6b24a6d526f7090e27067a76878a6aef))
+
 ## [0.4.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.0...v0.4.1) (2026-03-06)
 
 
