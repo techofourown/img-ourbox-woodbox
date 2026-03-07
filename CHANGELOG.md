@@ -1,3 +1,10 @@
+## [0.5.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.1...v0.5.2) (2026-03-07)
+
+
+### Bug Fixes
+
+* **platform:** pin full-shape contract and guard extracted shape ([e3771d9](https://github.com/techofourown/img-ourbox-woodbox/commit/e3771d95f15a7165ba0c757c85f74c9bc76c7db5))
+
 ## [0.5.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.0...v0.5.1) (2026-03-07)
 
 
