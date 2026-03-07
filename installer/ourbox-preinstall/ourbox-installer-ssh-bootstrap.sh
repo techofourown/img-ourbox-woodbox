@@ -73,17 +73,13 @@ on_exit() {
 trap 'on_exit "$?"' EXIT
 
 generate_installer_ssh_password() {
-  local generated_hash
+  local salt generated_hash
 
-  GENERATED_PASSWORD="$(
-    openssl rand -base64 18 2>/dev/null \
-      | tr -d '\n' \
-      | tr '/+' '89' \
-      | cut -c1-20
-  )"
+  GENERATED_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 20)" || return 1
   [[ -n "${GENERATED_PASSWORD}" ]] || return 1
 
-  generated_hash="$(printf '%s' "${GENERATED_PASSWORD}" | openssl passwd -6 -stdin 2>/dev/null)" || return 1
+  salt="$(printf '%s' "${GENERATED_PASSWORD}" | sha256sum | awk '{print substr($1,1,16)}')"
+  generated_hash="$(printf '%s' "${GENERATED_PASSWORD}" | openssl passwd -6 -stdin -salt "${salt}" 2>/dev/null)" || return 1
   [[ -n "${generated_hash}" ]] || return 1
 
   OURBOX_INSTALLER_SSH_PASSWORD_HASH="${generated_hash}"
@@ -98,6 +94,29 @@ restart_ssh_service() {
     || systemctl --no-block start openssh-server >/dev/null 2>&1; then
     return 0
   fi
+  return 1
+}
+
+wait_for_local_ssh_banner() {
+  local deadline=$((SECONDS + 30))
+
+  while (( SECONDS < deadline )); do
+    if python3 - <<'PY' >/dev/null 2>&1
+import socket
+try:
+    with socket.create_connection(("127.0.0.1", 22), timeout=2) as sock:
+        sock.settimeout(2)
+        data = sock.recv(64)
+    raise SystemExit(0 if data.startswith(b"SSH-") else 1)
+except OSError:
+    raise SystemExit(1)
+PY
+    then
+      return 0
+    fi
+    sleep 1
+  done
+
   return 1
 }
 
@@ -172,6 +191,7 @@ main() {
 
   assert_valid_mode
   clear_password_file
+  log "installer SSH bootstrap begin"
 
   if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
     if [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
@@ -201,6 +221,7 @@ main() {
       log "ERROR: failed to create installer SSH user '${OURBOX_INSTALLER_SSH_USER}'"
       return 1
     fi
+    log "installer SSH user ensured"
 
     if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
       if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" ]]; then
@@ -221,6 +242,7 @@ main() {
       return 1
     fi
   fi
+  log "installer SSH auth material prepared"
 
   local has_usable_auth="0"
   if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "configured-hash" || "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" ]]; then
@@ -270,21 +292,29 @@ main() {
       fi
     fi
   } > "${CONFIG_FILE}"
+  log "installer SSH config written"
 
   install -d -m 0755 /run/sshd
-  ssh-keygen -A >> "${LOG_FILE}" 2>&1 || true
+  log "installer SSH host key generation starting"
+  if ! timeout 60 ssh-keygen -A >> "${LOG_FILE}" 2>&1; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    log "ERROR: ssh-keygen -A failed or timed out"
+    return 1
+  fi
 
   if ! sshd -t >> "${LOG_FILE}" 2>&1; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd -t failed for ${CONFIG_FILE}"
     return 1
   fi
+  log "installer SSH config validated"
 
   if ! restart_ssh_service; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd config valid but ssh service restart/start failed"
     return 1
   fi
+  log "installer SSH service start requested"
 
   if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "off" ]]; then
     OURBOX_INSTALLER_SSH_STATUS="disabled"
@@ -295,6 +325,12 @@ main() {
   if [[ "${has_usable_auth}" != "1" ]]; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd started but installer SSH is not usable"
+    return 1
+  fi
+
+  if ! wait_for_local_ssh_banner; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    log "ERROR: sshd start was requested but no local SSH banner was observed"
     return 1
   fi
 
