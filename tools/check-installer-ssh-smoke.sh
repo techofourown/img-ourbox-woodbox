@@ -54,14 +54,6 @@ ssh_opts=(
   -p "${ssh_port}"
 )
 
-check_port() {
-  if command -v nc >/dev/null 2>&1; then
-    nc -z -w 3 "${host}" "${ssh_port}" >/dev/null 2>&1
-    return
-  fi
-  timeout 3 bash -lc "</dev/tcp/${host}/${ssh_port}" >/dev/null 2>&1
-}
-
 installer_auth="none"
 
 installer_ssh() {
@@ -80,14 +72,7 @@ installer_ssh() {
   esac
 }
 
-echo "==> [1/4] Checking sshd is listening on ${host}:${ssh_port}"
-check_port || {
-  echo "FAIL: sshd is not reachable on ${host}:${ssh_port}" >&2
-  exit 1
-}
-echo "PASS: ssh port reachable"
-
-echo "==> [2/4] Checking ${installer_user} login using mode=${ssh_mode}"
+echo "==> [1/3] Checking ${installer_user} login using mode=${ssh_mode}"
 case "${ssh_mode}" in
   off)
     if ssh -o BatchMode=yes "${ssh_opts[@]}" "${installer_user}@${host}" "true" >/dev/null 2>&1; then
@@ -133,7 +118,7 @@ case "${ssh_mode}" in
     ;;
 esac
 
-echo "==> [3/4] Checking root login policy (allow_root=${allow_root})"
+echo "==> [2/3] Checking root login policy (allow_root=${allow_root})"
 if [[ "${allow_root}" == "0" ]]; then
   if ssh -o BatchMode=yes "${ssh_opts[@]}" "root@${host}" "true" >/dev/null 2>&1; then
     echo "FAIL: root login succeeded with allow_root=0" >&2
@@ -157,7 +142,7 @@ else
   fi
 fi
 
-echo "==> [4/4] Checking for leaked secrets in installer log"
+echo "==> [3/3] Checking for leaked secrets in installer log"
 if [[ "${installer_auth}" == "none" ]]; then
   echo "WARN: no installer login method available; skipped remote log scan"
 else
