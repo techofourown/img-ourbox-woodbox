@@ -1,3 +1,10 @@
+## [0.5.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.0...v0.5.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* **installer:** prefer installed OS after USB install ([d09e6ed](https://github.com/techofourown/img-ourbox-woodbox/commit/d09e6ed454bab5db0a4ebbebbd30cfb5a345c2f3))
+
 # [0.5.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.6...v0.5.0) (2026-03-07)
 
 
