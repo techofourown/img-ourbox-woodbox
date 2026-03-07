@@ -7,15 +7,14 @@
 #                  OURBOX_VARIANT OURBOX_VERSION
 #   Pass 2 (install time, ourbox-preinstall):
 #     Substitutes: OURBOX_HOSTNAME OURBOX_USERNAME OURBOX_PASSWORD_HASH
-#                  OURBOX_STORAGE_MATCH OURBOX_DATA_DISK
+#                  OURBOX_STORAGE_MATCH OURBOX_DATA_DISK OURBOX_TARGET_DISK
 
 autoinstall:
   version: 1
 
-  # Power off after installation so the operator knows when to remove the USB.
-  # Ubuntu 24.04 Subiquity defaults to "reboot" when this key is absent, which
-  # causes the machine to boot from the USB again (USB is first in EFI boot order
-  # per the efibootmgr late-command) — creating a loop that repeats the installer.
+  # Power off after installation so the operator has a clear media-removal seam.
+  # The late-commands also try to prefer the installed OS for subsequent UEFI
+  # boots, but poweroff remains the simplest and least surprising operator flow.
   shutdown: poweroff
 
   locale: en_US
@@ -119,31 +118,165 @@ ${OURBOX_STORAGE_MATCH}
     - 'lsblk -o NAME,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$(blkid -L OURBOX_DATA)" || true'
 
     # -----------------------------------------------------------------------
-    # [8/8] Restore boot order. grub-install pushes itself to the front;
-    #       put USB first so it's skipped cleanly when absent, falling
-    #       through to the installed OS disk. Run this inside /target
-    #       because efibootmgr is installed there during curtin curthooks,
-    #       not in the live installer environment.
+    # [8/8] Prefer the installed EFI entry on the selected target disk.
+    #       Do not use BootCurrent here: during external-media installs it
+    #       identifies the installer transport, not the desired post-install
+    #       default. Instead, resolve the target ESP mounted at /target/boot/efi,
+    #       identify the Ubuntu loader on that ESP, set BootNext for the
+    #       immediate next boot, and move that entry to the front of BootOrder
+    #       while preserving the relative order of everything else.
     # -----------------------------------------------------------------------
-    - echo "==> [8/8] Adjusting EFI boot order"
+    - echo "==> [8/8] Preferring installed EFI boot entry"
     - |
-        curtin in-target --target=/target -- /bin/bash -lc '
+        set -e
+        EFI_STATUS_FILE="/run/ourbox-efi-boot-preference.env"
+        write_efi_status() {
+          printf 'OURBOX_EFI_BOOT_STATUS=%s\n' "$1" > "${EFI_STATUS_FILE}"
+        }
+        rm -f "${EFI_STATUS_FILE}"
+        TARGET_DISK_REAL="$(readlink -f "${OURBOX_TARGET_DISK}" 2>/dev/null || true)"
+        TARGET_DISK_NAME="$(basename "${TARGET_DISK_REAL}" 2>/dev/null || true)"
+        ESP_SRC="$(findmnt -nr -o SOURCE /target/boot/efi 2>/dev/null || true)"
+        if [ -z "${ESP_SRC}" ]; then
+          echo "==>       WARNING: /target/boot/efi is not mounted; skipping EFI boot preference update"
+          echo "==>       WARNING: remove the USB before the next power-on or the installer may boot again"
+          write_efi_status warning
+          exit 0
+        fi
+        ESP_REAL="$(readlink -f "${ESP_SRC}" 2>/dev/null || true)"
+        if [ -z "${ESP_REAL}" ]; then
+          echo "==>       WARNING: could not resolve target ESP device from ${ESP_SRC}; skipping EFI boot preference update"
+          echo "==>       WARNING: remove the USB before the next power-on or the installer may boot again"
+          write_efi_status warning
+          exit 0
+        fi
+        ESP_PARTUUID="$(blkid -s PARTUUID -o value "${ESP_REAL}" 2>/dev/null | tr "[:upper:]" "[:lower:]")"
+        if [ -z "${ESP_PARTUUID}" ]; then
+          echo "==>       WARNING: target ESP PARTUUID unavailable for ${ESP_REAL}; skipping EFI boot preference update"
+          echo "==>       WARNING: remove the USB before the next power-on or the installer may boot again"
+          write_efi_status warning
+          exit 0
+        fi
+        if [ -n "${TARGET_DISK_NAME}" ]; then
+          ESP_PARENT="$(lsblk -no PKNAME "${ESP_REAL}" 2>/dev/null | head -n1)"
+          if [ -n "${ESP_PARENT}" ] && [ "${ESP_PARENT}" != "${TARGET_DISK_NAME}" ]; then
+            echo "==>       WARNING: target ESP ${ESP_REAL} belongs to ${ESP_PARENT}, expected ${TARGET_DISK_NAME}; skipping EFI boot preference update"
+            echo "==>       WARNING: remove the USB before the next power-on or the installer may boot again"
+            write_efi_status warning
+            exit 0
+          fi
+        fi
+        echo "==>       target disk: ${TARGET_DISK_REAL:-unknown}"
+        echo "==>       target ESP : ${ESP_REAL}"
+        echo "==>       PARTUUID   : ${ESP_PARTUUID}"
+        cat > /target/tmp/ourbox-adjust-efi-order.sh <<'SCRIPT'
+        #!/bin/bash
+        set -euo pipefail
+
+        esp_partuuid="${1:-}"
+        target_disk="${2:-unknown}"
+        soft_skip() {
+          echo "$1"
+          exit 10
+        }
+
         if ! command -v efibootmgr >/dev/null 2>&1; then
-          echo "==>       efibootmgr not installed in target; skipping EFI boot order adjustment"
+          soft_skip "==>       efibootmgr not installed in target; skipping EFI boot preference update"
+        fi
+        if [[ -z "${esp_partuuid}" ]]; then
+          soft_skip "==>       target ESP PARTUUID unavailable; skipping EFI boot preference update"
+        fi
+
+        efi_before="$(efibootmgr -v || true)"
+        printf '%s\n' "${efi_before}"
+
+        order="$(printf '%s\n' "${efi_before}" | awk -F': ' '/^BootOrder:/ {print $2; exit}')"
+        if [[ -z "${order}" ]]; then
+          soft_skip "==>       WARNING: BootOrder unavailable; skipping EFI boot preference update"
+        fi
+
+        install_entry="$(
+          printf '%s\n' "${efi_before}" | awk -v esp="${esp_partuuid}" '
+            {
+              line = tolower($0)
+              if (index(line, "gpt," tolower(esp)) &&
+                  (index(line, "file(\\efi\\ubuntu\\shimx64.efi)") ||
+                   index(line, "file(\\efi\\ubuntu\\grubx64.efi)"))) {
+                entry = $1
+                sub(/^Boot/, "", entry)
+                sub(/\*.*/, "", entry)
+                print toupper(entry)
+                exit
+              }
+            }'
+        )"
+        if [[ -z "${install_entry}" ]]; then
+          install_entry="$(
+            printf '%s\n' "${efi_before}" | awk -v esp="${esp_partuuid}" '
+              {
+                line = tolower($0)
+                if (index(line, "gpt," tolower(esp)) &&
+                    index(line, "file(\\efi\\ubuntu\\")) {
+                  entry = $1
+                  sub(/^Boot/, "", entry)
+                  sub(/\*.*/, "", entry)
+                  print toupper(entry)
+                  exit
+                }
+              }'
+          )"
+        fi
+        if [[ -z "${install_entry}" ]]; then
+          soft_skip "==>       WARNING: could not identify installed EFI entry for target disk ${target_disk} (ESP ${esp_partuuid})"
+        fi
+
+        new_order="${install_entry}"
+        IFS=',' read -r -a order_entries <<< "${order}"
+        for entry in "${order_entries[@]}"; do
+          entry="${entry^^}"
+          [[ -n "${entry}" ]] || continue
+          [[ "${entry}" == "${install_entry}" ]] && continue
+          new_order="${new_order},${entry}"
+        done
+
+        bootnext_failed=0
+        bootorder_failed=0
+        echo "==>       installed EFI entry: ${install_entry}"
+        echo "==>       BootNext -> ${install_entry}"
+        echo "==>       BootOrder -> ${new_order}"
+        if ! efibootmgr --bootnext "${install_entry}"; then
+          bootnext_failed=1
+          echo "==>       WARNING: failed to set BootNext to ${install_entry}"
+        fi
+        if ! efibootmgr --bootorder "${new_order}"; then
+          bootorder_failed=1
+          echo "==>       WARNING: failed to set BootOrder to ${new_order}"
+        fi
+        efibootmgr -v || true
+        if [[ "${bootnext_failed}" -eq 1 && "${bootorder_failed}" -eq 1 ]]; then
+          exit 1
+        fi
+        SCRIPT
+        chmod 0755 /target/tmp/ourbox-adjust-efi-order.sh
+        if curtin in-target --target=/target -- /tmp/ourbox-adjust-efi-order.sh "${ESP_PARTUUID}" "${TARGET_DISK_REAL:-unknown}"; then
+          rm -f /target/tmp/ourbox-adjust-efi-order.sh
+          write_efi_status preferred
+        else
+          status=$?
+          rm -f /target/tmp/ourbox-adjust-efi-order.sh
+          case "${status}" in
+            10)
+              echo "==>       WARNING: EFI boot preference was not updated confidently"
+              ;;
+            *)
+              echo "==>       WARNING: EFI boot preference update failed with exit ${status}"
+              ;;
+          esac
+          echo "==>       WARNING: remove the USB before the next power-on or the installer may boot again"
+          write_efi_status warning
           exit 0
         fi
-        efibootmgr || true
-        CURRENT=$(efibootmgr | awk "/^BootCurrent:/ {print \$2}")
-        OTHERS=$(efibootmgr | awk -v c="$CURRENT" "/^Boot[0-9A-F]+[*]/ {match(\$1, /Boot([0-9A-F]+)/, m); if(m[1] != c) printf m[1]\",\"}" | sed "s/,$//")
-        if [ -z "$CURRENT" ]; then
-          echo "==>       BootCurrent unavailable; leaving existing EFI boot order unchanged"
-          exit 0
-        fi
-        ORDER="$CURRENT"
-        [ -n "$OTHERS" ] && ORDER="$CURRENT,$OTHERS"
-        efibootmgr --bootorder "$ORDER"
-        '
-    - echo "==>       EFI boot order adjusted when possible"
+    - echo "==>       Installed EFI boot entry preferred when possible"
 
     # Clear static MOTD so only our dynamic status script runs
     - truncate -s 0 /target/etc/motd
@@ -155,5 +288,19 @@ ${OURBOX_STORAGE_MATCH}
 
     - echo "==> =================================================================="
     - echo "==> OurBox late-commands complete. Machine powering off."
-    - 'echo "==> When power is off: remove USB, then press power button to boot."'
+    - |
+        EFI_STATUS_FILE="/run/ourbox-efi-boot-preference.env"
+        OURBOX_EFI_BOOT_STATUS="warning"
+        if [ -f "${EFI_STATUS_FILE}" ]; then
+          # shellcheck disable=SC1090
+          . "${EFI_STATUS_FILE}"
+        fi
+        if [ "${OURBOX_EFI_BOOT_STATUS}" = "preferred" ]; then
+          echo "==> Installer preferred the installed OS for the next UEFI boot when possible."
+          echo "==> When power is off: remove USB, then press power button to boot."
+        else
+          echo "==> WARNING: EFI boot preference was not updated confidently."
+          echo "==> WARNING: remove the USB before the next power-on or the installer may boot again."
+          echo "==> When power is off: remove USB, then press power button to boot."
+        fi
     - echo "==> =================================================================="

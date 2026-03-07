@@ -86,6 +86,10 @@ This is where higher-level stacks store persistent state:
 5. Operator confirms disk selection, identity, and INSTALL
 6. Autoinstall late-commands extract the OS payload to `/target/`
 
+After a successful install, the late-commands attempt to prefer the installed OS for the next and
+future UEFI boots. The operator should still remove the USB after poweroff, but first boot should
+not depend solely on that manual step.
+
 ### Fat ISO (`--embed-payload`)
 
 Same flow, except step 3 uses an embedded `os-payload.tar.gz` from `/cdrom/ourbox/payload/`

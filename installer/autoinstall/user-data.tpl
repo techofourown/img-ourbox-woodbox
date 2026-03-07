@@ -77,8 +77,9 @@ autoinstall:
   # No interactive-sections: the real config (written by ourbox-preinstall)
   # has none, so Subiquity runs fully automated once it starts.
 
-  # Power off so the operator knows when to remove the USB.
-  # Ubuntu 24.04 Subiquity defaults to "reboot" when this is absent.
+  # Power off so the operator has a clear media-removal seam.
+  # The runtime autoinstall also attempts to prefer the installed OS for
+  # subsequent UEFI boots when possible.
   shutdown: poweroff
 
   locale: en_US
