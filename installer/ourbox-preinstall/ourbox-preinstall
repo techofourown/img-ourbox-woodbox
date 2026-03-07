@@ -768,9 +768,110 @@ prompt_password_hash() {
     read -r -s -p "  Confirm:  " pw2; echo >&2
     [[ -n "${pw1}" ]] || { echo "  Password cannot be empty." >&2; continue; }
     [[ "${pw1}" == "${pw2}" ]] || { echo "  Passwords did not match. Try again." >&2; continue; }
+    printf '%s' "${pw1}" | openssl passwd -6 -stdin
+    return 0
+  done
+}
+
+prompt_optional_password_hash() {
+  local pw1="" pw2=""
+  while true; do
+    read -r -s -p "  Installer SSH password (press Enter to keep current posture): " pw1; echo >&2
+    if [[ -z "${pw1}" ]]; then
+      echo ""
+      return 0
+    fi
+    read -r -s -p "  Confirm installer SSH password: " pw2; echo >&2
+    [[ "${pw1}" == "${pw2}" ]] || { echo "  Passwords did not match. Try again." >&2; continue; }
     echo "${pw1}" | openssl passwd -6 -stdin
     return 0
   done
+}
+
+shell_assign() {
+  local name="$1" value="$2"
+  printf '%s=' "${name}"
+  printf '%q\n' "${value}"
+}
+
+apply_installer_ssh_password_override() {
+  local password_hash="$1"
+  local ssh_mode="" ssh_user="" ssh_allow_root="" ssh_keys=""
+  local defaults_tmp=""
+
+  [[ -n "${password_hash}" ]] || return 0
+  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
+
+  # shellcheck disable=SC1090
+  source "${DEFAULTS_ENV}"
+  ssh_mode="${OURBOX_INSTALLER_SSH_MODE:-both}"
+  ssh_user="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
+  ssh_allow_root="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+  ssh_keys="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
+
+  case "${ssh_mode}" in
+    password|both) ;;
+    *)
+      die "installer media is not password-capable (OURBOX_INSTALLER_SSH_MODE=${ssh_mode})"
+      ;;
+  esac
+
+  defaults_tmp="$(mktemp)"
+  {
+    shell_assign "OURBOX_INSTALLER_SSH_MODE" "${ssh_mode}"
+    shell_assign "OURBOX_INSTALLER_SSH_USER" "${ssh_user}"
+    shell_assign "OURBOX_INSTALLER_SSH_PASSWORD_HASH" "${password_hash}"
+    shell_assign "OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS" "${ssh_keys}"
+    shell_assign "OURBOX_INSTALLER_SSH_ALLOW_ROOT" "${ssh_allow_root}"
+  } > "${defaults_tmp}"
+
+  if DEFAULTS_FILE="${defaults_tmp}" /bin/bash /cdrom/ourbox/tools/ourbox-installer-ssh-bootstrap.sh >> "${INSTALLER_LOG}" 2>&1; then
+    rm -f "${defaults_tmp}"
+    return 0
+  fi
+
+  rm -f "${defaults_tmp}"
+  die "failed to apply live-installer SSH password override"
+}
+
+optional_installer_ssh_password_step() {
+  local ssh_mode="" ssh_user="" password_hash=""
+
+  [[ -f "${DEFAULTS_ENV}" ]] || die "missing installer defaults: ${DEFAULTS_ENV}"
+
+  # shellcheck disable=SC1090
+  source "${DEFAULTS_ENV}"
+  ssh_mode="${OURBOX_INSTALLER_SSH_MODE:-both}"
+  ssh_user="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
+
+  banner
+  echo "  Step 0: Optional installer SSH password"
+  echo
+
+  case "${ssh_mode}" in
+    password|both)
+      echo "  Set a temporary password for the live installer SSH account (${ssh_user})."
+      echo "  Press ENTER to keep the current installer SSH posture."
+      echo "  This password only applies to the installer environment."
+      echo
+      password_hash="$(prompt_optional_password_hash)"
+      if [[ -z "${password_hash}" ]]; then
+        echo "  Keeping current installer SSH posture."
+        echo
+        return 0
+      fi
+      apply_installer_ssh_password_override "${password_hash}"
+      banner
+      echo "  Installer SSH password updated for ${ssh_user}."
+      echo
+      ;;
+    *)
+      echo "  This media is not password-capable for installer SSH (mode=${ssh_mode})."
+      echo "  Press ENTER to continue."
+      echo
+      read -r
+      ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------
@@ -781,6 +882,8 @@ main() {
   banner
 
   udevadm settle --timeout=10 || true
+
+  optional_installer_ssh_password_step
 
   # --- Step 1: OS disk ---
   echo "  Step 1 of 5: Select the OS disk"
@@ -841,6 +944,15 @@ main() {
   echo "  DATA disk    : ${DATA_DISK}"
   echo "  OS artifact  : ${OS_ARTIFACT_REF}"
   echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
+  _load_installer_ssh_status
+  case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
+    configured-hash)
+      echo "  Installer SSH: operator-set temporary password"
+      ;;
+    generated-console-only)
+      echo "  Installer SSH: console-only generated password"
+      ;;
+  esac
   echo "  Hostname     : ${OURBOX_HOSTNAME}"
   echo "  Username     : ${OURBOX_USERNAME}"
   echo

@@ -69,6 +69,7 @@ Both the default and `--build-local` paths converge on the same rendered NoCloud
 
 The installer is interactive. It will prompt for:
 
+0. **Optional installer SSH password** — set a temporary password for `ourbox-installer`, or press Enter to keep the current media posture
 1. **OS disk selection** — any non-removable non-USB disk to install onto (will be erased; SSD/NVMe recommended)
 2. **DATA disk selection** — the disk to format as `OURBOX_DATA` (ext4)
 3. **OS artifact** — pulled from registry or used from embedded payload; displayed with SHA-256
@@ -79,6 +80,7 @@ If installer SSH is ready, the banner/monitor will show:
 - `ssh ourbox-installer@<installer-ip>`
 
 For official/public media, the live-installer password is generated at boot and shown only on the attached console. It is not broadcast over UDP, HTTP, or the shared installer log.
+If you set a password in step 0, that operator-chosen password replaces the generated installer password for the rest of the live install session.
 
 After confirmation, the installer runs unattended (~10–15 minutes). When the machine powers off:
 
