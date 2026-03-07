@@ -1,3 +1,11 @@
+## [0.5.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.2...v0.5.3) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** pin official Woodbox installer defaults ([335d7e2](https://github.com/techofourown/img-ourbox-woodbox/commit/335d7e23b1a89873dbd8b1cf0bc0012b1189a485))
+* **installer:** honor official build defaults inputs ([25a7af9](https://github.com/techofourown/img-ourbox-woodbox/commit/25a7af98ddb027213bdf6367f438515b29df4ead))
+
 ## [0.5.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.1...v0.5.2) (2026-03-07)
 
 
