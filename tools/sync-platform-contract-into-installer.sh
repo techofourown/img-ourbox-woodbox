@@ -30,6 +30,8 @@ SRC="${ROOT}/artifacts/platform-contract/extracted/platform-contract"
   exit 1
 }
 
+"${ROOT}/tools/validate-platform-contract-shape.sh" "${SRC}"
+
 # Destination: the canonical installer rootfs overlay
 ROOTFS="${ROOT}/installer/ourbox/rootfs"
 DST_BASE="${ROOTFS}/opt/ourbox/airgap/platform"
