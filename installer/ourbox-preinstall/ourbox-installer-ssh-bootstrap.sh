@@ -125,10 +125,10 @@ generate_installer_ssh_password() {
 }
 
 restart_ssh_service() {
-  systemctl --no-block restart ssh >/dev/null 2>&1 \
-    || systemctl --no-block restart openssh-server >/dev/null 2>&1 \
-    || systemctl --no-block start ssh >/dev/null 2>&1 \
-    || systemctl --no-block start openssh-server >/dev/null 2>&1
+  systemctl restart ssh >/dev/null 2>&1 \
+    || systemctl restart openssh-server >/dev/null 2>&1 \
+    || systemctl start ssh >/dev/null 2>&1 \
+    || systemctl start openssh-server >/dev/null 2>&1
 }
 
 assert_valid_mode() {
