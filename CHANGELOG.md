@@ -1,3 +1,15 @@
+# [0.5.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.6...v0.5.0) (2026-03-07)
+
+
+### Bug Fixes
+
+* **installer:** wait for sshd restart before ready ([0ac1dc4](https://github.com/techofourown/img-ourbox-woodbox/commit/0ac1dc467193ec17f1e34dd6739d4935495c6b67))
+
+
+### Features
+
+* **installer:** add step 0 installer ssh password ([1c5e559](https://github.com/techofourown/img-ourbox-woodbox/commit/1c5e55975911d9c65c1b3c17a63029fadc9b06fd))
+
 ## [0.4.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.5...v0.4.6) (2026-03-07)
 
 
