@@ -50,6 +50,12 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      - name: Resolve latest nightly upstream inputs
+        run: |
+          set -euo pipefail
+          echo "OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge)" >> "${GITHUB_ENV}"
+          echo "OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@$(oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64)" >> "${GITHUB_ENV}"
+
       - name: Clean stale workspace artifacts
         run: |
           rm -rf artifacts/ deploy/
@@ -69,18 +75,25 @@ jobs:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
 
+      - name: Publish OS artifact (official nightly)
+        run: ./tools/publish-os-artifact-official.sh nightly
+
+      - name: Resolve installer default OS ref
+        run: |
+          set -euo pipefail
+          echo "OS_DEFAULT_REF=$(cat deploy/os-artifact.pinned.ref)" >> "${GITHUB_ENV}"
+
       - name: Build installer ISO
         run: ./tools/build-installer-iso.sh
         env:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
           OS_CHANNEL: nightly
+          OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
+          INSTALL_DEFAULTS_REF: ""
           OURBOX_INSTALLER_SSH_MODE: both
           OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
-
-      - name: Publish OS artifact (official nightly)
-        run: ./tools/publish-os-artifact-official.sh nightly
 
       - name: Publish installer artifact (official nightly)
         run: ./tools/publish-installer-artifact-official.sh nightly

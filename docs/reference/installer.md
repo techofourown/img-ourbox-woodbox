@@ -24,11 +24,13 @@ Key variables:
 - `OS_REPO` — OS payload registry namespace (`ghcr.io/techofourown/ourbox-woodbox-os`)
 - `OS_TARGET` — build target (`x86`)
 - `OS_CHANNEL` — default channel (`stable`)
+- `OS_DEFAULT_REF` — optional digest/tag ref for the default "press Enter" install target
 - `OS_CATALOG_ENABLED` — enable catalog-based version selection (`1`)
 - `OS_CATALOG_TAG` — catalog tag (`x86-catalog`)
 - `OS_ORAS_VERSION` — ORAS binary version bundled in the ISO
 - `INSTALLER_VERSION` — version label baked at ISO build time
 - `INSTALLER_GIT_HASH` — git SHA of this repo at ISO build time
+- `INSTALL_DEFAULTS_REF` — optional remote install-defaults OCI ref; official installers bake this empty when `OS_DEFAULT_REF` is pinned
 - `OURBOX_INSTALLER_SSH_MODE` — live-installer SSH mode (`off|key|password|both`)
 - `OURBOX_INSTALLER_SSH_USER` — dedicated live-installer SSH user (`ourbox-installer`)
 - `OURBOX_INSTALLER_SSH_PASSWORD_HASH` — optional pre-baked password hash; blank means generate a one-time password at boot
@@ -70,7 +72,7 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 2. **Step 2**: Operator selects the DATA disk (all non-removable non-OS disks)
 3. **Step 3**: Resolves OS artifact
    - Checks for embedded payload at `/cdrom/ourbox/payload/os-payload.tar.gz` (fat ISO)
-   - Otherwise pulls from `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}` via ORAS
+   - Otherwise uses `OS_DEFAULT_REF` when baked, or falls back to `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}`
    - Verifies SHA-256
    - Displays artifact info (version, variant, sha256, source ref)
 4. **Step 4**: Operator sets hostname, username, and password
@@ -107,6 +109,12 @@ Validation:
 - `tools/validate-installer-seed.sh` renders and parses the NoCloud seed as YAML, asserts `bootcmd` exists, and optionally runs `cloud-init schema` when available
 - `tools/build-installer-iso.sh` runs the rendered-seed validator before repacking the ISO
 - official nightly/release/revalidation workflows boot a smoke ISO in QEMU before publishing or signing off on installer health
+
+## Official builds
+
+- Official Woodbox workflows now publish the OS payload first, then build the installer with that exact digest-pinned OS ref baked into `OS_DEFAULT_REF`.
+- Official installers bake `INSTALL_DEFAULTS_REF=''` for deterministic default installs; operators can still override the defaults at install time.
+- Official nightly builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time before building the OS payload; release builds continue to consume the pinned refs in `release/official-inputs.env`.
 
 ---
 

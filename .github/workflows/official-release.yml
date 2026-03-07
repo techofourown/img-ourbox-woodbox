@@ -68,19 +68,26 @@ jobs:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
 
+      - name: Publish OS artifact (official release)
+        run: ./tools/publish-os-artifact-official.sh release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+      - name: Resolve installer default OS ref
+        run: |
+          set -euo pipefail
+          echo "OS_DEFAULT_REF=$(cat deploy/os-artifact.pinned.ref)" >> "${GITHUB_ENV}"
+
       - name: Build installer ISO
         run: ./tools/build-installer-iso.sh
         env:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
+          OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
+          INSTALL_DEFAULTS_REF: ""
           OURBOX_INSTALLER_SSH_MODE: both
           OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
-
-      - name: Publish OS artifact (official release)
-        run: ./tools/publish-os-artifact-official.sh release
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
 
       - name: Publish installer artifact (official release)
         run: ./tools/publish-installer-artifact-official.sh release
