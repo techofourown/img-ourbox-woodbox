@@ -52,6 +52,7 @@ OURBOX_INSTALLER_SSH_KEY="${OURBOX_INSTALLER_SSH_KEY:-}"
 OURBOX_INSTALLER_SSH_PASSWORD="${OURBOX_INSTALLER_SSH_PASSWORD:-}"
 OURBOX_INSTALLER_SSH_PASSWORD_STATE="${OURBOX_INSTALLER_SSH_PASSWORD_STATE:-generated-console-only}"
 OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+SMOKE_ARTIFACT_DIR="${OURBOX_SMOKE_ARTIFACT_DIR:-}"
 
 if [[ -z "${OURBOX_INSTALLER_SSH_KEY}" && -z "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
   die "smoke test requires OURBOX_INSTALLER_SSH_KEY or OURBOX_INSTALLER_SSH_PASSWORD for initial access"
@@ -65,6 +66,11 @@ DATA_DISK="${TMP_DIR}/data-disk.qcow2"
 QEMU_PID=""
 UDP_LISTENER_PID=""
 HTTP_BODY="${TMP_DIR}/monitor.html"
+SSH_LAST_ERROR="${TMP_DIR}/ssh-last-error.log"
+SSH_BANNER_DIAG="${TMP_DIR}/ssh-banner.log"
+HTTP_DIAG_HEADERS="${TMP_DIR}/http.headers"
+HTTP_DIAG_BODY="${TMP_DIR}/http.body"
+HTTP_DIAG_ERROR="${TMP_DIR}/http.error"
 CLOUD_INIT_STATUS=""
 
 cleanup() {
@@ -91,6 +97,17 @@ cleanup() {
     fi
   fi
 
+  if [[ -n "${SMOKE_ARTIFACT_DIR}" ]]; then
+    mkdir -p "${SMOKE_ARTIFACT_DIR}"
+    cp -f "${SERIAL_LOG}" "${SMOKE_ARTIFACT_DIR}/serial.log" 2>/dev/null || true
+    cp -f "${UDP_CAPTURE}" "${SMOKE_ARTIFACT_DIR}/udp.log" 2>/dev/null || true
+    cp -f "${SSH_LAST_ERROR}" "${SMOKE_ARTIFACT_DIR}/ssh-last-error.log" 2>/dev/null || true
+    cp -f "${SSH_BANNER_DIAG}" "${SMOKE_ARTIFACT_DIR}/ssh-banner.log" 2>/dev/null || true
+    cp -f "${HTTP_DIAG_HEADERS}" "${SMOKE_ARTIFACT_DIR}/http.headers" 2>/dev/null || true
+    cp -f "${HTTP_DIAG_BODY}" "${SMOKE_ARTIFACT_DIR}/http.body" 2>/dev/null || true
+    cp -f "${HTTP_DIAG_ERROR}" "${SMOKE_ARTIFACT_DIR}/http.error" 2>/dev/null || true
+  fi
+
   rm -rf "${TMP_DIR}"
 }
 
@@ -102,6 +119,20 @@ ssh_opts=(
   -o ConnectTimeout=5
   -p "${VM_SSH_PORT}"
 )
+
+log_failure_diagnostics() {
+  if [[ -f "${SERIAL_LOG}" ]]; then
+    tail -n 200 "${SERIAL_LOG}" > "${SSH_BANNER_DIAG}" 2>/dev/null || true
+  fi
+
+  if [[ -n "${OURBOX_INSTALLER_SSH_KEY}" ]]; then
+    ssh "${ssh_opts[@]}" -i "${OURBOX_INSTALLER_SSH_KEY}" "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" "true"       > /dev/null 2>"${SSH_LAST_ERROR}" || true
+  elif [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
+    SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e ssh "${ssh_opts[@]}" "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" "true"       > /dev/null 2>"${SSH_LAST_ERROR}" || true
+  fi
+
+  curl -sS -D "${HTTP_DIAG_HEADERS}" -o "${HTTP_DIAG_BODY}" --max-time 5     "http://127.0.0.1:${VM_HTTP_PORT}/" > /dev/null 2>"${HTTP_DIAG_ERROR}" || true
+}
 
 wait_for_file_contains() {
   local file="$1" pattern="$2" timeout="$3"
@@ -259,6 +290,7 @@ qemu-system-x86_64 \
   -drive file="${DATA_DISK}",if=virtio,format=qcow2 \
   -netdev user,id=n1,hostfwd=tcp::"${VM_SSH_PORT}"-:22,hostfwd=tcp::"${VM_HTTP_PORT}"-:8888 \
   -device virtio-net-pci,netdev=n1 \
+  -device virtio-rng-pci \
   -display none \
   -serial file:"${SERIAL_LOG}" \
   -monitor none \
@@ -266,8 +298,21 @@ qemu-system-x86_64 \
   >/dev/null 2>&1 &
 QEMU_PID="$!"
 
+log "Waiting for installer monitor to serve initial status page"
+if ! wait_for_http_response_contains \
+  "http://127.0.0.1:${VM_HTTP_PORT}/" \
+  180 \
+  "${HTTP_BODY}" \
+  "OurBox Woodbox Installer"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer HTTP monitor"
+fi
+
 log "Waiting for live-installer SSH login to become reachable"
-wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}" || die "timed out waiting for installer SSH login"
+if ! wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer SSH login"
+fi
 
 log "Running SSH-level smoke assertions"
 ssh_smoke_env=(
@@ -309,28 +354,34 @@ installer_ssh "grep -qx 'OURBOX_INSTALLER_SSH_ALLOW_ROOT=${OURBOX_INSTALLER_SSH_
 installer_ssh "grep -qx 'OURBOX_INSTALLER_SSH_PASSWORD_STATE=${OURBOX_INSTALLER_SSH_PASSWORD_STATE}' /run/ourbox-installer-ssh-status.env"
 
 log "Checking password login and root lockout"
-installer_ssh_password_only "true"
-if SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
-  ssh \
-    -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null \
-    -o ConnectTimeout=5 \
-    -o PubkeyAuthentication=no \
-    -o PreferredAuthentications=password \
-    -p "${VM_SSH_PORT}" \
-    "root@127.0.0.1" \
-    "true" >/dev/null 2>&1; then
-  die "root password login unexpectedly succeeded in smoke VM"
+if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+  installer_ssh_password_only "true"
+fi
+if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+  if SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
+    ssh \
+      -o StrictHostKeyChecking=no \
+      -o UserKnownHostsFile=/dev/null \
+      -o ConnectTimeout=5 \
+      -o PubkeyAuthentication=no \
+      -o PreferredAuthentications=password \
+      -p "${VM_SSH_PORT}" \
+      "root@127.0.0.1" \
+      "true" >/dev/null 2>&1; then
+    die "root password login unexpectedly succeeded in smoke VM"
+  fi
 fi
 
 log "Waiting for installer monitor to serve the expected status page"
-wait_for_http_response_contains \
+if ! wait_for_http_response_contains \
   "http://127.0.0.1:${VM_HTTP_PORT}/" \
   120 \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer" \
-  "ssh ${OURBOX_INSTALLER_SSH_USER}@" \
-  || die "timed out waiting for installer HTTP monitor content"
+  "ssh ${OURBOX_INSTALLER_SSH_USER}@"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer HTTP monitor content"
+fi
 
 log "Waiting for UDP monitor output on port ${VM_UDP_PORT}"
 wait_for_file_contains "${UDP_CAPTURE}" "OurBox Woodbox Installer" 120 \
