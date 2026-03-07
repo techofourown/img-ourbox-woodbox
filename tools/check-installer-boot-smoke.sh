@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Usage:
   check-installer-boot-smoke.sh <installer.iso>
 
@@ -23,7 +23,7 @@ Environment overrides:
   OURBOX_INSTALLER_SSH_PASSWORD=<optional known live-installer password>
   OURBOX_INSTALLER_SSH_PASSWORD_STATE=generated-console-only
   OURBOX_INSTALLER_SSH_ALLOW_ROOT=0
-EOF
+USAGE
 }
 
 need_cmd qemu-system-x86_64
@@ -34,10 +34,7 @@ need_cmd curl
 need_cmd python3
 
 ISO_FILE="${1:-}"
-[[ -n "${ISO_FILE}" ]] || {
-  usage
-  exit 1
-}
+[[ -n "${ISO_FILE}" ]] || { usage; exit 1; }
 [[ -f "${ISO_FILE}" ]] || die "installer ISO not found: ${ISO_FILE}"
 
 VM_SSH_PORT="${VM_SSH_PORT:-22222}"
@@ -52,6 +49,7 @@ OURBOX_INSTALLER_SSH_KEY="${OURBOX_INSTALLER_SSH_KEY:-}"
 OURBOX_INSTALLER_SSH_PASSWORD="${OURBOX_INSTALLER_SSH_PASSWORD:-}"
 OURBOX_INSTALLER_SSH_PASSWORD_STATE="${OURBOX_INSTALLER_SSH_PASSWORD_STATE:-generated-console-only}"
 OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+SMOKE_ARTIFACT_DIR="${OURBOX_SMOKE_ARTIFACT_DIR:-}"
 
 if [[ -z "${OURBOX_INSTALLER_SSH_KEY}" && -z "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
   die "smoke test requires OURBOX_INSTALLER_SSH_KEY or OURBOX_INSTALLER_SSH_PASSWORD for initial access"
@@ -62,10 +60,15 @@ SERIAL_LOG="${TMP_DIR}/serial.log"
 UDP_CAPTURE="${TMP_DIR}/udp.log"
 OS_DISK="${TMP_DIR}/os-disk.qcow2"
 DATA_DISK="${TMP_DIR}/data-disk.qcow2"
+HTTP_BODY="${TMP_DIR}/monitor.html"
+HTTP_DIAG_HEADERS="${TMP_DIR}/http.headers"
+HTTP_DIAG_BODY="${TMP_DIR}/http.body"
+HTTP_DIAG_ERROR="${TMP_DIR}/http.error"
+SSH_LAST_ERROR="${TMP_DIR}/ssh-last-error.log"
+SSH_BANNER_DIAG="${TMP_DIR}/ssh-banner.log"
+CLOUD_INIT_STATUS=""
 QEMU_PID=""
 UDP_LISTENER_PID=""
-HTTP_BODY="${TMP_DIR}/monitor.html"
-CLOUD_INIT_STATUS=""
 
 cleanup() {
   local exit_code="$1"
@@ -80,63 +83,49 @@ cleanup() {
     wait "${QEMU_PID}" 2>/dev/null || true
   fi
 
+  if [[ -n "${SMOKE_ARTIFACT_DIR}" ]]; then
+    mkdir -p "${SMOKE_ARTIFACT_DIR}"
+    cp -f "${SERIAL_LOG}"        "${SMOKE_ARTIFACT_DIR}/serial.log"         2>/dev/null || true
+    cp -f "${UDP_CAPTURE}"       "${SMOKE_ARTIFACT_DIR}/udp.log"            2>/dev/null || true
+    cp -f "${SSH_LAST_ERROR}"    "${SMOKE_ARTIFACT_DIR}/ssh-last-error.log" 2>/dev/null || true
+    cp -f "${SSH_BANNER_DIAG}"   "${SMOKE_ARTIFACT_DIR}/ssh-banner.log"     2>/dev/null || true
+    cp -f "${HTTP_DIAG_HEADERS}" "${SMOKE_ARTIFACT_DIR}/http.headers"       2>/dev/null || true
+    cp -f "${HTTP_DIAG_BODY}"    "${SMOKE_ARTIFACT_DIR}/http.body"          2>/dev/null || true
+    cp -f "${HTTP_DIAG_ERROR}"   "${SMOKE_ARTIFACT_DIR}/http.error"         2>/dev/null || true
+  fi
+
   if [[ "${exit_code}" != "0" ]]; then
-    if [[ -f "${SERIAL_LOG}" ]]; then
-      log "Smoke VM serial log tail:"
-      tail -n 80 "${SERIAL_LOG}" || true
-    fi
-    if [[ -f "${UDP_CAPTURE}" ]]; then
-      log "Smoke VM UDP capture tail:"
-      tail -n 80 "${UDP_CAPTURE}" || true
-    fi
+    [[ -f "${SERIAL_LOG}" ]] && { log "Smoke VM serial log tail:"; tail -n 80 "${SERIAL_LOG}" || true; }
+    [[ -f "${UDP_CAPTURE}" ]] && { log "Smoke VM UDP capture tail:"; tail -n 80 "${UDP_CAPTURE}" || true; }
   fi
 
   rm -rf "${TMP_DIR}"
 }
-
 trap 'cleanup "$?"' EXIT
 
-ssh_opts=(
-  -o StrictHostKeyChecking=no
-  -o UserKnownHostsFile=/dev/null
-  -o ConnectTimeout=5
-  -p "${VM_SSH_PORT}"
-)
+ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p "${VM_SSH_PORT}")
 
 wait_for_file_contains() {
-  local file="$1" pattern="$2" timeout="$3"
-  local deadline
-  deadline=$((SECONDS + timeout))
-
+  local file="$1" pattern="$2" timeout="$3" deadline=$((SECONDS + timeout))
   while (( SECONDS < deadline )); do
-    if [[ -f "${file}" ]] && grep -aFq "${pattern}" "${file}"; then
-      return 0
-    fi
+    [[ -f "${file}" ]] && grep -aFq "${pattern}" "${file}" && return 0
     sleep 2
   done
-
   return 1
 }
 
 wait_for_http_response_contains() {
   local url="$1" timeout="$2" output_file="$3"
   shift 3
-
-  local deadline tmp_output pattern found_all
-  deadline=$((SECONDS + timeout))
-  tmp_output="${output_file}.tmp"
+  local deadline=$((SECONDS + timeout)) tmp_output="${output_file}.tmp" found pattern
 
   while (( SECONDS < deadline )); do
     if curl -fsS --max-time 5 "${url}" > "${tmp_output}" 2>/dev/null; then
-      found_all="1"
+      found=1
       for pattern in "$@"; do
-        if ! grep -Fq "${pattern}" "${tmp_output}"; then
-          found_all="0"
-          break
-        fi
+        grep -Fq "${pattern}" "${tmp_output}" || { found=0; break; }
       done
-
-      if [[ "${found_all}" == "1" ]]; then
+      if [[ "${found}" == "1" ]]; then
         mv "${tmp_output}" "${output_file}"
         return 0
       fi
@@ -150,59 +139,38 @@ wait_for_http_response_contains() {
 
 installer_ssh() {
   local remote_cmd="$1"
-
   if [[ -n "${OURBOX_INSTALLER_SSH_KEY}" ]]; then
-    ssh "${ssh_opts[@]}" -i "${OURBOX_INSTALLER_SSH_KEY}" \
-      "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
-      "${remote_cmd}"
+    ssh "${ssh_opts[@]}" -i "${OURBOX_INSTALLER_SSH_KEY}" "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" "${remote_cmd}"
     return 0
   fi
-
-  SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
-    ssh "${ssh_opts[@]}" \
-      "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
-      "${remote_cmd}"
+  SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e ssh "${ssh_opts[@]}" "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" "${remote_cmd}"
 }
 
 installer_ssh_password_only() {
   local remote_cmd="$1"
   [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD}" ]] || die "password-only SSH requested before a password was available"
-
-  SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
-    ssh \
-      -o StrictHostKeyChecking=no \
-      -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=5 \
-      -o PubkeyAuthentication=no \
-      -o PreferredAuthentications=password \
-      -p "${VM_SSH_PORT}" \
-      "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" \
-      "${remote_cmd}"
+  SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e ssh \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+    -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+    -p "${VM_SSH_PORT}" "${OURBOX_INSTALLER_SSH_USER}@127.0.0.1" "${remote_cmd}"
 }
 
 wait_for_remote_condition() {
-  local remote_cmd="$1" timeout="$2"
-  local deadline
-  deadline=$((SECONDS + timeout))
-
+  local remote_cmd="$1" timeout="$2" deadline=$((SECONDS + timeout))
   while (( SECONDS < deadline )); do
-    if installer_ssh "${remote_cmd}" >/dev/null 2>&1; then
+    if installer_ssh "${remote_cmd}" >/dev/null 2>"${SSH_LAST_ERROR}"; then
       return 0
     fi
     sleep 2
   done
-
   return 1
 }
 
 wait_for_cloud_init_healthy() {
-  local deadline status
-  deadline=$((SECONDS + BOOT_TIMEOUT_SECS))
-
+  local deadline=$((SECONDS + BOOT_TIMEOUT_SECS)) status
   while (( SECONDS < deadline )); do
     status="$(installer_ssh "cloud-init status --long 2>/dev/null" 2>/dev/null || true)"
-    if [[ -n "${status}" ]] \
-      && grep -q '^status: done$' <<<"${status}" \
+    if [[ -n "${status}" ]] && grep -q '^status: done$' <<<"${status}" \
       && grep -q '^extended_status:' <<<"${status}" \
       && ! grep -q '^extended_status: degraded' <<<"${status}" \
       && grep -q 'DataSourceNoCloud' <<<"${status}"; then
@@ -211,8 +179,28 @@ wait_for_cloud_init_healthy() {
     fi
     sleep 5
   done
-
   return 1
+}
+
+log_failure_diagnostics() {
+  log "Collecting smoke diagnostics"
+  curl -sS -D "${HTTP_DIAG_HEADERS}" --max-time 8 "http://127.0.0.1:${VM_HTTP_PORT}/" >"${HTTP_DIAG_BODY}" 2>"${HTTP_DIAG_ERROR}" || true
+  python3 - "${VM_SSH_PORT}" "${SSH_BANNER_DIAG}" <<'PY' || true
+import pathlib
+import socket
+import sys
+
+port = int(sys.argv[1])
+out = pathlib.Path(sys.argv[2])
+try:
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
+        sock.settimeout(3)
+        data = sock.recv(256)
+except OSError as exc:
+    out.write_text(f"connect-error: {exc}\n", encoding="utf-8")
+else:
+    out.write_bytes(data)
+PY
 }
 
 start_udp_listener() {
@@ -259,15 +247,24 @@ qemu-system-x86_64 \
   -drive file="${DATA_DISK}",if=virtio,format=qcow2 \
   -netdev user,id=n1,hostfwd=tcp::"${VM_SSH_PORT}"-:22,hostfwd=tcp::"${VM_HTTP_PORT}"-:8888 \
   -device virtio-net-pci,netdev=n1 \
+  -device virtio-rng-pci \
   -display none \
   -serial file:"${SERIAL_LOG}" \
   -monitor none \
-  -no-reboot \
-  >/dev/null 2>&1 &
+  -no-reboot >/dev/null 2>&1 &
 QEMU_PID="$!"
 
+log "Waiting for installer monitor to serve initial status page"
+if ! wait_for_http_response_contains "http://127.0.0.1:${VM_HTTP_PORT}/" 180 "${HTTP_BODY}" "OurBox Woodbox Installer"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer HTTP monitor"
+fi
+
 log "Waiting for live-installer SSH login to become reachable"
-wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}" || die "timed out waiting for installer SSH login"
+if ! wait_for_remote_condition "true" "${BOOT_TIMEOUT_SECS}"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer SSH login"
+fi
 
 log "Running SSH-level smoke assertions"
 ssh_smoke_env=(
@@ -276,19 +273,13 @@ ssh_smoke_env=(
   "SSH_PORT=${VM_SSH_PORT}"
   "REMOTE_INSTALLER_LOG_PATH=/run/ourbox-installer.log"
 )
-if [[ -n "${OURBOX_INSTALLER_SSH_KEY}" ]]; then
-  ssh_smoke_env+=("OURBOX_INSTALLER_SSH_KEY=${OURBOX_INSTALLER_SSH_KEY}")
-fi
-if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
-  ssh_smoke_env+=("OURBOX_INSTALLER_SSH_PASSWORD=${OURBOX_INSTALLER_SSH_PASSWORD}")
-fi
+[[ -n "${OURBOX_INSTALLER_SSH_KEY}" ]] && ssh_smoke_env+=("OURBOX_INSTALLER_SSH_KEY=${OURBOX_INSTALLER_SSH_KEY}")
+[[ -n "${OURBOX_INSTALLER_SSH_PASSWORD}" ]] && ssh_smoke_env+=("OURBOX_INSTALLER_SSH_PASSWORD=${OURBOX_INSTALLER_SSH_PASSWORD}")
 env "${ssh_smoke_env[@]}" bash "${ROOT}/tools/check-installer-ssh-smoke.sh" 127.0.0.1
 
 log "Waiting for installer runtime artifacts"
-wait_for_remote_condition "test -f /run/ourbox-installer.log && grep -Fq '[ourbox-bootcmd] START' /run/ourbox-installer.log" 180 \
-  || die "timed out waiting for /run/ourbox-installer.log with bootcmd start marker"
-wait_for_remote_condition "test -f /run/ourbox-installer-ssh-status.env && grep -qx 'OURBOX_INSTALLER_SSH_STATUS=ready' /run/ourbox-installer-ssh-status.env" 180 \
-  || die "timed out waiting for installer SSH ready status"
+wait_for_remote_condition "test -f /run/ourbox-installer.log && grep -Fq '[ourbox-bootcmd] START' /run/ourbox-installer.log" 180 || die "timed out waiting for /run/ourbox-installer.log with bootcmd start marker"
+wait_for_remote_condition "test -f /run/ourbox-installer-ssh-status.env && grep -qx 'OURBOX_INSTALLER_SSH_STATUS=ready' /run/ourbox-installer-ssh-status.env" 180 || die "timed out waiting for installer SSH ready status"
 
 log "Waiting for cloud-init to finish without degraded status"
 wait_for_cloud_init_healthy || die "timed out waiting for healthy cloud-init status"
@@ -296,8 +287,7 @@ printf '%s\n' "${CLOUD_INIT_STATUS}"
 
 if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" && -z "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
   log "Fetching generated installer SSH password through the additive smoke key"
-  wait_for_remote_condition "test -s /run/ourbox-installer-ssh-password.txt" 120 \
-    || die "timed out waiting for generated installer SSH password file"
+  wait_for_remote_condition "test -s /run/ourbox-installer-ssh-password.txt" 120 || die "timed out waiting for generated installer SSH password file"
   OURBOX_INSTALLER_SSH_PASSWORD="$(installer_ssh "tr -d '\r\n' < /run/ourbox-installer-ssh-password.txt")"
   [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD}" ]] || die "generated installer SSH password was empty"
 fi
@@ -309,32 +299,29 @@ installer_ssh "grep -qx 'OURBOX_INSTALLER_SSH_ALLOW_ROOT=${OURBOX_INSTALLER_SSH_
 installer_ssh "grep -qx 'OURBOX_INSTALLER_SSH_PASSWORD_STATE=${OURBOX_INSTALLER_SSH_PASSWORD_STATE}' /run/ourbox-installer-ssh-status.env"
 
 log "Checking password login and root lockout"
-installer_ssh_password_only "true"
-if SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e \
-  ssh \
-    -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null \
-    -o ConnectTimeout=5 \
-    -o PubkeyAuthentication=no \
-    -o PreferredAuthentications=password \
-    -p "${VM_SSH_PORT}" \
-    "root@127.0.0.1" \
-    "true" >/dev/null 2>&1; then
-  die "root password login unexpectedly succeeded in smoke VM"
+if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+  installer_ssh_password_only "true"
+  if SSHPASS="${OURBOX_INSTALLER_SSH_PASSWORD}" sshpass -e ssh \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+    -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+    -p "${VM_SSH_PORT}" "root@127.0.0.1" "true" >/dev/null 2>&1; then
+    die "root password login unexpectedly succeeded in smoke VM"
+  fi
 fi
 
 log "Waiting for installer monitor to serve the expected status page"
-wait_for_http_response_contains \
+if ! wait_for_http_response_contains \
   "http://127.0.0.1:${VM_HTTP_PORT}/" \
   120 \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer" \
-  "ssh ${OURBOX_INSTALLER_SSH_USER}@" \
-  || die "timed out waiting for installer HTTP monitor content"
+  "ssh ${OURBOX_INSTALLER_SSH_USER}@"; then
+  log_failure_diagnostics
+  die "timed out waiting for installer HTTP monitor content"
+fi
 
 log "Waiting for UDP monitor output on port ${VM_UDP_PORT}"
-wait_for_file_contains "${UDP_CAPTURE}" "OurBox Woodbox Installer" 120 \
-  || die "timed out waiting for installer UDP monitor traffic"
+wait_for_file_contains "${UDP_CAPTURE}" "OurBox Woodbox Installer" 120 || die "timed out waiting for installer UDP monitor traffic"
 
 log "Checking for leaked secrets in installer surfaces"
 installer_ssh "! grep -Fq '${OURBOX_INSTALLER_SSH_PASSWORD}' /run/ourbox-installer.log"

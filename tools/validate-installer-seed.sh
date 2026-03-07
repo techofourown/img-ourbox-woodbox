@@ -97,9 +97,32 @@ if not isinstance(bootcmd, list) or not bootcmd:
     print(f"ERROR: rendered seed {rendered_path} is missing a non-empty bootcmd list", file=sys.stderr)
     sys.exit(1)
 
-if not any("ourbox-installer-ssh-bootstrap.sh" in str(item) for item in bootcmd):
+monitor_indexes = [
+    idx for idx, item in enumerate(bootcmd)
+    if "ourbox-installer-monitor.py" in str(item)
+]
+ssh_indexes = [
+    idx for idx, item in enumerate(bootcmd)
+    if "ourbox-installer-ssh-bootstrap.sh" in str(item)
+]
+
+if not monitor_indexes:
+    print(
+        f"ERROR: rendered seed {rendered_path} does not reference ourbox-installer-monitor.py in bootcmd",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+if not ssh_indexes:
     print(
         f"ERROR: rendered seed {rendered_path} does not reference the staged installer SSH bootstrap script",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+if monitor_indexes[0] > ssh_indexes[0]:
+    print(
+        f"ERROR: rendered seed {rendered_path} references installer SSH bootstrap before installer monitor in bootcmd",
         file=sys.stderr,
     )
     sys.exit(1)
