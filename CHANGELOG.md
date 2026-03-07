@@ -1,3 +1,12 @@
+## [0.4.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.5...v0.4.6) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** propagate installer SSH probe failures ([5cfcdb2](https://github.com/techofourown/img-ourbox-woodbox/commit/5cfcdb23b65ca5e3a31d64697f0300e66bc7ed32))
+* **ci:** recover woodbox installer smoke gating ([dd69319](https://github.com/techofourown/img-ourbox-woodbox/commit/dd69319368d634e6c32956b35cf9166ace65eb03))
+* **smoke:** capture installer ssh failure diagnostics ([46cc987](https://github.com/techofourown/img-ourbox-woodbox/commit/46cc987bb3aadec104f9bb3eb0cad5ca679fa49e))
+
 ## [0.4.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.4.4...v0.4.5) (2026-03-06)
 
 
