@@ -42,6 +42,7 @@ EMBED_PAYLOAD=""
 # For nightly installer builds, set OS_CHANNEL=nightly so that the baked
 # fallback points at the nightly OS lane rather than stable.
 : "${OS_CHANNEL:=stable}"
+: "${OS_DEFAULT_REF:=}"
 : "${OURBOX_VARIANT:=prod}"
 : "${DEFAULT_INSTALLER_SSH_MODE:=both}"
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
@@ -254,7 +255,7 @@ OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo un
 #   2. contracts/install-defaults.ref legacy fallback
 #   3. empty (no remote defaults bundle configured)
 INSTALL_DEFAULTS_REF_BAKED="${INSTALL_DEFAULTS_REF:-}"
-if [[ -z "${INSTALL_DEFAULTS_REF_BAKED}" ]]; then
+if [[ -z "${INSTALL_DEFAULTS_REF+x}" && -z "${INSTALL_DEFAULTS_REF_BAKED}" ]]; then
   _idr_file="${ROOT}/contracts/install-defaults.ref"
   if [[ -f "${_idr_file}" ]]; then
     # Read first non-comment non-blank line
@@ -272,7 +273,7 @@ INSTALLER_ID=woodbox
 OS_REPO=${OFFICIAL_OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}
 OS_TARGET=${OURBOX_TARGET}
 OS_CHANNEL=${OS_CHANNEL}
-OS_DEFAULT_REF=
+OS_DEFAULT_REF=${OS_DEFAULT_REF}
 OS_CATALOG_ENABLED=1
 OS_CATALOG_TAG=${OURBOX_TARGET}-catalog
 INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF_BAKED}

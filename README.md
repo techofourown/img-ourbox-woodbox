@@ -75,6 +75,13 @@ Official artifacts are produced by organization-controlled build infrastructure 
 - Official release: triggered by `v*` tag push via `.github/workflows/official-release.yml`
 - Runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
 
+Official Woodbox installer builds publish the OS payload first and then bake that exact pinned
+OS payload ref into the installer defaults, so the published installer and its default install
+target stay on the same lane.
+Official nightly builds also resolve the latest `sw-ourbox-os` `edge` platform bundle digests at
+workflow time before building the OS payload; release builds continue to consume the pinned refs in
+`release/official-inputs.env`.
+
 ## Documentation
 
 | Document | Contents |

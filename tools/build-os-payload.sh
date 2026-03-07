@@ -69,9 +69,10 @@ source "${CONTRACT_ENV}"
 CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}" 2>/dev/null || echo unknown)"
 
 # Capture airgap-platform ref and digest for provenance.
-# AIRGAP_PLATFORM_REF is the ref used to fetch (from release/official-inputs.env or env var).
+# OURBOX_AIRGAP_PLATFORM_REF is the resolved fetch ref from workflows when present.
+# AIRGAP_PLATFORM_REF is the pinned fallback from release/official-inputs.env.
 # The actual digest is stored in artifacts/.airgap-platform-meta/oras.pull.log if available.
-AIRGAP_PLATFORM_REF_USED="${AIRGAP_PLATFORM_REF:-${OURBOX_AIRGAP_PLATFORM_REF:-unknown}}"
+AIRGAP_PLATFORM_REF_USED="${OURBOX_AIRGAP_PLATFORM_REF:-${AIRGAP_PLATFORM_REF:-unknown}}"
 AIRGAP_PLATFORM_DIGEST="unknown"
 AIRGAP_META_LOG="${ROOT}/artifacts/.airgap-platform-meta/oras.pull.log"
 if [[ -f "${AIRGAP_META_LOG}" ]]; then
