@@ -31,6 +31,9 @@ This pulls the official installer artifact from GHCR, flashes it to a USB disk y
 3. Type `INSTALL` to begin — runs unattended (~10–15 minutes)
 4. Machine powers off — remove USB, boot from NVMe
 
+The installer also attempts to prefer the installed OS for the next UEFI boot when possible, but
+removing the USB after poweroff is still the recommended operator flow.
+
 ### Prepare a fully offline USB (local source build)
 
 ```bash

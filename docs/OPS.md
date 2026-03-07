@@ -17,6 +17,7 @@ This will:
 
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
 prompts, wait for the machine to power off, remove USB, boot from the selected OS disk.
+The installer also attempts to prefer the installed OS for the next UEFI boot when possible.
 
 During live installation, official/public media exposes a dedicated installer SSH account:
 - user: `ourbox-installer`
@@ -87,6 +88,9 @@ After confirmation, the installer runs unattended (~10–15 minutes). When the m
 - Remove the USB stick
 - Boot from the selected OS disk
 - Wait for first-boot bootstrap (several minutes)
+
+The installer attempts to prefer the installed OS for the next and future UEFI boots, but USB
+removal after poweroff is still recommended.
 
 ---
 

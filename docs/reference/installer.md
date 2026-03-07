@@ -46,6 +46,9 @@ Official/public Woodbox media currently builds with:
 At install time, before disk selection, the operator may set a temporary live-installer SSH
 password on TTY1. Pressing Enter keeps the current media posture unchanged.
 
+After a successful install, the installer attempts to prefer the installed OS for the next and
+future UEFI boots. Removing the USB after poweroff is still recommended.
+
 ---
 
 ## Artifact contract (oras pull)
@@ -75,6 +78,11 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 
 After operator confirmation, `ourbox-preinstall` writes `/autoinstall.yaml` (filled from
 `/cdrom/ourbox/autoinstall.tpl`) and exits. Subiquity then runs fully automated.
+
+At the end of late-commands, the installer attempts to identify the installed EFI entry on the
+target ESP, set `BootNext` to it for the immediate next boot, and move that entry to the front of
+`BootOrder` while preserving the relative order of the remaining entries. If EFI retargeting
+cannot be performed confidently, the installer fails soft and still powers off.
 
 ---
 
@@ -125,7 +133,7 @@ Late-commands in `autoinstall.tpl`:
 7. Write DATA disk fstab entry
 8. Configure netplan by MAC address
 9. Format DATA disk as `OURBOX_DATA`
-10. Restore UEFI boot order
+10. Prefer the installed EFI entry for the next and future UEFI boots
 
 ---
 
