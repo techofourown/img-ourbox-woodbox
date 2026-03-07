@@ -79,6 +79,7 @@ Official artifacts are produced by organization-controlled build infrastructure 
 
 | Document | Contents |
 |---|---|
+| [`sw-ourbox-os`](https://github.com/techofourown/sw-ourbox-os) | Upstream platform-contract and install-defaults producer |
 | [`docs/OPS.md`](./docs/OPS.md) | Operator runbook |
 | [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) | Artifact provenance and release policy |
 | [`docs/reference/contracts.md`](./docs/reference/contracts.md) | Host contracts (release metadata, storage, installer) |
