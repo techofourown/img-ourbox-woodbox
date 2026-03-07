@@ -19,6 +19,7 @@ bootcmd:
   # All bootcmd log lines go to /run/ourbox-installer.log — the same file tailed
   # by ourbox-installer-monitor.py for UDP broadcast and HTTP viewing.
   - "echo '[ourbox-bootcmd] START' > /run/ourbox-installer.log"
+  - "/bin/sh -c 'for c in /dev/ttyS0 /dev/console; do [ -w \"$c\" ] && printf \"[ourbox-bootcmd] START\\n\" > \"$c\" || true; done'"
 
   # --- Network monitoring setup -------------------------------------------
   # Set a stable hostname so the machine is discoverable as
@@ -27,20 +28,21 @@ bootcmd:
   - "echo 'ourbox-woodbox-installer' > /etc/hostname"
   - "echo '[ourbox-bootcmd] hostname set to ourbox-woodbox-installer' >> /run/ourbox-installer.log"
 
+  # Copy and launch the network monitor (UDP broadcast + HTTP log server).
+  # Runs in the background; tails /run/ourbox-installer.log and rebroadcasts.
+  - "cp /cdrom/ourbox/tools/ourbox-installer-monitor.py /run/ourbox-installer-monitor.py 2>/dev/null || true"
+  - "python3 -u /run/ourbox-installer-monitor.py >> /run/ourbox-installer.log 2>&1 &"
+  - "echo '[ourbox-bootcmd] network monitor launch requested' >> /run/ourbox-installer.log"
+
   # Configure installer-time SSH using the staged bootstrap script. Keeping the
   # shell body out of cloud-config avoids YAML regressions from inline heredocs.
   - "install -m 0755 /cdrom/ourbox/tools/ourbox-installer-ssh-bootstrap.sh /run/ourbox-installer-ssh-bootstrap.sh 2>/dev/null || true"
-  - "/bin/bash /run/ourbox-installer-ssh-bootstrap.sh >> /run/ourbox-installer.log 2>&1 && echo '[ourbox-bootcmd] installer SSH bootstrap completed' >> /run/ourbox-installer.log || echo '[ourbox-bootcmd] ERROR: installer SSH bootstrap failed' >> /run/ourbox-installer.log"
+  - "echo '[ourbox-bootcmd] installer SSH bootstrap starting' >> /run/ourbox-installer.log"
+  - "timeout 120 /bin/bash /run/ourbox-installer-ssh-bootstrap.sh >> /run/ourbox-installer.log 2>&1 && echo '[ourbox-bootcmd] installer SSH bootstrap completed' >> /run/ourbox-installer.log || echo '[ourbox-bootcmd] ERROR: installer SSH bootstrap failed or timed out' >> /run/ourbox-installer.log"
 
   # Start avahi-daemon if available for mDNS (.local) discoverability.
   - "systemctl --no-block start avahi-daemon 2>/dev/null || true"
   - "echo '[ourbox-bootcmd] avahi-daemon start queued' >> /run/ourbox-installer.log"
-
-  # Copy and launch the network monitor (UDP broadcast + HTTP log server).
-  # Runs in the background; tails /run/ourbox-installer.log and rebroadcasts.
-  - "cp /cdrom/ourbox/tools/ourbox-installer-monitor.py /run/ourbox-installer-monitor.py 2>/dev/null || true"
-  - "python3 /run/ourbox-installer-monitor.py >> /run/ourbox-installer.log 2>&1 &"
-  - "echo '[ourbox-bootcmd] network monitor launch requested' >> /run/ourbox-installer.log"
   # --- End network monitoring setup ----------------------------------------
 
   # Make ORAS available to ourbox-preinstall for installer-time artifact pulls
@@ -58,9 +60,9 @@ bootcmd:
   # Targets both known Ubuntu 24.04 service names for belt-and-suspenders.
   # To verify these landed: ssh ourbox-installer@<ip> and cat /run/ourbox-installer.log
   - mkdir -p /etc/systemd/system/snap.subiquity.subiquity-server.service.d
-  - "printf '[Unit]\\nAfter=ourbox-preinstall.service\\nRequires=ourbox-preinstall.service\\n' > /etc/systemd/system/snap.subiquity.subiquity-server.service.d/ourbox-wait.conf"
+  - "printf '[Unit]\nAfter=ourbox-preinstall.service\nRequires=ourbox-preinstall.service\n' > /etc/systemd/system/snap.subiquity.subiquity-server.service.d/ourbox-wait.conf"
   - mkdir -p /etc/systemd/system/snap.subiquity.subiquity-service.service.d
-  - "printf '[Unit]\\nAfter=ourbox-preinstall.service\\nRequires=ourbox-preinstall.service\\n' > /etc/systemd/system/snap.subiquity.subiquity-service.service.d/ourbox-wait.conf"
+  - "printf '[Unit]\nAfter=ourbox-preinstall.service\nRequires=ourbox-preinstall.service\n' > /etc/systemd/system/snap.subiquity.subiquity-service.service.d/ourbox-wait.conf"
   - systemctl daemon-reload
   - "echo '[ourbox-bootcmd] subiquity drop-ins written and daemon-reloaded' >> /run/ourbox-installer.log"
 
@@ -68,7 +70,6 @@ bootcmd:
   # Expected: none visible yet — snap seeding hasn't started.
   - "systemctl list-units --type=service --state=loaded,active,inactive,failed 2>/dev/null | grep -i subiquity >> /run/ourbox-installer.log 2>&1 || echo '[ourbox-bootcmd] no subiquity units visible yet (expected)' >> /run/ourbox-installer.log"
   - "echo '[ourbox-bootcmd] DONE' >> /run/ourbox-installer.log"
-
 autoinstall:
   version: 1
 

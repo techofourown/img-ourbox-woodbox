@@ -75,6 +75,13 @@ jobs:
             echo 'EOF'
           } >> "${GITHUB_ENV}"
 
+      - name: Prepare installer smoke password
+        run: |
+          SMOKE_PASS='ourbox-smoke-pass'
+          SMOKE_HASH="$(printf '%s' "${SMOKE_PASS}" | openssl passwd -6 -stdin -salt smoke-ci)"
+          printf 'OURBOX_INSTALLER_SMOKE_PASSWORD=%s\n' "${SMOKE_PASS}" >> "${GITHUB_ENV}"
+          printf 'OURBOX_INSTALLER_SMOKE_PASSWORD_HASH=%s\n' "${SMOKE_HASH}" >> "${GITHUB_ENV}"
+
       - name: Build installer ISO (smoke)
         run: ./tools/build-installer-iso.sh
         env:
@@ -82,9 +89,10 @@ jobs:
           OURBOX_VARIANT: prod
           OURBOX_VERSION: ${{ env.OURBOX_VERSION }}-smoke
           OURBOX_INSTALLER_SSH_MODE: both
-          OURBOX_INSTALLER_SSH_PASSWORD_HASH: ""
+          OURBOX_INSTALLER_SSH_PASSWORD_HASH: ${{ env.OURBOX_INSTALLER_SMOKE_PASSWORD_HASH }}
           OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS: ${{ env.OURBOX_INSTALLER_SMOKE_PUBLIC_KEY }}
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
+          OURBOX_INSTALLER_SMOKE_CONSOLE: "1"
           OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR: 10.0.2.2
           OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: "19999"
 
@@ -99,10 +107,21 @@ jobs:
           bash ./tools/check-installer-boot-smoke.sh "${ISO}"
         env:
           OURBOX_INSTALLER_SSH_KEY: ${{ env.OURBOX_INSTALLER_SMOKE_KEY }}
-          OURBOX_INSTALLER_SSH_PASSWORD_STATE: generated-console-only
+          OURBOX_INSTALLER_SSH_PASSWORD: ${{ env.OURBOX_INSTALLER_SMOKE_PASSWORD }}
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE: configured-hash
           OURBOX_INSTALLER_SSH_MODE: both
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
           VM_UDP_PORT: "19999"
+          OURBOX_SMOKE_ARTIFACT_DIR: deploy/smoke-diag
+
+
+      - name: Upload smoke diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-diag-${{ github.run_id }}
+          path: deploy/smoke-diag/**
+          if-no-files-found: warn
 
       - name: Build installer ISO
         run: ./tools/build-installer-iso.sh

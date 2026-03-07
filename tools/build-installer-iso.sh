@@ -51,6 +51,7 @@ EMBED_PAYLOAD=""
 : "${OURBOX_INSTALLER_SSH_ALLOW_ROOT:=0}"
 : "${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR:=255.255.255.255}"
 : "${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT:=9999}"
+: "${OURBOX_INSTALLER_SMOKE_CONSOLE:=0}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --embed-payload)
@@ -85,6 +86,11 @@ esac
 if (( OURBOX_INSTALLER_MONITOR_BROADCAST_PORT < 1 || OURBOX_INSTALLER_MONITOR_BROADCAST_PORT > 65535 )); then
   die "OURBOX_INSTALLER_MONITOR_BROADCAST_PORT out of range: ${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
 fi
+
+case "${OURBOX_INSTALLER_SMOKE_CONSOLE}" in
+  0|1) ;;
+  *) die "invalid OURBOX_INSTALLER_SMOKE_CONSOLE: ${OURBOX_INSTALLER_SMOKE_CONSOLE}" ;;
+esac
 
 if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" && -z "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
   die "OURBOX_INSTALLER_SSH_MODE=key requires OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS"
@@ -302,6 +308,9 @@ fi
 
 # Patch bootloader configs to force autoinstall
 AUTOINSTALL_ARG='autoinstall cloud-config-url=/dev/null ds=nocloud\\;s=file:///cdrom/nocloud/'
+if [[ "${OURBOX_INSTALLER_SMOKE_CONSOLE}" == "1" ]]; then
+  AUTOINSTALL_ARG="${AUTOINSTALL_ARG} console=ttyS0,115200n8 systemd.journald.forward_to_console=1"
+fi
 : "${OURBOX_GRUB_TIMEOUT:=1}"
 
 patch_boot_cfg() {
@@ -331,6 +340,9 @@ if ! grep -Rqs 'autoinstall' "${ISO_DIR}/boot/grub"; then
 fi
 if ! grep -Rqs 'ds=nocloud' "${ISO_DIR}/boot/grub"; then
   die "ds=nocloud kernel args not found in ISO boot configs after patching"
+fi
+if [[ "${OURBOX_INSTALLER_SMOKE_CONSOLE}" == "1" ]] && ! grep -Rqs 'console=ttyS0,115200n8' "${ISO_DIR}/boot/grub"; then
+  die "serial console kernel args not found in ISO boot configs after patching"
 fi
 
 [[ -s "${ISO_DIR}/nocloud/user-data" ]] || die "missing nocloud/user-data in ISO staging tree"
