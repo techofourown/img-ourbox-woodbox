@@ -70,7 +70,20 @@ on_exit() {
   finalize_status
 }
 
+on_signal() {
+  OURBOX_INSTALLER_SSH_STATUS="error"
+  if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "disabled" ]]; then
+    OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
+  fi
+  log "ERROR: installer SSH bootstrap terminated by signal"
+  finalize_status
+  exit 1
+}
+
 trap 'on_exit "$?"' EXIT
+trap on_signal TERM
+trap on_signal INT
+trap on_signal HUP
 
 wait_for_local_ssh_banner() {
   local deadline=$((SECONDS + 30))
@@ -98,10 +111,11 @@ PY
 generate_installer_ssh_password() {
   local salt generated_hash
 
-  GENERATED_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 20)" || return 1
-  [[ -n "${GENERATED_PASSWORD}" ]] || return 1
+  GENERATED_PASSWORD="$(openssl rand -hex 16 2>/dev/null)" || return 1
+  GENERATED_PASSWORD="${GENERATED_PASSWORD:0:20}"
+  [[ ${#GENERATED_PASSWORD} -eq 20 ]] || return 1
 
-  salt="$(printf '%s' "${GENERATED_PASSWORD}" | sha256sum | awk '{print substr($1,1,16)}')"
+  salt="$(printf '%s' "${GENERATED_PASSWORD}" | sha256sum | awk '{print substr($1,1,16)}')" || return 1
   generated_hash="$(printf '%s' "${GENERATED_PASSWORD}" | openssl passwd -6 -stdin -salt "${salt}" 2>/dev/null)" || return 1
   [[ -n "${generated_hash}" ]] || return 1
 
@@ -111,13 +125,10 @@ generate_installer_ssh_password() {
 }
 
 restart_ssh_service() {
-  if systemctl restart ssh >/dev/null 2>&1 \
+  systemctl restart ssh >/dev/null 2>&1 \
     || systemctl restart openssh-server >/dev/null 2>&1 \
-    || systemctl --no-block start ssh >/dev/null 2>&1 \
-    || systemctl --no-block start openssh-server >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
+    || systemctl start ssh >/dev/null 2>&1 \
+    || systemctl start openssh-server >/dev/null 2>&1
 }
 
 assert_valid_mode() {
@@ -210,6 +221,7 @@ main() {
     else
       OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
       log "ERROR: could not generate installer SSH password"
+      write_status_file
     fi
   fi
 
@@ -220,6 +232,7 @@ main() {
       OURBOX_INSTALLER_SSH_STATUS="error"
       OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
       log "ERROR: failed to create installer SSH user '${OURBOX_INSTALLER_SSH_USER}'"
+      finalize_status
       return 1
     fi
     log "installer SSH user ensured"
@@ -230,6 +243,7 @@ main() {
           OURBOX_INSTALLER_SSH_STATUS="error"
           OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
           log "ERROR: failed to apply installer SSH password hash"
+          finalize_status
           return 1
         fi
       fi
@@ -240,6 +254,7 @@ main() {
     if ! configure_authorized_keys; then
       OURBOX_INSTALLER_SSH_STATUS="error"
       log "ERROR: failed to configure installer SSH authorized_keys"
+      finalize_status
       return 1
     fi
 
@@ -254,7 +269,10 @@ main() {
     has_usable_auth="1"
   fi
   if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" && "${has_usable_auth}" != "1" ]]; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: installer SSH has no usable auth path (mode=${OURBOX_INSTALLER_SSH_MODE})"
+    write_status_file
+    return 1
   fi
 
   mkdir -p /etc/ssh/sshd_config.d
@@ -301,12 +319,14 @@ main() {
   if ! timeout 60 ssh-keygen -A >> "${LOG_FILE}" 2>&1; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: ssh-keygen -A failed or timed out"
+    finalize_status
     return 1
   fi
 
   if ! sshd -t >> "${LOG_FILE}" 2>&1; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd -t failed for ${CONFIG_FILE}"
+    finalize_status
     return 1
   fi
   log "installer SSH config validated"
@@ -315,29 +335,34 @@ main() {
   if ! restart_ssh_service; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd config valid but ssh service restart/start failed"
+    finalize_status
     return 1
   fi
 
   if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "off" ]]; then
     OURBOX_INSTALLER_SSH_STATUS="disabled"
     log "SSH disabled by installer media config"
+    finalize_status
     return 0
   fi
 
   if ! wait_for_local_ssh_banner; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd start was requested but no local SSH banner was observed"
+    finalize_status
     return 1
   fi
 
   if [[ "${has_usable_auth}" != "1" ]]; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd started but installer SSH is not usable"
+    finalize_status
     return 1
   fi
 
   OURBOX_INSTALLER_SSH_STATUS="ready"
   log "SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT} password=${OURBOX_INSTALLER_SSH_PASSWORD_STATE} key=${OURBOX_INSTALLER_SSH_KEY_STATE})"
+  finalize_status
 }
 
 main "$@"

@@ -43,6 +43,9 @@ Official/public Woodbox media currently builds with:
 - `OURBOX_INSTALLER_SSH_PASSWORD_HASH=''` (generated at boot; shown only on the attached console)
 - `OURBOX_INSTALLER_SSH_ALLOW_ROOT=0`
 
+At install time, before disk selection, the operator may set a temporary live-installer SSH
+password on TTY1. Pressing Enter keeps the current media posture unchanged.
+
 ---
 
 ## Artifact contract (oras pull)
@@ -59,6 +62,7 @@ Official/public Woodbox media currently builds with:
 
 The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 
+0. **Step 0**: Optionally set a temporary password for the live-installer SSH account
 1. **Step 1**: Operator selects the OS disk (any non-removable non-USB disk)
 2. **Step 2**: Operator selects the DATA disk (all non-removable non-OS disks)
 3. **Step 3**: Resolves OS artifact
@@ -88,6 +92,7 @@ Behavior:
 - SSH is only advertised after validation and service startup succeed
 - official/public media is password-capable again by default
 - when no password hash is baked, the installer generates a one-time password at boot and shows it only on the attached console
+- step 0 on TTY1 can replace that generated password with an operator-chosen temporary password for the live installer only
 - HTTP/UDP monitor output never includes password material
 
 Validation:

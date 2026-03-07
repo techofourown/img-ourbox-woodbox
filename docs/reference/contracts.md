@@ -81,9 +81,10 @@ This is where higher-level stacks store persistent state:
 
 1. Operator boots USB installer on Woodbox
 2. `ourbox-preinstall` loads baked defaults (`/cdrom/ourbox/installer/defaults.env`)
-3. `ourbox-preinstall` pulls OS payload from registry via ORAS to `/opt/ourbox/installer/cache/payload/`
-4. Operator confirms disk selection, identity, and INSTALL
-5. Autoinstall late-commands extract the OS payload to `/target/`
+3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
+4. `ourbox-preinstall` pulls OS payload from registry via ORAS to `/opt/ourbox/installer/cache/payload/`
+5. Operator confirms disk selection, identity, and INSTALL
+6. Autoinstall late-commands extract the OS payload to `/target/`
 
 ### Fat ISO (`--embed-payload`)
 
