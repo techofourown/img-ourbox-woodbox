@@ -1,3 +1,11 @@
+## [0.6.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.0...v0.6.1) (2026-03-08)
+
+
+### Bug Fixes
+
+* **ci:** add release-side promotion wake-up ([94fa55c](https://github.com/techofourown/img-ourbox-woodbox/commit/94fa55c6d2182a16e82783cc8b1fb7605af749d2))
+* **ci:** gate promotion on candidate provenance ([eb54bbf](https://github.com/techofourown/img-ourbox-woodbox/commit/eb54bbf2e6f09c542540ecce893ec94414f852ae))
+
 # [0.6.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.4...v0.6.0) (2026-03-08)
 
 
