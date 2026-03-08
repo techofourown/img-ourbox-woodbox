@@ -195,6 +195,8 @@ log "Staging OurBox pre-installer assets"
 mkdir -p "${ISO_DIR}/ourbox/tools"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall"
+install -m 0644 "${ROOT}/tools/installer-selection-resolver.sh" \
+  "${ISO_DIR}/ourbox/tools/installer-selection-resolver.sh"
 install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
 install -m 0644 "${ROOT}/tools/lib.sh" \

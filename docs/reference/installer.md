@@ -19,6 +19,12 @@ and uses it directly. Produced by `./tools/prepare-installer-media.sh --build-lo
 
 Baked into ISO at build time: `/cdrom/ourbox/installer/defaults.env`
 
+Shared selection policy is sourced from `/cdrom/ourbox/tools/installer-selection-resolver.sh`, the
+upstream reference resolver defined in `sw-ourbox-os`.
+
+The vendored resolver copy is checked in CI against the upstream revision recorded in
+`tools/installer-selection-resolver.upstream.env`.
+
 Key variables:
 - `INSTALLER_ID` — installer identity (`woodbox`)
 - `OS_REPO` — OS payload registry namespace (`ghcr.io/techofourown/ourbox-woodbox-os`)
@@ -48,6 +54,18 @@ Official/public Woodbox media currently builds with:
 At install time, before disk selection, the operator may set a temporary live-installer SSH
 password on TTY1. Pressing Enter keeps the current media posture unchanged.
 
+When `INSTALL_DEFAULTS_REF` is used, the installer expects the upstream bundle shape published by
+`sw-ourbox-os`:
+
+- OCI pull output contains `dist/install-defaults.tar.gz`
+- that tarball expands to:
+  - `install-defaults/schema.env`
+  - `install-defaults/manifest.env`
+  - `install-defaults/defaults/<installer-id>.env`
+
+A baked non-empty `OS_DEFAULT_REF` remains authoritative unless the remote profile explicitly
+replaces it with another non-empty `OS_DEFAULT_REF`.
+
 After a successful install, the installer attempts to prefer the installed OS for the next and
 future UEFI boots. Removing the USB after poweroff is still recommended.
 
@@ -72,9 +90,16 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 2. **Step 2**: Operator selects the DATA disk (all non-removable non-OS disks)
 3. **Step 3**: Resolves OS artifact
    - Checks for embedded payload at `/cdrom/ourbox/payload/os-payload.tar.gz` (fat ISO)
-   - Otherwise uses `OS_DEFAULT_REF` when baked, or falls back to `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}`
+   - Otherwise applies the shared precedence:
+     1. `OS_REF`
+     2. `OS_DEFAULT_REF`
+     3. newest valid digest-pinned catalog row for `OS_CHANNEL`
+     4. `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}` fallback
+   - Catalog resolution is row-order independent and chooses the newest valid row by `created`
+   - Floating refs are resolved to digests with `oras resolve` and pulled immutably by digest unless
+     `OURBOX_ALLOW_UNRESOLVED_PULL=1` is set for development/testing
    - Verifies SHA-256
-   - Displays artifact info (version, variant, sha256, source ref)
+   - Displays artifact info (version, variant, sha256, source ref, selection source)
 4. **Step 4**: Operator sets hostname, username, and password
 5. **Step 5**: Summary and final confirmation (`INSTALL`)
 
@@ -126,6 +151,8 @@ Columns: `channel tab created version variant target sku git_sha platform_contra
 
 Updated automatically by `tools/publish-os-artifact.sh` when channel tags are pushed.
 
+Resolver behavior does not depend on append order; `created` is authoritative.
+
 ---
 
 ## Autoinstall late-commands (payload extraction)
@@ -149,8 +176,13 @@ Late-commands in `autoinstall.tpl`:
 
 `/etc/ourbox/release` is extended by late-commands with install-time fields:
 - `OURBOX_INSTALLER_ID`
+- `OURBOX_INSTALLER_VERSION`
+- `OURBOX_INSTALLER_GIT_HASH`
 - `OURBOX_OS_ARTIFACT_SOURCE` (`registry` or `embedded`)
 - `OURBOX_OS_ARTIFACT_REF`
 - `OURBOX_OS_ARTIFACT_DIGEST`
 - `OURBOX_OS_IMAGE_SHA256`
+- `OURBOX_INSTALL_DEFAULTS_SOURCE`
+- `OURBOX_INSTALL_DEFAULTS_REF`
+- `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
