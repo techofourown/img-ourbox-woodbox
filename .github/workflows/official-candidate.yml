@@ -1,20 +1,23 @@
-name: Official Release Build & Publish (Woodbox)
+name: Official Candidate Build & Publish (Woodbox)
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: official-release-woodbox-${{ github.event.release.tag_name || github.run_id }}
+  group: official-candidate-woodbox
   cancel-in-progress: false
 
 jobs:
   build-publish:
-    if: startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft
     runs-on: [self-hosted, official-heavy, x86-image]
     timeout-minutes: 120
 
@@ -22,15 +25,13 @@ jobs:
       - name: Fix workspace ownership from previous build
         run: sudo chown -R "$(id -u):$(id -g)" "${GITHUB_WORKSPACE}" 2>/dev/null || true
 
-      - name: Checkout release tag
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ github.event.release.tag_name }}
           fetch-depth: 0
-          fetch-tags: true
 
-      - name: Set release version
-        run: echo "OURBOX_VERSION=${{ github.event.release.tag_name }}" >> "${GITHUB_ENV}"
+      - name: Set build identity
+        run: echo "OURBOX_VERSION=main-${GITHUB_SHA:0:12}" >> "${GITHUB_ENV}"
 
       - name: Bootstrap host dependencies
         run: sudo ./tools/bootstrap-host.sh
@@ -59,7 +60,7 @@ jobs:
       - name: Preflight build host
         run: ./tools/preflight-build-host.sh
 
-      - name: Fetch pinned upstream inputs
+      - name: Fetch curated upstream inputs
         run: ./tools/fetch-airgap-platform.sh
 
       - name: Build OS payload
@@ -68,10 +69,8 @@ jobs:
           OURBOX_TARGET: x86
           OURBOX_VARIANT: prod
 
-      - name: Publish OS artifact (official release)
-        run: ./tools/publish-os-artifact-official.sh release
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+      - name: Publish OS artifact (official beta)
+        run: ./tools/publish-os-artifact-official.sh beta
 
       - name: Resolve installer default OS ref
         run: |
@@ -95,23 +94,23 @@ jobs:
           OURBOX_TARGET: x86
           EXPECTED_OS_DEFAULT_REF: ${{ env.OS_DEFAULT_REF }}
 
-      - name: Publish installer artifact (official release)
-        run: ./tools/publish-installer-artifact-official.sh release
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+      - name: Publish installer artifact (official beta)
+        run: ./tools/publish-installer-artifact-official.sh beta
 
       - name: Upload provenance outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: provenance-release-${{ github.event.release.tag_name }}
+          name: provenance-candidate-${{ github.sha }}
           path: |
             deploy/os-artifact.ref
             deploy/os-artifact.pinned.ref
             deploy/os-artifact.digest
+            deploy/os-artifact.meta.env
             deploy/installer-artifact.ref
             deploy/installer-artifact.pinned.ref
             deploy/installer-artifact.digest
+            deploy/installer-artifact.meta.env
             deploy/installer-defaults.extracted.env
             deploy/installer-defaults-smoke.txt
           if-no-files-found: warn

@@ -90,10 +90,10 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 2. **Step 2**: Operator selects the DATA disk (all non-removable non-OS disks)
 3. **Step 3**: Resolves OS artifact
    - Checks for embedded payload at `/cdrom/ourbox/payload/os-payload.tar.gz` (fat ISO)
-   - Otherwise applies the shared precedence:
+  - Otherwise applies the shared precedence:
      1. `OS_REF`
      2. `OS_DEFAULT_REF`
-     3. newest valid digest-pinned catalog row for `OS_CHANNEL`
+     3. newest valid digest-pinned catalog row for the mapped target channel tag (for example `x86-stable`)
      4. `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}` fallback
    - Catalog resolution is row-order independent and chooses the newest valid row by `created`
    - Floating refs are resolved to digests with `oras resolve` and pulled immutably by digest unless
@@ -133,13 +133,16 @@ Behavior:
 Validation:
 - `tools/validate-installer-seed.sh` renders and parses the NoCloud seed as YAML, asserts `bootcmd` exists, and optionally runs `cloud-init schema` when available
 - `tools/build-installer-iso.sh` runs the rendered-seed validator before repacking the ISO
-- official nightly/release/revalidation workflows boot a smoke ISO in QEMU before publishing or signing off on installer health
+- official candidate / integration nightly / revalidation workflows boot a smoke ISO in QEMU before publishing or signing off on installer health
 
 ## Official builds
 
 - Official Woodbox workflows now publish the OS payload first, then build the installer with that exact digest-pinned OS ref baked into `OS_DEFAULT_REF`.
 - Official installers bake `INSTALL_DEFAULTS_REF=''` for deterministic default installs; operators can still override the defaults at install time.
-- Official nightly builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time before building the OS payload; release builds continue to consume the pinned refs in `release/official-inputs.env`.
+- Push-to-`main` official candidate builds consume the pinned refs in `release/official-inputs.env` and publish the `beta` lane.
+- Stable builds are a promotion of that already-published candidate digest; they are not rebuilt on release.
+- Scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time and publish the `nightly` lane.
+- GitHub prereleases promote the same candidate digest into `exp-labs`.
 
 ---
 
@@ -150,6 +153,7 @@ Tag: `x86-catalog`
 Columns: `channel tab created version variant target sku git_sha platform_contract_digest k3s_version payload_sha256 artifact_digest pinned_ref`
 
 Updated automatically by `tools/publish-os-artifact.sh` when channel tags are pushed.
+`channel` stores the target-qualified moving tag (`x86-stable`, `x86-beta`, `x86-nightly`, `x86-exp-labs`).
 
 Resolver behavior does not depend on append order; `created` is authoritative.
 

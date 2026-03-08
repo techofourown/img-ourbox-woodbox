@@ -152,12 +152,7 @@ update_catalog() {
   } > "${catalog_file}.tmp"
   mv "${catalog_file}.tmp" "${catalog_file}"
 
-  # Catalog channel column uses short names (stable, nightly, beta, …) — not
-  # target-qualified tags (x86-stable). The target is already encoded in the
-  # artifact repository and tag. Installers query by short channel name.
-  local channel
-  channel="${channel_tag#"${OURBOX_TARGET}"-}"
-  channel="${channel:-custom}"
+  local channel="${channel_tag:-custom}"
   awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
     NR == 1 { print; next }
     !($1 == ch && $2 == tag) { print }

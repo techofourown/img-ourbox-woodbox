@@ -193,16 +193,17 @@ ourbox_selection_catalog_entries() {
 
 ourbox_selection_catalog_newest_ref() {
   local catalog_tsv="$1"
-  local channel="$2"
+  local channel_tag="$2"
   local row=""
 
-  row="$(ourbox_selection_catalog_entries "${catalog_tsv}" | awk -F'\t' -v ch="${channel}" '$1 == ch { print; exit }' || true)"
+  row="$(ourbox_selection_catalog_entries "${catalog_tsv}" | awk -F'\t' -v ch="${channel_tag}" '$1 == ch { print; exit }' || true)"
   [[ -n "${row}" ]] || return 1
   printf '%s\n' "${row##*$'\t'}"
 }
 
 ourbox_selection_determine_default_ref() {
   local catalog_dir="$1"
+  local channel_tag=""
   local channel_tag_ref=""
   local catalog_tsv=""
   local catalog_ref=""
@@ -225,19 +226,20 @@ ourbox_selection_determine_default_ref() {
     return 0
   fi
 
-  channel_tag_ref="${OS_REPO}:$(ourbox_selection_channel_tag "${OS_CHANNEL}")"
+  channel_tag="$(ourbox_selection_channel_tag "${OS_CHANNEL}")"
+  channel_tag_ref="${OS_REPO}:${channel_tag}"
 
   if [[ "${OS_CATALOG_ENABLED:-1}" == "1" ]]; then
     if ourbox_selection_pull_catalog "${catalog_dir}"; then
       catalog_tsv="${catalog_dir}/catalog.tsv"
-      catalog_ref="$(ourbox_selection_catalog_newest_ref "${catalog_tsv}" "${OS_CHANNEL}" || true)"
+      catalog_ref="$(ourbox_selection_catalog_newest_ref "${catalog_tsv}" "${channel_tag}" || true)"
       if ourbox_selection_is_digest_pinned_ref "${catalog_ref}"; then
         OURBOX_INSTALL_SELECTION_SOURCE="catalog"
         OURBOX_RELEASE_CHANNEL="${OS_CHANNEL}"
         OURBOX_SELECTED_REF="${catalog_ref}"
         return 0
       fi
-      ourbox_selection_log "Catalog has no valid digest-pinned entry for channel '${OS_CHANNEL}'; falling back to channel tag."
+      ourbox_selection_log "Catalog has no valid digest-pinned entry for channel tag '${channel_tag}'; falling back to channel tag."
     else
       ourbox_selection_log "Catalog unavailable; falling back to channel tag."
     fi
