@@ -22,6 +22,9 @@ Baked into ISO at build time: `/cdrom/ourbox/installer/defaults.env`
 Shared selection policy is sourced from `/cdrom/ourbox/tools/installer-selection-resolver.sh`, the
 upstream reference resolver defined in `sw-ourbox-os`.
 
+The vendored resolver copy is checked in CI against the upstream revision recorded in
+`tools/installer-selection-resolver.upstream.env`.
+
 Key variables:
 - `INSTALLER_ID` — installer identity (`woodbox`)
 - `OS_REPO` — OS payload registry namespace (`ghcr.io/techofourown/ourbox-woodbox-os`)
