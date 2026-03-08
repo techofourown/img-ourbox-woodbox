@@ -64,6 +64,7 @@ update_catalog() {
   local catalog_file="${catalog_dir}/catalog.tsv"
   local catalog_ref="${OFFICIAL_OS_REPO}:${OFFICIAL_OS_CATALOG_TAG}"
   local pinned_ref="${OFFICIAL_OS_REPO}@${immutable_digest}"
+  local channel=""
 
   rm -rf "${catalog_dir}"
   mkdir -p "${catalog_dir}"
@@ -81,13 +82,16 @@ update_catalog() {
   } > "${catalog_file}.tmp"
   mv "${catalog_file}.tmp" "${catalog_file}"
 
-  awk -F '\t' -v ch="${channel_tag}" -v tag="${immutable_tag}" '
+  channel="${channel_tag#"${OURBOX_TARGET}"-}"
+  channel="${channel:-custom}"
+
+  awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
     NR == 1 { print; next }
     !($1 == ch && $2 == tag) { print }
   ' "${catalog_file}" > "${catalog_file}.tmp"
   mv "${catalog_file}.tmp" "${catalog_file}"
 
-  echo -e "${channel_tag}\t${immutable_tag}\t${PROMOTE_TS}\t${PROMOTE_VERSION}\t${OURBOX_VARIANT}\t${OURBOX_TARGET}\t${OURBOX_SKU}\t${GIT_SHA}\t${CONTRACT_DIGEST}\t${K3S_VERSION}\t${SHA256}\t${immutable_digest}\t${pinned_ref}" >> "${catalog_file}"
+  echo -e "${channel}\t${immutable_tag}\t${PROMOTE_TS}\t${PROMOTE_VERSION}\t${OURBOX_VARIANT}\t${OURBOX_TARGET}\t${OURBOX_SKU}\t${GIT_SHA}\t${CONTRACT_DIGEST}\t${K3S_VERSION}\t${SHA256}\t${immutable_digest}\t${pinned_ref}" >> "${catalog_file}"
 
   log ">> Updating catalog: ${catalog_ref}"
   (cd "${catalog_dir}" && oras push "${catalog_ref}" \

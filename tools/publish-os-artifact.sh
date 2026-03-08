@@ -152,7 +152,11 @@ update_catalog() {
   } > "${catalog_file}.tmp"
   mv "${catalog_file}.tmp" "${catalog_file}"
 
-  local channel="${channel_tag:-custom}"
+  # Catalog channel column uses short names (stable, nightly, beta, ...) rather
+  # than target-qualified tags. The target is already scoped by x86-catalog.
+  local channel
+  channel="${channel_tag#"${OURBOX_TARGET}"-}"
+  channel="${channel:-custom}"
   awk -F '\t' -v ch="${channel}" -v tag="${immutable_tag}" '
     NR == 1 { print; next }
     !($1 == ch && $2 == tag) { print }
