@@ -1,3 +1,11 @@
+## [0.5.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.3...v0.5.4) (2026-03-08)
+
+
+### Bug Fixes
+
+* **installer:** sync resolver stderr hardening ([c43310c](https://github.com/techofourown/img-ourbox-woodbox/commit/c43310c27de2e98bc51ab131ae52b2d039da5e9a))
+* **installer:** sync shared selection resolver fixes ([cdadff1](https://github.com/techofourown/img-ourbox-woodbox/commit/cdadff141d938c3d7967406258ea26f298e27f86))
+
 ## [0.5.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.2...v0.5.3) (2026-03-07)
 
 
