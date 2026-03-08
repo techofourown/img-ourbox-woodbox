@@ -38,6 +38,19 @@ mkdir -p "${PULL_DIR}" "${EXTRACT_DIR}" "${META_DIR}"
 echo "Pulling platform contract:"
 echo "  ${REF}"
 
+if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
+  if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
+    echo "PLATFORM_CONTRACT_REF '${REF}' is not digest-pinned." >&2
+    echo "Official candidate/release builds require @sha256: refs to ensure reproducibility." >&2
+    echo "Update PLATFORM_CONTRACT_REF in release/official-inputs.env:" >&2
+    echo "  oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge" >&2
+    exit 1
+  elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
+    echo "WARNING: PLATFORM_CONTRACT_REF is not digest-pinned — nightly build will not be reproducible" >&2
+    echo "  Update PLATFORM_CONTRACT_REF in release/official-inputs.env once the digest is available" >&2
+  fi
+fi
+
 # Resolve to an immutable digest before pulling.
 # This is required for reliable provenance recording — grepping pull output
 # is fragile. oras resolve gives a definitive sha256: digest string.

@@ -36,11 +36,11 @@ log "Using airgap platform ref: ${REF}"
 
 # Enforce digest pinning in official builds.
 # Nightly: warn (non-reproducible but permitted for bootstrap).
-# Release: hard fail (release artifacts must be reproducible).
+# Official candidate/release lanes: hard fail.
 if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
-  if [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
+  if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
-  Release builds require @sha256: refs to ensure reproducibility.
+  Official candidate/release builds require @sha256: refs to ensure reproducibility.
   Update AIRGAP_PLATFORM_REF in release/official-inputs.env:
     oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64"
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then

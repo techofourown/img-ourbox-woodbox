@@ -71,16 +71,17 @@ and official release policy.
 Official artifacts are produced by organization-controlled build infrastructure per
 [ADR-0008](https://github.com/techofourown/org-techofourown/blob/main/docs/decisions/ADR-0008-adopt-organization-controlled-build-infrastructure-for-heavy-artifacts.md).
 
-- Official nightly: triggered by push to `main` via `.github/workflows/official-nightly.yml`
-- Official release: triggered by `v*` tag push via `.github/workflows/official-release.yml`
-- Runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
+- Official candidate: push to `main` via `.github/workflows/official-candidate.yml` → publishes `x86-beta` / `x86-installer-beta`
+- Integration nightly: daily cron via `.github/workflows/integration-nightly.yml` → publishes `x86-nightly` / `x86-installer-nightly`
+- Stable promotion: GitHub Release `published` via `.github/workflows/official-promote-stable.yml`
+- Exp-labs promotion: GitHub Release `prereleased` via `.github/workflows/official-exp-labs.yml`
+- Heavy-build runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
 
 Official Woodbox installer builds publish the OS payload first and then bake that exact pinned
 OS payload ref into the installer defaults, so the published installer and its default install
 target stay on the same lane.
-Official nightly builds also resolve the latest `sw-ourbox-os` `edge` platform bundle digests at
-workflow time before building the OS payload; release builds continue to consume the pinned refs in
-`release/official-inputs.env`.
+Candidate builds consume the pinned refs in `release/official-inputs.env`; scheduled nightly
+integration builds resolve the latest `sw-ourbox-os` `edge` digests at workflow time.
 
 ## Documentation
 
