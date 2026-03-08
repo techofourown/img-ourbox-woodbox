@@ -1,3 +1,16 @@
+# [0.6.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.4...v0.6.0) (2026-03-08)
+
+
+### Bug Fixes
+
+* **release:** preserve nightly and pinned-input provenance ([e77a492](https://github.com/techofourown/img-ourbox-woodbox/commit/e77a492fc254205ebaa0a562527345ec7e1d358d))
+* **release:** restore short catalog channel keys ([a6b6c23](https://github.com/techofourown/img-ourbox-woodbox/commit/a6b6c2339fcb3d6106f9f92c5ce61d6e97fdffc2))
+
+
+### Features
+
+* **release:** adopt promote-first official channels ([6888084](https://github.com/techofourown/img-ourbox-woodbox/commit/6888084a7b9e47ecd932a5c51eebe964bc918703))
+
 ## [0.5.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.5.3...v0.5.4) (2026-03-08)
 
 
