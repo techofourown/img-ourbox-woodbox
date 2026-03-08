@@ -30,10 +30,15 @@ Line-oriented `KEY=VALUE` pairs (shell-friendly). Fields written at build time:
 Fields appended at install time (by autoinstall late-commands):
 
 - `OURBOX_INSTALLER_ID`
+- `OURBOX_INSTALLER_VERSION`
+- `OURBOX_INSTALLER_GIT_HASH`
 - `OURBOX_OS_ARTIFACT_SOURCE` (`registry` or `embedded`)
 - `OURBOX_OS_ARTIFACT_REF`
 - `OURBOX_OS_ARTIFACT_DIGEST`
 - `OURBOX_OS_IMAGE_SHA256`
+- `OURBOX_INSTALL_DEFAULTS_SOURCE`
+- `OURBOX_INSTALL_DEFAULTS_REF`
+- `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
 
 ### Why it exists
@@ -81,6 +86,7 @@ This is where higher-level stacks store persistent state:
 
 1. Operator boots USB installer on Woodbox
 2. `ourbox-preinstall` loads baked defaults (`/cdrom/ourbox/installer/defaults.env`)
+   - shared selection policy comes from `/cdrom/ourbox/tools/installer-selection-resolver.sh`
 3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
 4. `ourbox-preinstall` pulls OS payload from registry via ORAS to `/opt/ourbox/installer/cache/payload/`
 5. Operator confirms disk selection, identity, and INSTALL
@@ -110,8 +116,10 @@ Key variables:
 - `OS_REPO` (`ghcr.io/techofourown/ourbox-woodbox-os`)
 - `OS_TARGET` (`x86`)
 - `OS_CHANNEL` (`stable`)
+- `OS_DEFAULT_REF` (optional pinned default)
 - `OS_CATALOG_ENABLED` (`1`)
 - `OS_CATALOG_TAG` (`x86-catalog`)
+- `INSTALL_DEFAULTS_REF` (optional remote install-defaults bundle)
 - `OS_ORAS_VERSION`
 - `INSTALLER_VERSION`
 - `INSTALLER_GIT_HASH`
