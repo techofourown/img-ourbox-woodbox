@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.0...v0.7.1) (2026-03-09)
+
+
+### Bug Fixes
+
+* **installer:** keep shared ssh helper exit semantics ([becf323](https://github.com/techofourown/img-ourbox-woodbox/commit/becf323d5ba01dd3ef06fb4117a536946cd22c4e))
+
 # [0.7.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.2...v0.7.0) (2026-03-09)
 
 
