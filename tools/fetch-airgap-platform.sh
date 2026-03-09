@@ -41,11 +41,10 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
   if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
   Official candidate/release builds require @sha256: refs to ensure reproducibility.
-  Update AIRGAP_PLATFORM_REF in release/official-inputs.env:
-    oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64"
+  Update the approved upstream snapshot in sw-ourbox-os instead of editing release/official-inputs.env by hand."
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
     log "WARNING: AIRGAP_PLATFORM_REF is not digest-pinned — nightly build will not be reproducible"
-    log "  Update AIRGAP_PLATFORM_REF in release/official-inputs.env once the amd64 digest is available"
+    log "  Update the approved upstream snapshot in sw-ourbox-os once the next release is approved"
   fi
 fi
 

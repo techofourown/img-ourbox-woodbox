@@ -10,10 +10,11 @@ this repo.
 
 - `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact)
 - `sw-ourbox-os` artifact docs: https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
+- Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
 - Pinned refs in this repo:
   - `contracts/platform-contract.ref` (arch-agnostic contract, fallback for dev builds)
   - `contracts/airgap-platform.ref` (amd64-specific bundle with k3s + images, fallback for dev)
-  - `release/official-inputs.env` (digest-pinned refs for official builds)
+  - `release/official-inputs.env` (generated digest-pinned lockfile for official builds)
 
 ---
 
@@ -56,16 +57,10 @@ These are read from the synced `contract.env` and `contract.digest` files in the
 
 ## Updating pins
 
-1. Publish new `platform-contract` and `airgap-platform` (amd64) from `sw-ourbox-os`.
-2. Resolve new digests:
-   ```bash
-   oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge
-   oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64
-   ```
-3. Update `release/official-inputs.env` with the new digest-pinned refs.
-4. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
-5. Rebuild OS payload; update release notes/changelog with new digests.
-6. Open a PR so the pinned refs are reviewed before merging.
+1. Approve the new upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`.
+2. Let the upstream sync workflow open the Woodbox lockfile PR updating `release/official-inputs.env`.
+3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
+4. Rebuild OS payload; update release notes/changelog with new digests.
 
 ---
 

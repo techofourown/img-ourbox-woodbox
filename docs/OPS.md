@@ -158,16 +158,12 @@ OURBOX_INSTALLER_SSH_PASSWORD='ourbox-smoke-pass' \
 When `sw-ourbox-os` publishes new `platform-contract` or `airgap-platform` bundles:
 
 ```bash
-# 1. Resolve new digests
-oras resolve ghcr.io/techofourown/sw-ourbox-os/platform-contract:edge
-oras resolve ghcr.io/techofourown/sw-ourbox-os/airgap-platform:edge-amd64
+# 1. Approve the new upstream snapshot in sw-ourbox-os and take the generated lockfile PR
 
-# 2. Update release/official-inputs.env with the new digest-pinned refs
-
-# 3. Pull and sync
+# 2. Pull and sync
 ./tools/fetch-airgap-platform.sh
 
-# 4. Rebuild OS payload + installer; verify; open a PR
+# 3. Rebuild OS payload + installer; verify; open a PR
 ```
 
 ---
@@ -247,4 +243,4 @@ To run a non-publishing revalidation build:
 - `docs/reference/installer.md` — installer defaults, artifact contract, UX flow
 - `docs/reference/platform-contract.md` — upstream platform contract consumption
 - `release/official-artifacts.env` — official GHCR namespaces and channel tags
-- `release/official-inputs.env` — digest-pinned upstream refs for official builds
+- `release/official-inputs.env` — generated digest-pinned upstream lockfile for official builds

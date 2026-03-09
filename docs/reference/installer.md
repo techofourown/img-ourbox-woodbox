@@ -139,7 +139,7 @@ Validation:
 
 - Official Woodbox workflows now publish the OS payload first, then build the installer with that exact digest-pinned OS ref baked into `OS_DEFAULT_REF`.
 - Official installers bake `INSTALL_DEFAULTS_REF=''` for deterministic default installs; operators can still override the defaults at install time.
-- Push-to-`main` official candidate builds consume the pinned refs in `release/official-inputs.env` and publish the `beta` lane.
+- Push-to-`main` official candidate builds consume the generated pinned refs in `release/official-inputs.env` and publish the `beta` lane.
 - Stable builds are a promotion of that already-published candidate digest once both candidate success and a matching published GitHub Release are present; they are not rebuilt on release.
 - Scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time and publish the `nightly` lane.
 - GitHub prereleases authorize promotion of the same candidate digest into `exp-labs`, and either the candidate or the prerelease event may wake that promotion after the other condition already exists.
