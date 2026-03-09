@@ -78,6 +78,8 @@ future UEFI boots. Removing the USB after poweroff is still recommended.
   - `os-payload.tar.gz` — rootfs overlay + airgap bundle
   - `os-payload.tar.gz.sha256` — first field is SHA-256 hex digest; required
   - `os.meta.env` — KEY=VALUE metadata (version/target/sku/git sha/platform contract digest/k3s)
+- Optional:
+  - `os.meta.json` — JSON form of the same flat metadata map
 
 ---
 
@@ -143,6 +145,7 @@ Validation:
 - Stable builds are a promotion of that already-published candidate digest once both candidate success and a matching published GitHub Release are present; they are not rebuilt on release.
 - Scheduled nightly integration builds resolve the latest `sw-ourbox-os` `edge` platform bundle digests at workflow time and publish the `nightly` lane.
 - GitHub prereleases authorize promotion of the same candidate digest into `exp-labs`, and either the candidate or the prerelease event may wake that promotion after the other condition already exists.
+- Promotion is driven by `candidate-provenance.json`; it does not use artifact-carried `.env` sidecars as promotion control-plane inputs.
 
 ---
 

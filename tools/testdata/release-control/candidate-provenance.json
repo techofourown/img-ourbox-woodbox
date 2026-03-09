@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "kind": "candidate-provenance",
+  "source_repo": "https://github.com/techofourown/img-ourbox-woodbox",
+  "source_commit": "92b5a1ffcd0a1111222233334444555566667777",
+  "candidate_workflow": "Official Candidate Build & Publish (Woodbox)",
+  "candidate_run_id": "22837297056",
+  "candidate_run_attempt": "1",
+  "artifacts": {
+    "os": {
+      "schema": 1,
+      "artifact_role": "os",
+      "artifact_kind": "os-payload",
+      "artifact_type": "application/vnd.techofourown.ourbox.woodbox.os-payload.v1",
+      "artifact_repo": "ghcr.io/techofourown/ourbox-woodbox-os",
+      "artifact_ref": "ghcr.io/techofourown/ourbox-woodbox-os:main-92b5a1ffcd0a-x86",
+      "artifact_pinned_ref": "ghcr.io/techofourown/ourbox-woodbox-os@sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "artifact_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "payload_filename": "os-payload.tar.gz",
+      "payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "payload_size_bytes": 362343849,
+      "control_fields": {
+        "version": "main-92b5a1ffcd0a",
+        "variant": "prod",
+        "target": "x86",
+        "sku": "TOO-OBX-WBX-BASE-JU3XK8",
+        "git_sha": "92b5a1ffcd0a",
+        "platform_contract_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "k3s_version": "v1.35.0+k3s1"
+      },
+      "meta_env": {
+        "OS_PAYLOAD_BASENAME": "os-payload-ourbox-woodbox-x86-too-obx-wbx-base-ju3xk8-prod-main-92b5a1ffcd0a",
+        "OS_PAYLOAD_SHA256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "OS_PAYLOAD_SIZE_BYTES": "362343849",
+        "OS_ARTIFACT_TYPE": "application/vnd.techofourown.ourbox.woodbox.os-payload.v1",
+        "OURBOX_TARGET": "x86",
+        "OURBOX_VARIANT": "prod",
+        "OURBOX_VERSION": "main-92b5a1ffcd0a",
+        "OURBOX_SKU": "TOO-OBX-WBX-BASE-JU3XK8",
+        "BUILD_TS": "2026-03-09T03:38:48Z",
+        "GIT_SHA": "92b5a1ffcd0a",
+        "OURBOX_PLATFORM_CONTRACT_DIGEST": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "OURBOX_PLATFORM_CONTRACT_SOURCE": "https://github.com/techofourown/sw-ourbox-os",
+        "OURBOX_PLATFORM_CONTRACT_REVISION": "93e087a671428ee9e87688d039a8715abea735a7",
+        "OURBOX_PLATFORM_CONTRACT_VERSION": "v0.10.1",
+        "K3S_VERSION": "v1.35.0+k3s1",
+        "GITHUB_WORKFLOW": "Official Candidate Build & Publish (Woodbox)",
+        "GITHUB_RUN_ID": "22837297056",
+        "GITHUB_RUN_ATTEMPT": "1"
+      }
+    },
+    "installer": {
+      "schema": 1,
+      "artifact_role": "installer",
+      "artifact_kind": "installer",
+      "artifact_type": "application/vnd.techofourown.ourbox.woodbox.installer.v1",
+      "artifact_repo": "ghcr.io/techofourown/ourbox-woodbox-installer",
+      "artifact_ref": "ghcr.io/techofourown/ourbox-woodbox-installer:main-92b5a1ffcd0a-x86-installer",
+      "artifact_pinned_ref": "ghcr.io/techofourown/ourbox-woodbox-installer@sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "artifact_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "payload_filename": "installer.iso",
+      "payload_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "payload_size_bytes": 234567890,
+      "control_fields": {
+        "version": "main-92b5a1ffcd0a",
+        "variant": "prod",
+        "target": "x86",
+        "sku": "TOO-OBX-WBX-BASE-JU3XK8",
+        "git_sha": "92b5a1ffcd0a"
+      },
+      "meta_env": {
+        "INSTALLER_BASENAME": "installer-ourbox-woodbox-x86-too-obx-wbx-base-ju3xk8-prod-main-92b5a1ffcd0a",
+        "INSTALLER_SHA256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "INSTALLER_SIZE_BYTES": "234567890",
+        "INSTALLER_ARTIFACT_TYPE": "application/vnd.techofourown.ourbox.woodbox.installer.v1",
+        "OURBOX_TARGET": "x86",
+        "OURBOX_VARIANT": "prod",
+        "OURBOX_VERSION": "main-92b5a1ffcd0a",
+        "OURBOX_SKU": "TOO-OBX-WBX-BASE-JU3XK8",
+        "BUILD_TS": "2026-03-09T03:45:00Z",
+        "GIT_SHA": "92b5a1ffcd0a",
+        "GITHUB_WORKFLOW": "Official Candidate Build & Publish (Woodbox)",
+        "GITHUB_RUN_ID": "22837297056",
+        "GITHUB_RUN_ATTEMPT": "1"
+      }
+    }
+  }
+}
