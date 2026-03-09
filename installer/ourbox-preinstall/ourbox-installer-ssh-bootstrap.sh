@@ -6,6 +6,7 @@ DEFAULTS_FILE="${DEFAULTS_FILE:-/cdrom/ourbox/installer/defaults.env}"
 STATUS_FILE="${STATUS_FILE:-/run/ourbox-installer-ssh-status.env}"
 PASSWORD_FILE="${PASSWORD_FILE:-/run/ourbox-installer-ssh-password.txt}"
 CONFIG_FILE="${CONFIG_FILE:-/etc/ssh/sshd_config.d/60-ourbox-installer.conf}"
+HELPER_FILE="${HELPER_FILE:-/cdrom/ourbox/tools/installer-ssh-helper.sh}"
 
 OURBOX_INSTALLER_SSH_STATUS="pending"
 OURBOX_INSTALLER_SSH_USER="ourbox-installer"
@@ -131,60 +132,6 @@ restart_ssh_service() {
     || systemctl start openssh-server >/dev/null 2>&1
 }
 
-assert_valid_mode() {
-  case "${OURBOX_INSTALLER_SSH_MODE}" in
-    off|key|password|both) ;;
-    *)
-      log "WARNING: invalid installer SSH mode '${OURBOX_INSTALLER_SSH_MODE}'; defaulting to both"
-      OURBOX_INSTALLER_SSH_MODE="both"
-      ;;
-  esac
-
-  case "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" in
-    0|1) ;;
-    *)
-      log "WARNING: invalid installer SSH root flag '${OURBOX_INSTALLER_SSH_ALLOW_ROOT}'; defaulting to 0"
-      OURBOX_INSTALLER_SSH_ALLOW_ROOT="0"
-      ;;
-  esac
-}
-
-ensure_user() {
-  if id -u "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  adduser --disabled-password --gecos "" "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1 \
-    || useradd -m -s /bin/bash "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1
-}
-
-configure_authorized_keys() {
-  local ssh_home ssh_group ssh_dir ssh_auth_keys
-
-  ssh_home="$(getent passwd "${OURBOX_INSTALLER_SSH_USER}" | awk -F: '{print $6}' | head -n1)"
-  if [[ -z "${ssh_home}" ]]; then
-    ssh_home="/home/${OURBOX_INSTALLER_SSH_USER}"
-  fi
-  ssh_group="$(id -gn "${OURBOX_INSTALLER_SSH_USER}" 2>/dev/null || printf '%s' "${OURBOX_INSTALLER_SSH_USER}")"
-  ssh_dir="${ssh_home}/.ssh"
-  ssh_auth_keys="${ssh_dir}/authorized_keys"
-
-  install -d -m 0700 "${ssh_dir}"
-  chown "${OURBOX_INSTALLER_SSH_USER}:${ssh_group}" "${ssh_dir}"
-
-  if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
-    if [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
-      printf '%s\n' "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" > "${ssh_auth_keys}"
-      chown "${OURBOX_INSTALLER_SSH_USER}:${ssh_group}" "${ssh_auth_keys}"
-      chmod 0600 "${ssh_auth_keys}"
-    else
-      rm -f "${ssh_auth_keys}"
-    fi
-  else
-    rm -f "${ssh_auth_keys}"
-  fi
-}
-
 main() {
   log "installer SSH bootstrap begin"
 
@@ -198,14 +145,45 @@ main() {
   OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-}"
   OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
   OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+  OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY="${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-1}"
   OURBOX_INSTALLER_SSH_STATUS="pending"
   OURBOX_INSTALLER_SSH_PASSWORD_STATE="disabled"
   OURBOX_INSTALLER_SSH_KEY_STATE="disabled"
 
-  assert_valid_mode
+  [[ -f "${HELPER_FILE}" ]] || {
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    log "ERROR: missing installer SSH helper: ${HELPER_FILE}"
+    finalize_status
+    return 1
+  }
+
+  # shellcheck disable=SC1090
+  source "${HELPER_FILE}"
+
+  ourbox_installer_ssh_log() {
+    log "$*"
+  }
+
+  ourbox_installer_ssh_die() {
+    log "ERROR: $*"
+    return 1
+  }
+
+  if ! ourbox_installer_ssh_normalize_inputs; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    finalize_status
+    return 1
+  fi
+
+  if ! ourbox_installer_ssh_validate_requested_posture; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    finalize_status
+    return 1
+  fi
+
   clear_password_file
 
-  if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+  if ourbox_installer_ssh_mode_has_keys; then
     if [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
       OURBOX_INSTALLER_SSH_KEY_STATE="configured"
     else
@@ -213,105 +191,39 @@ main() {
     fi
   fi
 
-  if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
+  if ourbox_installer_ssh_mode_has_password; then
     if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" ]]; then
       OURBOX_INSTALLER_SSH_PASSWORD_STATE="configured-hash"
-    elif command -v openssl >/dev/null 2>&1 && generate_installer_ssh_password; then
-      log "installer SSH password generated for attached console"
     else
-      OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
-      log "ERROR: could not generate installer SSH password"
-      write_status_file
+      OURBOX_INSTALLER_SSH_PASSWORD_STATE="absent"
+      if [[ "${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}" == "1" ]]; then
+        if command -v openssl >/dev/null 2>&1 && generate_installer_ssh_password; then
+          log "installer SSH password generated for attached console"
+        else
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
+          log "ERROR: could not generate installer SSH password"
+        fi
+      fi
     fi
   fi
 
   write_status_file
 
-  if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" ]]; then
-    if ! ensure_user; then
-      OURBOX_INSTALLER_SSH_STATUS="error"
-      OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
-      log "ERROR: failed to create installer SSH user '${OURBOX_INSTALLER_SSH_USER}'"
-      finalize_status
-      return 1
-    fi
-    log "installer SSH user ensured"
-
-    if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
-      if [[ -n "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" ]]; then
-        if ! printf '%s:%s\n' "${OURBOX_INSTALLER_SSH_USER}" "${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" | chpasswd -e >/dev/null 2>&1; then
-          OURBOX_INSTALLER_SSH_STATUS="error"
-          OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
-          log "ERROR: failed to apply installer SSH password hash"
-          finalize_status
-          return 1
-        fi
-      fi
-    else
-      passwd -l "${OURBOX_INSTALLER_SSH_USER}" >/dev/null 2>&1 || true
-    fi
-
-    if ! configure_authorized_keys; then
-      OURBOX_INSTALLER_SSH_STATUS="error"
-      log "ERROR: failed to configure installer SSH authorized_keys"
-      finalize_status
-      return 1
-    fi
-
-    log "installer SSH auth material prepared"
-  fi
-
-  local has_usable_auth="0"
-  if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "configured-hash" || "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" ]]; then
-    has_usable_auth="1"
-  fi
-  if [[ "${OURBOX_INSTALLER_SSH_KEY_STATE}" == "configured" ]]; then
-    has_usable_auth="1"
-  fi
-  if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" && "${has_usable_auth}" != "1" ]]; then
+  if ! ourbox_installer_ssh_validate_materialized_auth; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: installer SSH has no usable auth path (mode=${OURBOX_INSTALLER_SSH_MODE})"
-    write_status_file
+    finalize_status
     return 1
   fi
 
-  mkdir -p /etc/ssh/sshd_config.d
-  {
-    if [[ "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" == "1" ]]; then
-      if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
-        echo "PermitRootLogin prohibit-password"
-      else
-        echo "PermitRootLogin yes"
-      fi
-    else
-      echo "PermitRootLogin no"
-    fi
-
-    if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "password" || "${OURBOX_INSTALLER_SSH_MODE}" == "both" ]]; then
-      echo "PasswordAuthentication yes"
-    else
-      echo "PasswordAuthentication no"
-    fi
-
-    echo "PubkeyAuthentication yes"
-    echo "KbdInteractiveAuthentication no"
-    echo "X11Forwarding no"
-    echo "AllowTcpForwarding no"
-
-    if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "off" ]]; then
-      if [[ "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" == "1" ]]; then
-        echo "AllowUsers root"
-      else
-        echo "AllowUsers nobody"
-      fi
-    else
-      if [[ "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" == "1" ]]; then
-        echo "AllowUsers ${OURBOX_INSTALLER_SSH_USER} root"
-      else
-        echo "AllowUsers ${OURBOX_INSTALLER_SSH_USER}"
-      fi
-    fi
-  } > "${CONFIG_FILE}"
+  if ! ourbox_installer_ssh_apply_common_state "${CONFIG_FILE}"; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    finalize_status
+    return 1
+  fi
+  if [[ "${OURBOX_INSTALLER_SSH_MODE}" != "off" ]]; then
+    log "installer SSH auth material prepared"
+  fi
   log "installer SSH config written"
 
   install -d -m 0755 /run/sshd
@@ -349,13 +261,6 @@ main() {
   if ! wait_for_local_ssh_banner; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     log "ERROR: sshd start was requested but no local SSH banner was observed"
-    finalize_status
-    return 1
-  fi
-
-  if [[ "${has_usable_auth}" != "1" ]]; then
-    OURBOX_INSTALLER_SSH_STATUS="error"
-    log "ERROR: sshd started but installer SSH is not usable"
     finalize_status
     return 1
   fi

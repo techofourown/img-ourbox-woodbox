@@ -20,6 +20,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
 # shellcheck disable=SC1091
+source "${ROOT}/tools/installer-ssh-helper.sh"
+# shellcheck disable=SC1091
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
@@ -50,6 +52,7 @@ EMBED_PAYLOAD=""
 : "${OURBOX_INSTALLER_SSH_PASSWORD_HASH:=}"
 : "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:=}"
 : "${OURBOX_INSTALLER_SSH_ALLOW_ROOT:=0}"
+: "${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:=1}"
 : "${OURBOX_INSTALLER_SMOKE_CONSOLE:=0}"
 : "${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR:=255.255.255.255}"
 : "${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT:=9999}"
@@ -71,15 +74,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-case "${OURBOX_INSTALLER_SSH_MODE}" in
-  off|key|password|both) ;;
-  *) die "invalid OURBOX_INSTALLER_SSH_MODE: ${OURBOX_INSTALLER_SSH_MODE}" ;;
-esac
-
-case "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" in
-  0|1) ;;
-  *) die "invalid OURBOX_INSTALLER_SSH_ALLOW_ROOT: ${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" ;;
-esac
+ourbox_installer_ssh_normalize_inputs
+ourbox_installer_ssh_validate_requested_posture
 
 case "${OURBOX_INSTALLER_SMOKE_CONSOLE}" in
   0|1) ;;
@@ -91,10 +87,6 @@ esac
   || die "invalid OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: ${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
 if (( OURBOX_INSTALLER_MONITOR_BROADCAST_PORT < 1 || OURBOX_INSTALLER_MONITOR_BROADCAST_PORT > 65535 )); then
   die "OURBOX_INSTALLER_MONITOR_BROADCAST_PORT out of range: ${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}"
-fi
-
-if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "key" && -z "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" ]]; then
-  die "OURBOX_INSTALLER_SSH_MODE=key requires OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS"
 fi
 
 if [[ -n "${EMBED_PAYLOAD}" ]]; then
@@ -201,6 +193,8 @@ install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" 
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
 install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
+install -m 0644 "${ROOT}/tools/installer-ssh-helper.sh" \
+  "${ISO_DIR}/ourbox/tools/installer-ssh-helper.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
   "${ISO_DIR}/ourbox/tools/format-data-disk.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-monitor.py" \
@@ -290,6 +284,7 @@ OURBOX_INSTALLER_SSH_USER='${OURBOX_INSTALLER_SSH_USER}'
 OURBOX_INSTALLER_SSH_PASSWORD_HASH='${OURBOX_INSTALLER_SSH_PASSWORD_HASH}'
 OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS='${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}'
 OURBOX_INSTALLER_SSH_ALLOW_ROOT='${OURBOX_INSTALLER_SSH_ALLOW_ROOT}'
+OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY='${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}'
 OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR='${OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR}'
 OURBOX_INSTALLER_MONITOR_BROADCAST_PORT='${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}'
 EOT

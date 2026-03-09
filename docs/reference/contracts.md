@@ -87,6 +87,7 @@ This is where higher-level stacks store persistent state:
 1. Operator boots USB installer on Woodbox
 2. `ourbox-preinstall` loads baked defaults (`/cdrom/ourbox/installer/defaults.env`)
    - shared selection policy comes from `/cdrom/ourbox/tools/installer-selection-resolver.sh`
+   - shared installer SSH mode/user/root/auth semantics come from the vendored helper at `/cdrom/ourbox/tools/installer-ssh-helper.sh`, which realizes the upstream installer SSH contract from `sw-ourbox-os`
 3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
 4. `ourbox-preinstall` pulls OS payload from registry via ORAS to `/opt/ourbox/installer/cache/payload/`
 5. Operator confirms disk selection, identity, and INSTALL
@@ -123,6 +124,16 @@ Key variables:
 - `OS_ORAS_VERSION`
 - `INSTALLER_VERSION`
 - `INSTALLER_GIT_HASH`
+- `OURBOX_INSTALLER_SSH_MODE`
+- `OURBOX_INSTALLER_SSH_USER`
+- `OURBOX_INSTALLER_SSH_PASSWORD_HASH`
+- `OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS`
+- `OURBOX_INSTALLER_SSH_ALLOW_ROOT`
+- `OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY`
+
+Woodbox keeps live-installer password generation, `/run/ourbox-installer-ssh-status.env`,
+`/run/ourbox-installer-ssh-password.txt`, and monitor output as repo-local behavior layered on top
+of that shared upstream SSH contract.
 
 ### OS payload artifact files (oras pull)
 

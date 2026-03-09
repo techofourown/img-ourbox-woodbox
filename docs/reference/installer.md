@@ -25,6 +25,10 @@ upstream reference resolver defined in `sw-ourbox-os`.
 The vendored resolver copy is checked in CI against the upstream revision recorded in
 `tools/installer-selection-resolver.upstream.env`.
 
+Shared installer SSH policy is sourced from `/cdrom/ourbox/tools/installer-ssh-helper.sh`, the
+vendored helper that realizes the upstream installer SSH contract in
+`sw-ourbox-os/docs/reference/installer-ssh-contract.md`.
+
 Key variables:
 - `INSTALLER_ID` — installer identity (`woodbox`)
 - `OS_REPO` — OS payload registry namespace (`ghcr.io/techofourown/ourbox-woodbox-os`)
@@ -42,6 +46,7 @@ Key variables:
 - `OURBOX_INSTALLER_SSH_PASSWORD_HASH` — optional pre-baked password hash; blank means generate a one-time password at boot
 - `OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS` — optional authorized key material for key-capable modes
 - `OURBOX_INSTALLER_SSH_ALLOW_ROOT` — root-login override (`0` by default)
+- `OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY` — allow the Woodbox live installer to generate a one-time password locally when no hash is baked (`1` for official/public media)
 - `OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR` — optional monitor UDP destination override (defaults to `255.255.255.255`)
 - `OURBOX_INSTALLER_MONITOR_BROADCAST_PORT` — optional monitor UDP destination port override (defaults to `9999`)
 
@@ -49,6 +54,7 @@ Official/public Woodbox media currently builds with:
 - `OURBOX_INSTALLER_SSH_MODE=both`
 - `OURBOX_INSTALLER_SSH_USER=ourbox-installer`
 - `OURBOX_INSTALLER_SSH_PASSWORD_HASH=''` (generated at boot; shown only on the attached console)
+- `OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY=1`
 - `OURBOX_INSTALLER_SSH_ALLOW_ROOT=0`
 
 At install time, before disk selection, the operator may set a temporary live-installer SSH
@@ -123,6 +129,11 @@ The live installer keeps a dedicated diagnostics account:
 - status surface: `/run/ourbox-installer-ssh-status.env`
 - bootstrap logic: `/cdrom/ourbox/tools/ourbox-installer-ssh-bootstrap.sh`
 
+Shared mode/user/root/auth semantics come from the upstream installer SSH contract in
+`sw-ourbox-os/docs/reference/installer-ssh-contract.md`. Woodbox vendors the corresponding helper
+at `/cdrom/ourbox/tools/installer-ssh-helper.sh`, and CI checks that copy against the pinned
+upstream revision in `tools/installer-ssh-helper.upstream.env`.
+
 Behavior:
 - `installer/autoinstall/user-data.tpl` stays a small cloud-config wrapper; the complex SSH bootstrap logic is staged into the ISO as a standalone shell script
 - host keys are generated before `sshd -t`
@@ -130,6 +141,7 @@ Behavior:
 - official/public media is password-capable again by default
 - when no password hash is baked, the installer generates a one-time password at boot and shows it only on the attached console
 - step 0 on TTY1 can replace that generated password with an operator-chosen temporary password for the live installer only
+- generated-password handling, the status file, and the HTTP/UDP monitor surfaces are Woodbox-local layers on top of the upstream SSH contract
 - HTTP/UDP monitor output never includes password material
 
 Validation:

@@ -62,6 +62,16 @@ jobs:
       - name: Verify vendored installer-selection resolver
         run: bash tools/check-vendored-installer-selection-resolver.sh
 
+  installer-ssh-vendoring:
+    name: Vendored installer SSH helper sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify vendored installer SSH helper
+        run: bash tools/check-vendored-installer-ssh-helper.sh
+
   release-control-vendoring:
     name: Vendored release-control sync
     runs-on: ubuntu-latest
