@@ -164,11 +164,6 @@ main() {
     log "$*"
   }
 
-  ourbox_installer_ssh_die() {
-    log "ERROR: $*"
-    return 1
-  }
-
   if ! ourbox_installer_ssh_normalize_inputs; then
     OURBOX_INSTALLER_SSH_STATUS="error"
     finalize_status
