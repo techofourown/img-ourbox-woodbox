@@ -1,3 +1,10 @@
+## [0.6.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.1...v0.6.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* **release:** consume approved upstream inputs ([67f065a](https://github.com/techofourown/img-ourbox-woodbox/commit/67f065a12c1ec7180a480550247dc913ae468c4c))
+
 ## [0.6.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.0...v0.6.1) (2026-03-08)
 
 
