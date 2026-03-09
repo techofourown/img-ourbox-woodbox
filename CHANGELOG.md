@@ -1,3 +1,15 @@
+# [0.7.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.2...v0.7.0) (2026-03-09)
+
+
+### Bug Fixes
+
+* align platform contract digest publish metadata ([7079aab](https://github.com/techofourown/img-ourbox-woodbox/commit/7079aab2ba9a89d0f25c56e12cd13d2f20988f54))
+
+
+### Features
+
+* vendor shared release-control plane ([6d82071](https://github.com/techofourown/img-ourbox-woodbox/commit/6d820714c775b7e6b091e5645c8ad9e35906a0ce))
+
 ## [0.6.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.6.1...v0.6.2) (2026-03-09)
 
 
