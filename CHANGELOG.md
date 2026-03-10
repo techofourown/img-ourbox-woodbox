@@ -1,3 +1,10 @@
+## [0.7.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.1...v0.7.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* resolve pr batch diffs from pr refs ([106d4aa](https://github.com/techofourown/img-ourbox-woodbox/commit/106d4aafafe09f9de92fee6d5333fe6339943823))
+
 ## [0.7.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.0...v0.7.1) (2026-03-09)
 
 
