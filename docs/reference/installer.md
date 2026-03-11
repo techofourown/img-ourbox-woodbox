@@ -109,8 +109,11 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
        available
      - `l` list digest-pinned catalog entries (newest first by `created`)
      - `r` enter a custom OCI ref
-     - `o` override the OS repo/catalog defaults interactively
+   - `o` override the OS repo/catalog defaults interactively
    - Catalog resolution is row-order independent and chooses the newest valid row by `created`
+   - The resolver also accepts legacy target-qualified catalog rows during the migration window,
+     but install-time provenance and summaries normalize those back to the short release-channel
+     vocabulary (`stable`, `beta`, `nightly`, `exp-labs`)
    - Floating refs are resolved to digests with `oras resolve` and pulled immutably by digest unless
      `OURBOX_ALLOW_UNRESOLVED_PULL=1` is set for development/testing
    - Verifies SHA-256
@@ -176,6 +179,8 @@ Columns: `channel tab created version variant target sku git_sha platform_contra
 
 Updated automatically by `tools/publish-os-artifact.sh` when channel tags are pushed.
 `channel` stores the short release channel name (`stable`, `beta`, `nightly`, `exp-labs`).
+The resolver still accepts legacy target-qualified rows during the migration window, but
+`OURBOX_RELEASE_CHANNEL` remains normalized to the short names above.
 
 Resolver behavior does not depend on append order; `created` is authoritative.
 
