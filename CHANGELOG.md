@@ -1,3 +1,16 @@
+# [0.9.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.8.0...v0.9.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* address airgap review findings ([7859872](https://github.com/techofourown/img-ourbox-woodbox/commit/7859872147a8acd287d1b3f4477c667d8664f005))
+* clear lint and resolver sync failures ([705c99b](https://github.com/techofourown/img-ourbox-woodbox/commit/705c99b1cd6cf167fba15d4be6174c3fe93fff6a))
+
+
+### Features
+
+* add contract-bound airgap bundle selection ([1e03827](https://github.com/techofourown/img-ourbox-woodbox/commit/1e038276abfbb3a598da350f7d5c83e93bbcb658))
+
 # [0.8.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.2...v0.8.0) (2026-03-11)
 
 
