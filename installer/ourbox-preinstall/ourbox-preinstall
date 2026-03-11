@@ -756,7 +756,13 @@ main() {
     echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
   echo "  DATA disk    : ${DATA_DISK}"
   echo "  OS artifact  : ${OS_ARTIFACT_REF}"
+  echo "  Selection    : ${INSTALL_SELECTION_SOURCE}"
+  if [[ -n "${RELEASE_CHANNEL}" ]]; then
+    echo "  Channel      : ${RELEASE_CHANNEL}"
+  fi
+  echo "  OS digest    : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
+  echo "  Contract     : ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
     configured-hash)
