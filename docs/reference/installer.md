@@ -103,6 +103,13 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
      2. `OS_DEFAULT_REF`
      3. newest valid digest-pinned catalog row for `OS_CHANNEL`
      4. `${OS_REPO}:${OS_TARGET}-${OS_CHANNEL}` fallback
+   - Interactive options mirror the shared resolver menu:
+     - `c` choose channel (stable/beta/nightly/exp-labs/custom); named lanes prefer the newest
+       digest-pinned catalog row and fall back to the lane tag only when catalog resolution is not
+       available
+     - `l` list digest-pinned catalog entries (newest first by `created`)
+     - `r` enter a custom OCI ref
+     - `o` override the OS repo/catalog defaults interactively
    - Catalog resolution is row-order independent and chooses the newest valid row by `created`
    - Floating refs are resolved to digests with `oras resolve` and pulled immutably by digest unless
      `OURBOX_ALLOW_UNRESOLVED_PULL=1` is set for development/testing
