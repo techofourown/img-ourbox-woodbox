@@ -27,7 +27,13 @@ source "${ROOT}/tools/installer-ssh-helper.sh"
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
 # shellcheck disable=SC1091
 # Official pinned inputs take precedence over versions.env defaults.
-[ -f "${ROOT}/release/official-inputs.env" ] && source "${ROOT}/release/official-inputs.env"
+OFFICIAL_INPUTS_ENV="${ROOT}/release/official-inputs.env"
+OFFICIAL_AIRGAP_PLATFORM_REF=""
+if [[ -f "${OFFICIAL_INPUTS_ENV}" ]]; then
+  # shellcheck disable=SC1091
+  source "${OFFICIAL_INPUTS_ENV}"
+  OFFICIAL_AIRGAP_PLATFORM_REF="${AIRGAP_PLATFORM_REF:-}"
+fi
 
 need_cmd curl
 need_cmd xorriso
@@ -45,6 +51,17 @@ EMBED_PAYLOAD=""
 # fallback points at the nightly OS lane rather than stable.
 : "${OS_CHANNEL:=stable}"
 : "${OS_DEFAULT_REF:=}"
+: "${AIRGAP_PLATFORM_REPO:=ghcr.io/techofourown/sw-ourbox-os/airgap-platform}"
+: "${AIRGAP_PLATFORM_ARCH:=amd64}"
+: "${AIRGAP_PLATFORM_CHANNEL:=stable}"
+: "${AIRGAP_PLATFORM_REF:=}"
+: "${AIRGAP_PLATFORM_DEFAULT_REF:=}"
+: "${AIRGAP_PLATFORM_CATALOG_ENABLED:=1}"
+: "${AIRGAP_PLATFORM_CATALOG_TAG:=catalog-${AIRGAP_PLATFORM_ARCH}}"
+: "${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG:=stable-${AIRGAP_PLATFORM_ARCH}}"
+: "${AIRGAP_PLATFORM_CHANNEL_BETA_TAG:=beta-${AIRGAP_PLATFORM_ARCH}}"
+: "${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG:=nightly-${AIRGAP_PLATFORM_ARCH}}"
+: "${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG:=exp-labs-${AIRGAP_PLATFORM_ARCH}}"
 : "${OURBOX_VARIANT:=prod}"
 : "${DEFAULT_INSTALLER_SSH_MODE:=both}"
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
@@ -73,6 +90,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -z "${AIRGAP_PLATFORM_DEFAULT_REF}" && -n "${AIRGAP_PLATFORM_REF}" && "${AIRGAP_PLATFORM_REF}" == "${OFFICIAL_AIRGAP_PLATFORM_REF}" ]]; then
+  AIRGAP_PLATFORM_DEFAULT_REF="${AIRGAP_PLATFORM_REF}"
+  AIRGAP_PLATFORM_REF=""
+fi
 
 ourbox_installer_ssh_normalize_inputs
 ourbox_installer_ssh_validate_requested_posture
@@ -264,7 +286,8 @@ fi
 cat > "${ISO_DIR}/ourbox/installer/defaults.env" <<EOT
 # OurBox Woodbox installer baked defaults.
 # Remote install-defaults (INSTALL_DEFAULTS_REF) override these at install time
-# if the registry is reachable. This file is the offline/no-network fallback.
+# if the registry is reachable. This file is the offline/no-network fallback for
+# both OS payload and airgap-platform discovery.
 INSTALLER_ID=woodbox
 OS_REPO=${OFFICIAL_OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}
 OS_TARGET=${OURBOX_TARGET}
@@ -272,6 +295,17 @@ OS_CHANNEL=${OS_CHANNEL}
 OS_DEFAULT_REF=${OS_DEFAULT_REF}
 OS_CATALOG_ENABLED=1
 OS_CATALOG_TAG=${OURBOX_TARGET}-catalog
+AIRGAP_PLATFORM_REPO=${AIRGAP_PLATFORM_REPO}
+AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH}
+AIRGAP_PLATFORM_CHANNEL=${AIRGAP_PLATFORM_CHANNEL}
+AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF}
+AIRGAP_PLATFORM_DEFAULT_REF=${AIRGAP_PLATFORM_DEFAULT_REF}
+AIRGAP_PLATFORM_CATALOG_ENABLED=${AIRGAP_PLATFORM_CATALOG_ENABLED}
+AIRGAP_PLATFORM_CATALOG_TAG=${AIRGAP_PLATFORM_CATALOG_TAG}
+AIRGAP_PLATFORM_CHANNEL_STABLE_TAG=${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG}
+AIRGAP_PLATFORM_CHANNEL_BETA_TAG=${AIRGAP_PLATFORM_CHANNEL_BETA_TAG}
+AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG=${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG}
+AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG=${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG}
 INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF_BAKED}
 OS_ORAS_VERSION=${ORAS_VERSION:-1.3.0}
 INSTALLER_VERSION=${OURBOX_VERSION}

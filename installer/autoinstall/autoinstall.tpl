@@ -70,23 +70,30 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       rootfs + airgap copied to /target"
 
     # -----------------------------------------------------------------------
-    # [2/8] Install k3s binary from staged airgap payload
+    # [2/9] Apply optional airgap-platform override (mutable subset only).
     # -----------------------------------------------------------------------
-    - echo "==> [2/8] Installing k3s binary"
-    - install -D -m 0755 /opt/ourbox/installer/cache/payload-staging/airgap/k3s/k3s /target/usr/local/bin/k3s
+    - echo "==> [2/9] Applying optional airgap-platform override"
+    - /bin/bash /opt/ourbox/installer/cache/apply-airgap-platform-override.sh
+    - echo "==>       airgap override step complete"
+
+    # -----------------------------------------------------------------------
+    # [3/9] Install k3s binary from the final selected airgap payload
+    # -----------------------------------------------------------------------
+    - echo "==> [3/9] Installing k3s binary"
+    - install -D -m 0755 /target/opt/ourbox/airgap/k3s/k3s /target/usr/local/bin/k3s
     - 'echo "==>       k3s installed: $(ls -lh /target/usr/local/bin/k3s 2>/dev/null)"'
 
     # -----------------------------------------------------------------------
-    # [3/8] Append install-time provenance to /etc/ourbox/release
+    # [4/9] Append install-time provenance to /etc/ourbox/release
     # -----------------------------------------------------------------------
-    - echo "==> [3/8] Appending install provenance"
+    - echo "==> [4/9] Appending install provenance"
     - /bin/bash /opt/ourbox/installer/cache/append-provenance.sh
     - echo "==>       provenance appended"
 
     # -----------------------------------------------------------------------
-    # [4/8] Enable required services
+    # [5/9] Enable required services
     # -----------------------------------------------------------------------
-    - echo "==> [4/8] Enabling OurBox services"
+    - echo "==> [5/9] Enabling OurBox services"
     - curtin in-target --target=/target -- systemctl enable ourbox-bootstrap.service
     - curtin in-target --target=/target -- systemctl enable ourbox-status.service
     - curtin in-target --target=/target -- systemctl enable avahi-daemon.service
@@ -95,30 +102,30 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       services enabled"
 
     # -----------------------------------------------------------------------
-    # [5/8] OurBox DATA mount contract (by label).
+    # [6/9] OurBox DATA mount contract (by label).
     #       Written directly to /target/etc/fstab.
     # -----------------------------------------------------------------------
-    - echo "==> [5/8] Writing OURBOX_DATA fstab entry"
+    - echo "==> [6/9] Writing OURBOX_DATA fstab entry"
     - 'mkdir -p /target/var/lib/ourbox && grep -qF "LABEL=OURBOX_DATA" /target/etc/fstab || echo "LABEL=OURBOX_DATA /var/lib/ourbox ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2" >> /target/etc/fstab'
     - echo "==>       fstab entry written"
 
     # -----------------------------------------------------------------------
-    # [6/8] Rewrite netplan to match NIC by MAC address.
+    # [7/9] Rewrite netplan to match NIC by MAC address.
     # -----------------------------------------------------------------------
-    - echo "==> [6/8] Rewriting netplan (MAC-based)"
+    - echo "==> [7/9] Rewriting netplan (MAC-based)"
     - 'iface=$(ip route show default 2>/dev/null | awk "{print \$5; exit}"); mac=$(cat /sys/class/net/"$iface"/address 2>/dev/null); echo "==>       iface=${iface} mac=${mac}"; [ -n "$mac" ] && printf "network:\n  version: 2\n  ethernets:\n    id0:\n      match:\n        macaddress: %s\n      dhcp4: true\n" "$mac" > /target/etc/netplan/00-installer-config.yaml'
     - echo "==>       netplan written"
 
     # -----------------------------------------------------------------------
-    # [7/8] Verify DATA disk prepared by pre-installer after INSTALL confirmation.
+    # [8/9] Verify DATA disk prepared by pre-installer after INSTALL confirmation.
     # -----------------------------------------------------------------------
-    - 'echo "==> [7/8] Verifying DATA disk prepared in preinstall"'
+    - 'echo "==> [8/9] Verifying DATA disk prepared in preinstall"'
     - 'test -n "$(blkid -L OURBOX_DATA 2>/dev/null)"'
     - 'echo "==>       OURBOX_DATA present on $(blkid -L OURBOX_DATA)"'
     - 'lsblk -o NAME,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$(blkid -L OURBOX_DATA)" || true'
 
     # -----------------------------------------------------------------------
-    # [8/8] Prefer the installed EFI entry on the selected target disk.
+    # [9/9] Prefer the installed EFI entry on the selected target disk.
     #       Do not use BootCurrent here: during external-media installs it
     #       identifies the installer transport, not the desired post-install
     #       default. Instead, resolve the target ESP mounted at /target/boot/efi,
@@ -126,7 +133,7 @@ ${OURBOX_STORAGE_MATCH}
     #       immediate next boot, and move that entry to the front of BootOrder
     #       while preserving the relative order of everything else.
     # -----------------------------------------------------------------------
-    - echo "==> [8/8] Preferring installed EFI boot entry"
+    - echo "==> [9/9] Preferring installed EFI boot entry"
     - |
         set -e
         EFI_STATUS_FILE="/run/ourbox-efi-boot-preference.env"
