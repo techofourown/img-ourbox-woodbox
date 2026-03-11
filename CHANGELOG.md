@@ -1,3 +1,15 @@
+# [0.8.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.2...v0.8.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* confirm pinned browse selections before install ([9a2012c](https://github.com/techofourown/img-ourbox-woodbox/commit/9a2012cfc00ad81dae6cd034a7c247936ebaf958))
+
+
+### Features
+
+* adopt shared installer selection browsing ([1c5c3d4](https://github.com/techofourown/img-ourbox-woodbox/commit/1c5c3d4e85161cef7da5a1eeaeda66be9cafcb3e))
+
 ## [0.7.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.7.1...v0.7.2) (2026-03-10)
 
 
