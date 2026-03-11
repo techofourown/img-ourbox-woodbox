@@ -477,30 +477,10 @@ resolve_and_stage_os_artifact() {
   INSTALL_DEFAULTS_SOURCE="${OURBOX_INSTALL_DEFAULTS_SOURCE}"
   normalize_payload_config
 
-  ourbox_selection_determine_default_ref "${catalog_dir}"
+  ourbox_selection_interactive_select_ref "${catalog_dir}"
   local selected_ref="${OURBOX_SELECTED_REF}"
   INSTALL_SELECTION_SOURCE="${OURBOX_INSTALL_SELECTION_SOURCE}"
   RELEASE_CHANNEL="${OURBOX_RELEASE_CHANNEL}"
-
-  # --- Operator interactive override ---
-  # Show the resolved ref and offer the operator a chance to substitute an exact
-  # ref without requiring ISO remastering. Pressing Enter accepts the resolved ref.
-  echo
-  echo "  =================================================================="
-  echo "  Resolved OS artifact ref:"
-  echo "    ${selected_ref}"
-  echo "  Source: ${INSTALL_DEFAULTS_SOURCE}"
-  echo "  =================================================================="
-  echo
-  local override_input=""
-  read -r -p "  Override ref (press Enter to accept, or type an exact ref/digest): " override_input
-  if [[ -n "${override_input}" ]]; then
-    log "  Operator supplied override ref: ${override_input}"
-    selected_ref="${override_input}"
-    INSTALL_SELECTION_SOURCE="operator-override"
-    RELEASE_CHANNEL=""
-  fi
-
   ourbox_selection_finalize_registry_ref "${selected_ref}"
   OS_ARTIFACT_SOURCE="${OURBOX_OS_ARTIFACT_SOURCE}"
   OS_ARTIFACT_REF="${OURBOX_OS_ARTIFACT_REF}"
@@ -776,7 +756,13 @@ main() {
     echo "  Disk serial  : ${TARGET_DISK_SERIAL}"
   echo "  DATA disk    : ${DATA_DISK}"
   echo "  OS artifact  : ${OS_ARTIFACT_REF}"
+  echo "  Selection    : ${INSTALL_SELECTION_SOURCE}"
+  if [[ -n "${RELEASE_CHANNEL}" ]]; then
+    echo "  Channel      : ${RELEASE_CHANNEL}"
+  fi
+  echo "  OS digest    : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
+  echo "  Contract     : ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
     configured-hash)
