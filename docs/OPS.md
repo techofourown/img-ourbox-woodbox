@@ -6,7 +6,7 @@ Use the unified host-side installer repo as the operator front door:
 
 ```bash
 cd sw-ourbox-installer
-./tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox
+./tools/prepare-installer-media.sh
 ```
 
 This will:
@@ -14,8 +14,9 @@ This will:
 1. Resolve the selected OS payload on the trusted host
 2. Resolve the selected `airgap-platform` bundle on the trusted host
 3. Pull and verify those bytes locally
-4. Compose Woodbox mission media using the adapter in this repo
-5. Optionally flash the resulting media to a USB device
+4. Pull the published Woodbox installer substrate artifact
+5. Compose Woodbox mission media using the adapter in this repo
+6. Optionally flash the resulting media to a USB device
 
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
 prompts, wait for the machine to power off, remove USB, boot from the selected OS disk.

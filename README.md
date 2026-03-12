@@ -22,17 +22,17 @@ Woodbox mission media is now composed by the unified host-side installer repo,
 `sw-ourbox-installer`. This repo is no longer the operator front door for
 artifact selection or USB composition.
 
-Use the unified host-side composer, pointing it at this Woodbox repo as the
-target adapter/substrate source:
+Use the unified host-side composer:
 
 ```bash
 cd sw-ourbox-installer
-./tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox
+./tools/prepare-installer-media.sh
 ```
 
 That flow resolves the selected OS payload and `airgap-platform` bundle on the
-trusted host, stages the exact bytes onto mission media, and produces a USB
-that installs fully offline on the target.
+trusted host, pulls the published Woodbox installer substrate artifact,
+stages the exact bytes onto mission media, and produces a USB that installs
+fully offline on the target.
 
 The helper at [tools/prepare-installer-media.sh](/techofourown/img-ourbox-woodbox/tools/prepare-installer-media.sh)
 now delegates to `sw-ourbox-installer`; it does not maintain a separate
