@@ -19,6 +19,7 @@ SOURCE_BUNDLE_DIR="${TMP}/source-airgap"
 mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${PAYLOAD_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
+cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
 cp "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" "${PREINSTALL_DIR}/ourbox-preinstall"
 
 # shellcheck disable=SC1091

@@ -9,12 +9,14 @@ ROOT="${WOODBOX_REPO_ROOT}"
 source "${ROOT}/tools/lib.sh"
 
 ADAPTER_JSON="${WOODBOX_ADAPTER_ROOT}/adapter.json"
+STRICT_METADATA_PARSER="${WOODBOX_ADAPTER_ROOT}/strict-kv-metadata.py"
 MISSION_DIR=""
 OS_PAYLOAD=""
+OS_META_ENV=""
 
 usage() {
   cat <<EOF
-Usage: $0 --mission-dir DIR --os-payload PATH
+Usage: $0 --mission-dir DIR --os-payload PATH --os-meta-env PATH
 
 Validates the phase-one Woodbox mission directory contract before compose.
 EOF
@@ -32,6 +34,11 @@ while [[ $# -gt 0 ]]; do
       OS_PAYLOAD="$2"
       shift 2
       ;;
+    --os-meta-env)
+      [[ $# -ge 2 ]] || die "--os-meta-env requires a value"
+      OS_META_ENV="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -45,13 +52,14 @@ done
 
 [[ -n "${MISSION_DIR}" ]] || die "--mission-dir is required"
 [[ -n "${OS_PAYLOAD}" ]] || die "--os-payload is required"
+[[ -n "${OS_META_ENV}" ]] || die "--os-meta-env is required"
 [[ -d "${MISSION_DIR}" ]] || die "mission dir not found: ${MISSION_DIR}"
 [[ -f "${MISSION_DIR}/mission-manifest.json" ]] || die "mission-manifest.json missing from ${MISSION_DIR}"
 [[ -f "${OS_PAYLOAD}" ]] || die "os payload not found: ${OS_PAYLOAD}"
+[[ -f "${OS_META_ENV}" ]] || die "os metadata not found: ${OS_META_ENV}"
+[[ -f "${STRICT_METADATA_PARSER}" ]] || die "strict metadata parser not found: ${STRICT_METADATA_PARSER}"
 
-PAYLOAD_META="${OS_PAYLOAD%.tar.gz}.meta.env"
-
-python3 - <<'PY' "${ADAPTER_JSON}" "${MISSION_DIR}/mission-manifest.json"
+python3 - <<'PY' "${ADAPTER_JSON}" "${MISSION_DIR}/mission-manifest.json" "${OS_PAYLOAD}" "${OS_META_ENV}"
 import json
 import pathlib
 import sys
@@ -62,6 +70,8 @@ with open(sys.argv[2], "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
 mission_dir = pathlib.Path(sys.argv[2]).parent
+expected_payload = pathlib.Path(sys.argv[3]).resolve()
+expected_meta = pathlib.Path(sys.argv[4]).resolve()
 
 expected_type = adapter["expected_os_artifact_type"]
 expected_arch = adapter["expected_airgap_arch"]
@@ -101,6 +111,10 @@ if not (mission_dir / os_payload_relpath).is_file():
     raise SystemExit("mission selected_os.payload.relpath must point to a staged file")
 if not (mission_dir / os_meta_relpath).is_file():
     raise SystemExit("mission selected_os.metadata_relpath must point to a staged file")
+if (mission_dir / os_payload_relpath).resolve() != expected_payload:
+    raise SystemExit("mission selected_os.payload.relpath must match the explicit --os-payload input")
+if (mission_dir / os_meta_relpath).resolve() != expected_meta:
+    raise SystemExit("mission selected_os.metadata_relpath must match the explicit --os-meta-env input")
 selected_airgap = manifest.get("selected_airgap", {})
 if selected_airgap:
     if selected_airgap.get("arch") != expected_arch:
@@ -120,21 +134,51 @@ if selected_airgap:
         raise SystemExit("mission selected_airgap.manifest_relpath must point to a staged file")
 PY
 
-if [[ -f "${PAYLOAD_META}" ]]; then
-  payload_check="$(
-    (
-      unset OS_ARTIFACT_TYPE OURBOX_PLATFORM_CONTRACT_DIGEST
-      # shellcheck disable=SC1090
-      source "${PAYLOAD_META}"
-      printf '%s\n%s\n' "${OS_ARTIFACT_TYPE-}" "${OURBOX_PLATFORM_CONTRACT_DIGEST-}"
-    )
-  )"
-  mapfile -t payload_fields <<<"${payload_check}"
-  [[ "${#payload_fields[@]}" -eq 2 ]] || die "failed to parse ${PAYLOAD_META}"
-  [[ "${payload_fields[0]}" == "application/vnd.techofourown.ourbox.woodbox.os-payload.v1" ]] \
-    || die "payload meta artifact type mismatch in ${PAYLOAD_META}"
-  [[ "${payload_fields[1]}" =~ ^sha256:[0-9a-f]{64}$ ]] \
-    || die "payload meta contract digest missing or invalid in ${PAYLOAD_META}"
-fi
+payload_check="$(
+  python3 "${STRICT_METADATA_PARSER}" "${OS_META_ENV}" \
+    --allow OS_PAYLOAD_BASENAME \
+    --allow OS_PAYLOAD_SHA256 \
+    --allow OS_PAYLOAD_SIZE_BYTES \
+    --allow OS_ARTIFACT_TYPE \
+    --allow OURBOX_PRODUCT \
+    --allow OURBOX_DEVICE \
+    --allow OURBOX_TARGET \
+    --allow OURBOX_SKU \
+    --allow OURBOX_VARIANT \
+    --allow OURBOX_VERSION \
+    --allow OURBOX_RECIPE_GIT_HASH \
+    --allow BUILD_TS \
+    --allow GIT_SHA \
+    --allow OURBOX_PLATFORM_CONTRACT_SOURCE \
+    --allow OURBOX_PLATFORM_CONTRACT_REVISION \
+    --allow OURBOX_PLATFORM_CONTRACT_VERSION \
+    --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
+    --allow OURBOX_AIRGAP_PLATFORM_REF \
+    --allow OURBOX_AIRGAP_PLATFORM_DIGEST \
+    --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
+    --allow OURBOX_AIRGAP_PLATFORM_REVISION \
+    --allow OURBOX_AIRGAP_PLATFORM_VERSION \
+    --allow OURBOX_AIRGAP_PLATFORM_CREATED \
+    --allow OURBOX_AIRGAP_PLATFORM_ARCH \
+    --allow OURBOX_AIRGAP_PLATFORM_PROFILE \
+    --allow OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
+    --allow OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+    --allow OURBOX_BASE_ISO_URL \
+    --allow OURBOX_BASE_ISO_SHA256 \
+    --allow K3S_VERSION \
+    --allow GITHUB_WORKFLOW \
+    --allow GITHUB_RUN_ID \
+    --allow GITHUB_RUN_ATTEMPT \
+    --require OS_ARTIFACT_TYPE \
+    --require OURBOX_PLATFORM_CONTRACT_DIGEST \
+    --print OS_ARTIFACT_TYPE \
+    --print OURBOX_PLATFORM_CONTRACT_DIGEST
+)"
+mapfile -t payload_fields <<<"${payload_check}"
+[[ "${#payload_fields[@]}" -eq 2 ]] || die "failed to parse ${OS_META_ENV}"
+[[ "${payload_fields[0]}" == "application/vnd.techofourown.ourbox.woodbox.os-payload.v1" ]] \
+  || die "payload meta artifact type mismatch in ${OS_META_ENV}"
+[[ "${payload_fields[1]}" =~ ^sha256:[0-9a-f]{64}$ ]] \
+  || die "payload meta contract digest missing or invalid in ${OS_META_ENV}"
 
 log "Woodbox media adapter validation passed"

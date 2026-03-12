@@ -11,6 +11,8 @@
 # Flags:
 #   --embed-payload PATH      Embed the specified OS payload tar.gz into the ISO
 #                             as part of a composed mission medium.
+#   --embed-payload-meta PATH Embed the metadata sidecar that must land at
+#                             /cdrom/ourbox/payload/payload.meta.env.
 #   --embed-mission-dir PATH  Copy a prepared mission directory into
 #                             /cdrom/ourbox/mission/ inside the ISO.
 set -euo pipefail
@@ -35,6 +37,7 @@ need_cmd awk
 need_cmd bash
 
 EMBED_PAYLOAD=""
+EMBED_PAYLOAD_META=""
 EMBED_MISSION_DIR=""
 : "${OURBOX_VARIANT:=prod}"
 : "${DEFAULT_INSTALLER_SSH_MODE:=both}"
@@ -52,6 +55,11 @@ while [[ $# -gt 0 ]]; do
     --embed-payload)
       [[ $# -ge 2 ]] || die "--embed-payload requires a path"
       EMBED_PAYLOAD="$2"
+      shift 2
+      ;;
+    --embed-payload-meta)
+      [[ $# -ge 2 ]] || die "--embed-payload-meta requires a path"
+      EMBED_PAYLOAD_META="$2"
       shift 2
       ;;
     --embed-mission-dir)
@@ -84,6 +92,10 @@ if [[ -n "${EMBED_PAYLOAD}" ]]; then
   [[ -f "${EMBED_PAYLOAD}" ]] || die "embedded payload not found: ${EMBED_PAYLOAD}"
 fi
 
+if [[ -n "${EMBED_PAYLOAD_META}" ]]; then
+  [[ -f "${EMBED_PAYLOAD_META}" ]] || die "embedded payload metadata not found: ${EMBED_PAYLOAD_META}"
+fi
+
 if [[ -n "${EMBED_MISSION_DIR}" ]]; then
   [[ -d "${EMBED_MISSION_DIR}" ]] || die "embedded mission dir not found: ${EMBED_MISSION_DIR}"
   [[ -f "${EMBED_MISSION_DIR}/mission-manifest.json" ]] \
@@ -94,12 +106,21 @@ if [[ -n "${EMBED_PAYLOAD}" && -z "${EMBED_MISSION_DIR}" ]]; then
   die "--embed-payload requires --embed-mission-dir for a supported Woodbox mission medium"
 fi
 
+if [[ -n "${EMBED_PAYLOAD}" && -z "${EMBED_PAYLOAD_META}" ]]; then
+  die "--embed-payload requires --embed-payload-meta for a supported Woodbox mission medium"
+fi
+
+if [[ -z "${EMBED_PAYLOAD}" && -n "${EMBED_PAYLOAD_META}" ]]; then
+  die "--embed-payload-meta requires --embed-payload for a supported Woodbox mission medium"
+fi
+
 if [[ -z "${EMBED_PAYLOAD}" && -n "${EMBED_MISSION_DIR}" ]]; then
   die "--embed-mission-dir requires --embed-payload for a supported Woodbox mission medium"
 fi
 
 if [[ -n "${EMBED_PAYLOAD}" ]]; then
   log "Embedding mission payload from ${EMBED_PAYLOAD}"
+  log "Embedding mission payload metadata from ${EMBED_PAYLOAD_META}"
   log "Embedding mission directory from ${EMBED_MISSION_DIR}"
 else
   log "Building installer substrate only (no mission bytes embedded)"
@@ -202,6 +223,8 @@ install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" 
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
 install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
+install -m 0755 "${ROOT}/tools/strict-kv-metadata.py" \
+  "${ISO_DIR}/ourbox/tools/strict-kv-metadata.py"
 install -m 0644 "${ROOT}/tools/installer-ssh-helper.sh" \
   "${ISO_DIR}/ourbox/tools/installer-ssh-helper.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
@@ -244,11 +267,7 @@ if [[ -n "${EMBED_PAYLOAD}" ]]; then
   cp "${EMBED_PAYLOAD}" "${ISO_DIR}/ourbox/payload/os-payload.tar.gz"
   sha256sum "${ISO_DIR}/ourbox/payload/os-payload.tar.gz" \
     | awk '{print $1}' > "${ISO_DIR}/ourbox/payload/os-payload.tar.gz.sha256"
-  # Copy meta.env if it exists alongside the payload
-  PAYLOAD_META="${EMBED_PAYLOAD%.tar.gz}.meta.env"
-  if [[ -f "${PAYLOAD_META}" ]]; then
-    cp "${PAYLOAD_META}" "${ISO_DIR}/ourbox/payload/payload.meta.env"
-  fi
+  cp "${EMBED_PAYLOAD_META}" "${ISO_DIR}/ourbox/payload/payload.meta.env"
   log "  payload staged into mission media"
 fi
 
