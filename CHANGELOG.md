@@ -1,3 +1,10 @@
+## [0.10.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.1...v0.10.2) (2026-03-12)
+
+
+### Bug Fixes
+
+* **adapter:** avoid redundant airgap extraction ([8ef5d8a](https://github.com/techofourown/img-ourbox-woodbox/commit/8ef5d8a75be9fb42de06402253a866806c4c4f3c))
+
 ## [0.10.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.0...v0.10.1) (2026-03-12)
 
 
