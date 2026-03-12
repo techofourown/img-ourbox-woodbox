@@ -1,3 +1,10 @@
+## [0.9.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.9.1...v0.9.2) (2026-03-12)
+
+
+### Bug Fixes
+
+* refresh approved upstream pins to v0.16.2 ([dccdf75](https://github.com/techofourown/img-ourbox-woodbox/commit/dccdf75ee939ef88fe60285151b134dc4579cba9))
+
 ## [0.9.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.9.0...v0.9.1) (2026-03-11)
 
 
