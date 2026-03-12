@@ -177,7 +177,7 @@ BOOT_DIR="${WORKDIR}/BOOT"
 mkdir -p "${ISO_DIR}" "${BOOT_DIR}"
 
 VOLID="$(xorriso -indev "${SUBSTRATE_ISO}" -pvd_info 2>/dev/null \
-  | awk -F': *' '/Volume id/ {print $2; exit}' \
+  | awk -F': *' 'tolower($1) ~ /volume id/ {print $2; exit}' \
   | sed -E "s/[[:space:]]*$//; s/^'//; s/'$//")"
 [[ -n "${VOLID}" ]] || die "failed to read volume id from substrate ISO: ${SUBSTRATE_ISO}"
 
