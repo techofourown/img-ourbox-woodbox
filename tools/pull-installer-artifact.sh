@@ -26,6 +26,9 @@ Defaults:
   --channel stable
   --outdir deploy-installer-from-registry
   REF from channel: \${INSTALLER_REPO}:\${OURBOX_TARGET}-installer-\${CHANNEL}
+
+This pulls the published Woodbox installer substrate artifact. Supported
+operator installs still require host-composed mission media.
 EOF
 }
 
@@ -94,7 +97,7 @@ fi
 
 mkdir -p "${OUTDIR}"
 
-log ">> Pull installer: ${REF}"
+log ">> Pull installer substrate: ${REF}"
 maybe_login "${REF}"
 oras pull "${REF}" -o "${OUTDIR}"
 
@@ -110,5 +113,5 @@ actual="$(sha256sum "${OUTDIR}/installer.iso" | awk '{print $1}')"
 [[ "${expected}" == "${actual}" ]] || die "sha mismatch (expected ${expected}, got ${actual})"
 log "sha256 verified: ${actual}"
 
-log "DONE: extracted installer artifact files:"
+log "DONE: extracted installer substrate artifact files:"
 ls -lah "${OUTDIR}"

@@ -1,19 +1,21 @@
 # OPS — OurBox Woodbox
 
-## Quick start: prepare installer media
+## Quick start: compose Woodbox mission media
 
-### Default path (recommended): pull official installer from registry
+Use the unified host-side installer repo as the operator front door:
 
 ```bash
-./tools/prepare-installer-media.sh
+cd sw-ourbox-installer
+./tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox
 ```
 
 This will:
 
-1. Prompt you to select a target USB disk (interactive)
-2. Bootstrap host dependencies (ORAS, xorriso, etc.)
-3. Pull the official installer ISO from GHCR (channel `stable`, tag `x86-installer-stable`, by default)
-4. Flash the ISO to the selected USB disk
+1. Resolve the selected OS payload on the trusted host
+2. Resolve the selected `airgap-platform` bundle on the trusted host
+3. Pull and verify those bytes locally
+4. Compose Woodbox mission media using the adapter in this repo
+5. Optionally flash the resulting media to a USB device
 
 Then: plug the USB into the Woodbox, boot from USB (UEFI boot menu), follow the installer
 prompts, wait for the machine to power off, remove USB, boot from the selected OS disk.
@@ -26,22 +28,9 @@ During live installation, official/public media exposes a dedicated installer SS
 
 ---
 
-### Local source-build path
-
-```bash
-./tools/prepare-installer-media.sh --build-local
-```
-
-This will:
-
-1. Prompt you to select a target USB disk
-2. Bootstrap host dependencies
-3. Fetch upstream platform bundle (k3s + images + platform contract) via ORAS
-4. Build OS payload locally
-5. Build a fat installer ISO with the OS payload embedded (no network pull at install time)
-6. Flash the ISO
-
-Custom installer SSH posture can be set with environment overrides passed to `build-installer-iso.sh`, for example:
+This repo still owns substrate/payload build steps and the Woodbox adapter.
+Custom installer SSH posture can be set with environment overrides passed to
+`build-installer-iso.sh`, for example:
 
 ```bash
 OURBOX_INSTALLER_SSH_MODE=key \
@@ -49,22 +38,8 @@ OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)" \
 ./tools/build-installer-iso.sh
 ```
 
-Both the default and `--build-local` paths converge on the same rendered NoCloud seed.
-`tools/build-installer-iso.sh` now validates that rendered seed as YAML before repacking the ISO.
-
----
-
-### Other installer options
-
-```bash
-# Pull a specific installer ref by digest or tag
-./tools/prepare-installer-media.sh --installer-ref ghcr.io/techofourown/ourbox-woodbox-installer@sha256:...
-
-# Pull from a specific channel (short name: stable or nightly)
-./tools/prepare-installer-media.sh --installer-channel nightly
-```
-
----
+`tools/build-installer-iso.sh` validates the rendered NoCloud seed as YAML
+before repacking the ISO.
 
 ## Boot + install on Woodbox
 
@@ -73,9 +48,10 @@ The installer is interactive. It will prompt for:
 0. **Optional installer SSH password** — set a temporary password for `ourbox-installer`, or press Enter to keep the current media posture
 1. **OS disk selection** — any non-removable non-USB disk to install onto (will be erased; SSD/NVMe recommended)
 2. **DATA disk selection** — the disk to format as `OURBOX_DATA` (ext4)
-3. **OS artifact** — pulled from registry or used from embedded payload; displayed with SHA-256
-4. **Hostname, username, password** — for the installed system
-5. **INSTALL confirmation** — type `INSTALL` to begin
+3. **OS payload** — loaded from embedded mission media and displayed with SHA-256
+4. **Apps bundle** — staged from embedded mission media; no target-side registry access
+5. **Hostname, username, password** — for the installed system
+6. **INSTALL confirmation** — type `INSTALL` to begin
 
 If installer SSH is ready, the banner/monitor will show:
 - `ssh ourbox-installer@<installer-ip>`
@@ -121,12 +97,14 @@ sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.)
 
 ./tools/build-os-payload.sh            # Build OS payload tarball (rootfs overlay + airgap)
 
-./tools/build-installer-iso.sh         # Build thin installer ISO (no payload embedded)
+./tools/build-installer-iso.sh         # Build installer substrate ISO (not a standalone install path)
 
 ./tools/validate-installer-seed.sh     # Render + parse the NoCloud seed as YAML
 
-# Or: build fat ISO with embedded OS payload (for offline operation)
-./tools/build-installer-iso.sh --embed-payload deploy/os-payload-ourbox-woodbox-x86-*.tar.gz
+# Or: build mission media by embedding both payload and mission directory
+./tools/build-installer-iso.sh \
+  --embed-payload deploy/os-payload-ourbox-woodbox-x86-*.tar.gz \
+  --embed-mission-dir /path/to/prepared-mission-dir
 ```
 
 For an explicit boot-level check of the installer control plane on a development machine:
@@ -141,15 +119,18 @@ OURBOX_INSTALLER_SSH_PASSWORD='ourbox-smoke-pass' \
 ## Registry operations
 
 ```bash
-# Publish OS payload and installer ISO after building
+# Publish OS payload and installer substrate ISO after building
 ./tools/publish-os-artifact.sh deploy
 ./tools/publish-installer-artifact.sh deploy
 
-# Pull OS payload or installer ISO from registry
+# Pull OS payload or installer substrate ISO from registry
 ./tools/pull-os-artifact.sh ghcr.io/techofourown/ourbox-woodbox-os:x86-stable
 # Channel arg is the short channel name (stable|nightly); the x86-installer- prefix is added automatically
 ./tools/pull-installer-artifact.sh --channel stable
 ```
+
+The published installer artifact is substrate only. Supported operator installs
+still require host-composed mission media from `sw-ourbox-installer`.
 
 ---
 
@@ -163,7 +144,7 @@ When `sw-ourbox-os` publishes new `platform-contract` or `airgap-platform` bundl
 # 2. Pull and sync
 ./tools/fetch-airgap-platform.sh
 
-# 3. Rebuild OS payload + installer; verify; open a PR
+# 3. Rebuild OS payload/substrate as needed; then compose mission media via sw-ourbox-installer
 ```
 
 ---
@@ -215,8 +196,8 @@ sudo /cdrom/ourbox/tools/format-data-disk.sh /dev/sdX
 ### Verify artifact provenance at install time
 
 During installation (`ourbox-preinstall` step 3 output):
-- Source: `registry` or `embedded`
-- Ref: the ORAS ref used
+- Source: `mission`
+- Ref: the host-selected artifact ref staged onto the mission media
 - SHA-256: the tarball SHA-256
 
 After installation:

@@ -53,7 +53,7 @@ INSTALLER_IMMUTABLE_TAG="${INSTALLER_IMMUTABLE_TAG:-${BASE}}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
-log "Preparing installer artifact payload for ${INSTALLER_REPO}"
+log "Preparing installer substrate artifact payload for ${INSTALLER_REPO}"
 
 cp "${ISO_FILE}" "${TMP}/installer.iso"
 SHA256="$(sha256sum "${TMP}/installer.iso" | awk '{print $1}')"

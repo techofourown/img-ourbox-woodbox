@@ -17,19 +17,10 @@ if [[ -z "${ISO_FILE}" ]]; then
 fi
 [[ -n "${ISO_FILE}" && -f "${ISO_FILE}" ]] || die "installer ISO not found"
 
-EXPECTED_OS_DEFAULT_REF="${EXPECTED_OS_DEFAULT_REF:-}"
-if [[ -z "${EXPECTED_OS_DEFAULT_REF}" && -f "${DEPLOY_DIR}/os-artifact.pinned.ref" ]]; then
-  EXPECTED_OS_DEFAULT_REF="$(cat "${DEPLOY_DIR}/os-artifact.pinned.ref")"
-fi
-[[ -n "${EXPECTED_OS_DEFAULT_REF}" ]] || die "EXPECTED_OS_DEFAULT_REF not set and ${DEPLOY_DIR}/os-artifact.pinned.ref missing"
-
-EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF="${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF:-}"
-if [[ -z "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" && -f "${ROOT}/release/official-inputs.env" ]]; then
-  # shellcheck disable=SC1091
-  source "${ROOT}/release/official-inputs.env"
-  EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF="${AIRGAP_PLATFORM_REF:-}"
-fi
-[[ -n "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" ]] || die "EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF not set and release/official-inputs.env did not provide AIRGAP_PLATFORM_REF"
+EXPECTED_INSTALLER_SSH_MODE="${EXPECTED_INSTALLER_SSH_MODE:-both}"
+EXPECTED_INSTALLER_SSH_USER="${EXPECTED_INSTALLER_SSH_USER:-ourbox-installer}"
+EXPECTED_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY="${EXPECTED_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-1}"
+EXPECTED_INSTALLER_SSH_ALLOW_ROOT="${EXPECTED_INSTALLER_SSH_ALLOW_ROOT:-0}"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
@@ -43,29 +34,56 @@ xorriso -osirrox on -indev "${ISO_FILE}" \
 # shellcheck disable=SC1090
 source "${EXTRACTED_DEFAULTS}"
 
-[[ "${OS_DEFAULT_REF:-}" == "${EXPECTED_OS_DEFAULT_REF}" ]] || die \
-  "installer defaults OS_DEFAULT_REF mismatch: expected '${EXPECTED_OS_DEFAULT_REF}', found '${OS_DEFAULT_REF:-}'"
-[[ -z "${AIRGAP_PLATFORM_REF:-}" ]] || die \
-  "installer defaults AIRGAP_PLATFORM_REF must be empty on official media, found '${AIRGAP_PLATFORM_REF:-}'"
-[[ "${AIRGAP_PLATFORM_DEFAULT_REF:-}" == "${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}" ]] || die \
-  "installer defaults AIRGAP_PLATFORM_DEFAULT_REF mismatch: expected '${EXPECTED_AIRGAP_PLATFORM_DEFAULT_REF}', found '${AIRGAP_PLATFORM_DEFAULT_REF:-}'"
-[[ "${AIRGAP_PLATFORM_ARCH:-}" == "amd64" ]] || die \
-  "installer defaults AIRGAP_PLATFORM_ARCH mismatch: expected 'amd64', found '${AIRGAP_PLATFORM_ARCH:-}'"
-[[ "${AIRGAP_PLATFORM_CATALOG_TAG:-}" == "catalog-amd64" ]] || die \
-  "installer defaults AIRGAP_PLATFORM_CATALOG_TAG mismatch: expected 'catalog-amd64', found '${AIRGAP_PLATFORM_CATALOG_TAG:-}'"
-[[ -z "${INSTALL_DEFAULTS_REF:-}" ]] || die \
-  "installer defaults INSTALL_DEFAULTS_REF must be empty for official installer, found '${INSTALL_DEFAULTS_REF}'"
+[[ "${INSTALLER_ID:-}" == "woodbox" ]] || die \
+  "installer defaults INSTALLER_ID mismatch: expected 'woodbox', found '${INSTALLER_ID:-}'"
+[[ -n "${INSTALLER_VERSION:-}" ]] || die "installer defaults INSTALLER_VERSION must not be empty"
+[[ -n "${INSTALLER_GIT_HASH:-}" ]] || die "installer defaults INSTALLER_GIT_HASH must not be empty"
+[[ "${OURBOX_INSTALLER_SSH_MODE:-}" == "${EXPECTED_INSTALLER_SSH_MODE}" ]] || die \
+  "installer defaults OURBOX_INSTALLER_SSH_MODE mismatch: expected '${EXPECTED_INSTALLER_SSH_MODE}', found '${OURBOX_INSTALLER_SSH_MODE:-}'"
+[[ "${OURBOX_INSTALLER_SSH_USER:-}" == "${EXPECTED_INSTALLER_SSH_USER}" ]] || die \
+  "installer defaults OURBOX_INSTALLER_SSH_USER mismatch: expected '${EXPECTED_INSTALLER_SSH_USER}', found '${OURBOX_INSTALLER_SSH_USER:-}'"
+[[ "${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-}" == "${EXPECTED_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}" ]] || die \
+  "installer defaults OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY mismatch: expected '${EXPECTED_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}', found '${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-}'"
+[[ "${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-}" == "${EXPECTED_INSTALLER_SSH_ALLOW_ROOT}" ]] || die \
+  "installer defaults OURBOX_INSTALLER_SSH_ALLOW_ROOT mismatch: expected '${EXPECTED_INSTALLER_SSH_ALLOW_ROOT}', found '${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-}'"
+
+for legacy_key in \
+  OS_REPO \
+  OS_TARGET \
+  OS_CHANNEL \
+  OS_DEFAULT_REF \
+  OS_CATALOG_ENABLED \
+  OS_CATALOG_TAG \
+  INSTALL_DEFAULTS_REF \
+  OS_ORAS_VERSION \
+  AIRGAP_PLATFORM_REPO \
+  AIRGAP_PLATFORM_ARCH \
+  AIRGAP_PLATFORM_CHANNEL \
+  AIRGAP_PLATFORM_REF \
+  AIRGAP_PLATFORM_DEFAULT_REF \
+  AIRGAP_PLATFORM_CATALOG_ENABLED \
+  AIRGAP_PLATFORM_CATALOG_TAG \
+  AIRGAP_PLATFORM_CHANNEL_STABLE_TAG \
+  AIRGAP_PLATFORM_CHANNEL_BETA_TAG \
+  AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG \
+  AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG; do
+  if grep -Eq "^${legacy_key}=" "${EXTRACTED_DEFAULTS}"; then
+    die "installer defaults must not contain legacy target-side artifact selection key: ${legacy_key}"
+  fi
+done
 
 cp "${EXTRACTED_DEFAULTS}" "${DEPLOY_DIR}/installer-defaults.extracted.env"
 cat > "${DEPLOY_DIR}/installer-defaults-smoke.txt" <<EOF
 ARTIFACT=$(basename "${ISO_FILE}")
 EXTRACTED_DEFAULTS=${DEPLOY_DIR}/installer-defaults.extracted.env
-OS_DEFAULT_REF=${OS_DEFAULT_REF}
-AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF-}
-AIRGAP_PLATFORM_DEFAULT_REF=${AIRGAP_PLATFORM_DEFAULT_REF}
-AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH}
-AIRGAP_PLATFORM_CATALOG_TAG=${AIRGAP_PLATFORM_CATALOG_TAG}
-INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF-}
+INSTALLER_ID=${INSTALLER_ID}
+INSTALLER_VERSION=${INSTALLER_VERSION}
+INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH}
+OURBOX_INSTALLER_SSH_MODE=${OURBOX_INSTALLER_SSH_MODE}
+OURBOX_INSTALLER_SSH_USER=${OURBOX_INSTALLER_SSH_USER}
+OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY=${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}
+OURBOX_INSTALLER_SSH_ALLOW_ROOT=${OURBOX_INSTALLER_SSH_ALLOW_ROOT}
+LEGACY_SELECTION_KEYS_PRESENT=0
 EOF
 
 log "Installer defaults smoke passed for $(basename "${ISO_FILE}")"
