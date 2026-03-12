@@ -15,6 +15,10 @@
 # OS cruft
 .DS_Store
 
+# Python cache
+__pycache__/
+*.pyc
+
 
 # installer-side artifact pull cache (populated at install time in live env)
 /installer/ourbox/rootfs/opt/ourbox/airgap/platform/manifests/*.yaml
