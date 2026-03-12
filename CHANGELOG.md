@@ -1,3 +1,11 @@
+## [0.10.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.0...v0.10.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* **installer:** tighten mission adapter validation ([4a02fa7](https://github.com/techofourown/img-ourbox-woodbox/commit/4a02fa7cc87cb7b4df5850c686beff07a055977f))
+* **publish:** keep strict metadata parseable ([27b1c2a](https://github.com/techofourown/img-ourbox-woodbox/commit/27b1c2ab866689c6cc58113b046d0cb03741e8bd))
+
 # [0.10.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.9.2...v0.10.0) (2026-03-12)
 
 
