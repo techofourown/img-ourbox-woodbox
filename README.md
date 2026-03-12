@@ -16,32 +16,27 @@ artifacts for Woodbox hardware.
 
 ## Quick start
 
-### Prepare and flash an installer USB (default: pull from registry)
+### Compose Woodbox mission media
+
+Woodbox mission media is now composed by the unified host-side installer repo,
+`sw-ourbox-installer`. This repo is no longer the operator front door for
+artifact selection or USB composition.
+
+Use the unified host-side composer, pointing it at this Woodbox repo as the
+target adapter/substrate source:
 
 ```bash
-git clone https://github.com/techofourown/img-ourbox-woodbox.git
-cd img-ourbox-woodbox
-./tools/prepare-installer-media.sh
+cd sw-ourbox-installer
+./tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox
 ```
 
-This pulls the official installer artifact from GHCR, flashes it to a USB disk you select, then:
+That flow resolves the selected OS payload and `airgap-platform` bundle on the
+trusted host, stages the exact bytes onto mission media, and produces a USB
+that installs fully offline on the target.
 
-1. Plug USB into Woodbox, boot from USB (UEFI boot menu)
-2. Installer prompts: OS disk, DATA disk, OS artifact (auto-resolved), hostname/username/password
-3. Type `INSTALL` to begin — runs unattended (~10–15 minutes)
-4. Machine powers off — remove USB, boot from NVMe
-
-The installer also attempts to prefer the installed OS for the next UEFI boot when possible, but
-removing the USB after poweroff is still the recommended operator flow.
-
-### Prepare a fully offline USB (local source build)
-
-```bash
-./tools/prepare-installer-media.sh --build-local
-```
-
-Builds the OS payload and installer ISO locally from source, then flashes. No network access
-required at install time.
+The helper at [tools/prepare-installer-media.sh](/techofourown/img-ourbox-woodbox/tools/prepare-installer-media.sh)
+now delegates to `sw-ourbox-installer`; it does not maintain a separate
+Woodbox-only operator flow.
 
 ## Operator runbook
 
@@ -77,11 +72,11 @@ Official artifacts are produced by organization-controlled build infrastructure 
 - Exp-labs promotion: GitHub Release `prereleased` via `.github/workflows/official-exp-labs.yml`
 - Heavy-build runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
 
-Official Woodbox installer builds publish the OS payload first and then bake that exact pinned
-OS payload ref into the installer defaults, so the published installer and its default install
-target stay on the same lane.
-Candidate builds consume the pinned refs in `release/official-inputs.env`; scheduled nightly
-integration builds resolve the latest `sw-ourbox-os` `edge` digests at workflow time.
+Official Woodbox builds still publish the OS payload first and also publish a
+bootable installer substrate artifact for host-side composition workflows.
+Candidate builds consume the pinned refs in `release/official-inputs.env`;
+scheduled nightly integration builds resolve the latest `sw-ourbox-os`
+nightly/platform inputs at workflow time.
 
 ## Documentation
 

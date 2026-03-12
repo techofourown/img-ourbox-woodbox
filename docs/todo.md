@@ -10,63 +10,12 @@ must never destructively modify any disk without explicit operator confirmation.
 (This is now implemented via the pre-installer UI. Keep this note as a reminder
 not to regress toward silent/automated installs without confirmation gates.)
 
-## TODO: Username and password should be prompted on the Woodbox, not on the build host
+## Resolved: Identity stays on the Woodbox, not on the host
 
-Currently `prepare-installer-media.sh` prompts for hostname, username, and
-password before building the ISO. This bakes identity into the installer media,
-which means a USB stick prepared for Bob can't safely be handed to Alice.
-
-We want the USB to be identity-neutral: one stick, many users.
-
-Desired behaviour:
-- Remove the username/password prompt from the build step entirely.
-- Identity (username, password) should only be collected when the installer
-  actually runs on the Woodbox — i.e. as part of the autoinstall flow on the
-  target machine, not on the build host.
-- Reconsider whether a default username should be offered at all (it
-  pre-fills an answer that the user on the Woodbox should own).
-- Hostname might still be build-time if it's meant to be baked in, but
-  username/password definitely should not be.
-
-Not a blocker for first successful Woodbox install. Park until then.
-
-### Trade-off analysis (expanded)
-
-The core tension is between two UX models:
-
-**Option A — Identity at USB build time (current behaviour)**
-- User enters username/password on their build machine when running `prepare-installer-media.sh`
-- Advantage: the Woodbox install can be fully non-interactive — plug in USB, boot, walk away
-- Advantage: no keyboard or monitor required on the Woodbox (except possibly to set boot order in UEFI/firmware, but that's not our problem — it's a one-time UEFI thing, not an OS installer thing)
-- Disadvantage: identity is baked into the USB stick; you can't hand the same stick to someone else or ship a product image that works for all customers
-
-**Option B — Identity at install time (on the Woodbox)**
-- Username/password are collected when the autoinstall runs on the target machine
-- Advantage: USB stick is identity-neutral; same stick works for any user; shippable as a product
-- Disadvantage: requires a keyboard and monitor plugged into the Woodbox at install time — the only moment in the whole workflow where that's needed, which feels like a heavy ask
-
-**Preferred direction — offer a choice at build time**
-
-Add a prompt to `prepare-installer-media.sh` that asks:
-
-  "Set username/password now (fully hands-free install on Woodbox, but
-   this USB is personalised to you), or defer identity to the Woodbox
-   install (USB is shareable/shippable, but requires keyboard + monitor
-   on the target)?"
-
-If the user chooses now: behave as today (bake credentials into autoinstall).
-If the user chooses defer: omit credentials from the autoinstall seed; the
-installer must pause and prompt for identity interactively on the Woodbox.
-
-Notes:
-- "Might not need keyboard/monitor" caveat: even with Option A, the user may
-  need to enter UEFI to change boot order the first time. That's firmware, not
-  our installer — mention it, but don't overstate it.
-- Hostname is a separate question. It could reasonably stay build-time (baked
-  in) even when credentials are deferred, or it could also be deferred. Decide
-  separately.
-- For a shippable product (many customers, one image), Option B / defer is
-  almost certainly the right default. Option A is a power-user convenience.
+The unified host-side mission composer no longer personalizes Woodbox install
+media with end-user identity. Hostname, username, and password are collected on
+the Woodbox during `ourbox-preinstall`, so mission media stays identity-neutral
+and safe to hand between operators.
 
 ## TODO: USB stick mount lifecycle management
 

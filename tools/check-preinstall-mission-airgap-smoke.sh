@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "${TMP}"' EXIT
+
+FIXTURE_ROOT="${TMP}/repo"
+TOOLS_DIR="${FIXTURE_ROOT}/tools"
+PREINSTALL_DIR="${FIXTURE_ROOT}/installer/ourbox-preinstall"
+MISSION_ROOT="${TMP}/cdrom/ourbox/mission"
+PAYLOAD_DIR="${TMP}/cache/payload"
+OVERRIDE_DIR="${TMP}/cache/airgap-platform-override"
+MISSION_AIRGAP_DIR="${MISSION_ROOT}/artifacts/airgap"
+MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
+SOURCE_BUNDLE_DIR="${TMP}/source-airgap"
+
+mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${PAYLOAD_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
+
+cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
+cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
+cp "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" "${PREINSTALL_DIR}/ourbox-preinstall"
+
+# shellcheck disable=SC1091
+OURBOX_PREINSTALL_LIBRARY_ONLY=1 \
+OURBOX_PREINSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
+  source "${PREINSTALL_DIR}/ourbox-preinstall"
+
+MISSION_DIR="${MISSION_ROOT}"
+MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
+PAYLOAD_CACHE_DIR="${PAYLOAD_DIR}"
+AIRGAP_PLATFORM_OVERRIDE_DIR="${OVERRIDE_DIR}"
+
+PLATFORM_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+BAKED_AIRGAP_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+MISSION_AIRGAP_DIGEST="sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+
+cat > "${PAYLOAD_CACHE_DIR}/payload.meta.env" <<EOF
+OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_DIGEST}
+OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@${BAKED_AIRGAP_DIGEST}
+OURBOX_AIRGAP_PLATFORM_DIGEST=${BAKED_AIRGAP_DIGEST}
+OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/example/sw-ourbox-os
+OURBOX_AIRGAP_PLATFORM_REVISION=baked-revision
+OURBOX_AIRGAP_PLATFORM_VERSION=v0.0.0-baked
+OURBOX_AIRGAP_PLATFORM_CREATED=2026-03-12T00:00:00Z
+OURBOX_AIRGAP_PLATFORM_ARCH=amd64
+OURBOX_AIRGAP_PLATFORM_PROFILE=demo-apps
+OURBOX_AIRGAP_PLATFORM_K3S_VERSION=v1.35.0+k3s1
+OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+EOF
+
+cat > "${SOURCE_BUNDLE_DIR}/manifest.env" <<EOF
+OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/example/sw-ourbox-os
+OURBOX_AIRGAP_PLATFORM_REVISION=mission-revision
+OURBOX_AIRGAP_PLATFORM_VERSION=v0.0.0-mission
+OURBOX_AIRGAP_PLATFORM_CREATED=2026-03-12T00:10:00Z
+OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_DIGEST}
+AIRGAP_PLATFORM_ARCH=amd64
+K3S_VERSION=v1.35.0+k3s1
+OURBOX_PLATFORM_PROFILE=demo-apps
+OURBOX_PLATFORM_IMAGES_LOCK_PATH=platform/images.lock.json
+OURBOX_PLATFORM_IMAGES_LOCK_SHA256=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+EOF
+
+printf '#!/bin/sh\nexit 0\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s"
+chmod +x "${SOURCE_BUNDLE_DIR}/k3s/k3s"
+printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-airgap-images-amd64.tar"
+printf '{"images":[]}\n' > "${SOURCE_BUNDLE_DIR}/platform/images.lock.json"
+printf 'PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
+printf 'fixture image tar\n' > "${SOURCE_BUNDLE_DIR}/platform/images/platform-demo.tar"
+
+tar -C "${SOURCE_BUNDLE_DIR}" -czf "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" k3s platform manifest.env
+sha256sum "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" | awk '{print $1"  airgap-platform.tar.gz"}' > "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz.sha256"
+cp "${SOURCE_BUNDLE_DIR}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
+
+printf 'fixture os payload\n' > "${MISSION_OS_DIR}/os-payload.tar.gz"
+printf 'OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1\n' > "${MISSION_OS_DIR}/os.meta.env"
+
+cat > "${MISSION_MANIFEST}" <<EOF
+{
+  "schema": 1,
+  "kind": "ourbox-mission",
+  "target": {
+    "id": "woodbox",
+    "media_kind": "installer-usb"
+  },
+  "operator_mode": {
+    "mode": "install",
+    "prompt_hostname_on_target": true,
+    "prompt_identity_on_target": true
+  },
+  "selected_os": {
+    "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@${MISSION_AIRGAP_DIGEST}",
+    "artifact_digest": "${MISSION_AIRGAP_DIGEST}",
+    "selection_source": "catalog",
+    "release_channel": "stable",
+    "platform_contract_digest": "${PLATFORM_DIGEST}",
+    "payload": {
+      "relpath": "artifacts/os/os-payload.tar.gz",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "size_bytes": 18
+    },
+    "metadata_relpath": "artifacts/os/os.meta.env"
+  },
+  "selected_airgap": {
+    "artifact_ref": "ghcr.io/example/airgap-platform@${MISSION_AIRGAP_DIGEST}",
+    "artifact_digest": "${MISSION_AIRGAP_DIGEST}",
+    "selection_source": "catalog",
+    "release_channel": "stable",
+    "platform_contract_digest": "${PLATFORM_DIGEST}",
+    "arch": "amd64",
+    "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
+    "manifest_relpath": "artifacts/airgap/manifest.env",
+    "present_in_selected_os_payload": false
+  }
+}
+EOF
+
+load_selected_payload_airgap_metadata
+[[ "${MISSION_PRESENT}" == "1" ]] || {
+  echo "expected embedded mission metadata to be loaded" >&2
+  exit 1
+}
+[[ "${OS_ARTIFACT_SOURCE}" == "mission" ]] || {
+  echo "expected OS artifact source to switch to mission provenance" >&2
+  exit 1
+}
+[[ "${OS_ARTIFACT_REF}" == "ghcr.io/example/ourbox-woodbox-os@${MISSION_AIRGAP_DIGEST}" ]] || {
+  echo "unexpected mission OS artifact ref: ${OS_ARTIFACT_REF}" >&2
+  exit 1
+}
+
+prepare_selected_airgap_platform_bundle
+[[ "${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE}" == "mission" ]] || {
+  echo "expected mission-local airgap override source, got ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE}" >&2
+  exit 1
+}
+[[ "${OURBOX_AIRGAP_PLATFORM_REF}" == "ghcr.io/example/airgap-platform@${MISSION_AIRGAP_DIGEST}" ]] || {
+  echo "unexpected mission airgap ref: ${OURBOX_AIRGAP_PLATFORM_REF}" >&2
+  exit 1
+}
+[[ -x "${AIRGAP_PLATFORM_OVERRIDE_DIR}/k3s/k3s" ]] || {
+  echo "mission airgap bundle was not extracted into override dir" >&2
+  exit 1
+}
+[[ -f "${AIRGAP_PLATFORM_OVERRIDE_DIR}/platform/images/platform-demo.tar" ]] || {
+  echo "mission airgap platform image tar missing from override dir" >&2
+  exit 1
+}
+
+printf '[%s] Woodbox preinstall mission-airgap smoke passed\n' "$(date -Is)"

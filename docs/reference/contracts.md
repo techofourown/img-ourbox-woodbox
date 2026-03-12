@@ -32,12 +32,10 @@ Fields appended at install time (by autoinstall late-commands):
 - `OURBOX_INSTALLER_ID`
 - `OURBOX_INSTALLER_VERSION`
 - `OURBOX_INSTALLER_GIT_HASH`
-- `OURBOX_OS_ARTIFACT_SOURCE` (`registry` or `embedded`)
+- `OURBOX_OS_ARTIFACT_SOURCE`
 - `OURBOX_OS_ARTIFACT_REF`
 - `OURBOX_OS_ARTIFACT_DIGEST`
 - `OURBOX_OS_IMAGE_SHA256`
-- `OURBOX_INSTALL_DEFAULTS_SOURCE`
-- `OURBOX_INSTALL_DEFAULTS_REF`
 - `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
 
@@ -82,25 +80,30 @@ This is where higher-level stacks store persistent state:
 
 ## Contract: Installer flow
 
-### Thin ISO (default)
+Mission media is now the only supported Woodbox install path.
 
-1. Operator boots USB installer on Woodbox
-2. `ourbox-preinstall` loads baked defaults (`/cdrom/ourbox/installer/defaults.env`)
-   - shared selection policy comes from `/cdrom/ourbox/tools/installer-selection-resolver.sh`
+Mission media contains:
+
+- installer substrate
+- embedded OS payload
+- embedded mission manifest
+- embedded selected `airgap-platform` bundle
+
+Install flow:
+
+1. Operator boots Woodbox mission media
+2. `ourbox-preinstall` loads installer-local defaults (`/cdrom/ourbox/installer/defaults.env`)
    - shared installer SSH mode/user/root/auth semantics come from the vendored helper at `/cdrom/ourbox/tools/installer-ssh-helper.sh`, which realizes the upstream installer SSH contract from `sw-ourbox-os`
 3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
-4. `ourbox-preinstall` pulls OS payload from registry via ORAS to `/opt/ourbox/installer/cache/payload/`
-5. Operator confirms disk selection, identity, and INSTALL
-6. Autoinstall late-commands extract the OS payload to `/target/`
+4. `ourbox-preinstall` stages the embedded OS payload into `/opt/ourbox/installer/cache/payload/`
+5. `ourbox-preinstall` reads mission-selected OS and `airgap-platform` provenance from the embedded mission manifest
+6. Operator confirms disk selection, identity, and `INSTALL`
+7. Autoinstall late-commands extract the staged OS payload to `/target/`
 
-After a successful install, the late-commands attempt to prefer the installed OS for the next and
-future UEFI boots. The operator should still remove the USB after poweroff, but first boot should
-not depend solely on that manual step.
+The target does not browse catalogs, resolve refs, or pull artifacts during install.
 
-### Fat ISO (`--embed-payload`)
-
-Same flow, except step 3 uses an embedded `os-payload.tar.gz` from `/cdrom/ourbox/payload/`
-instead of a registry pull. No network access required.
+Installer substrate artifacts may still exist as host-composition inputs, but they are not a
+supported standalone install path.
 
 ### Payload cache path
 
@@ -114,14 +117,6 @@ instead of a registry pull. No network access required.
 
 Key variables:
 - `INSTALLER_ID` (woodbox)
-- `OS_REPO` (`ghcr.io/techofourown/ourbox-woodbox-os`)
-- `OS_TARGET` (`x86`)
-- `OS_CHANNEL` (`stable`)
-- `OS_DEFAULT_REF` (optional pinned default)
-- `OS_CATALOG_ENABLED` (`1`)
-- `OS_CATALOG_TAG` (`x86-catalog`)
-- `INSTALL_DEFAULTS_REF` (optional remote install-defaults bundle)
-- `OS_ORAS_VERSION`
 - `INSTALLER_VERSION`
 - `INSTALLER_GIT_HASH`
 - `OURBOX_INSTALLER_SSH_MODE`
@@ -135,7 +130,7 @@ Woodbox keeps live-installer password generation, `/run/ourbox-installer-ssh-sta
 `/run/ourbox-installer-ssh-password.txt`, and monitor output as repo-local behavior layered on top
 of that shared upstream SSH contract.
 
-### OS payload artifact files (oras pull)
+### OS payload artifact files
 
 - Type: `application/vnd.techofourown.ourbox.woodbox.os-payload.v1`
 - Required files:

@@ -9,6 +9,7 @@ need_cmd tar
 need_cmd oras
 need_cmd find
 need_cmd grep
+need_cmd python3
 
 ref_repo_base() {
   local ref="$1"
@@ -47,44 +48,67 @@ write_selected_bundle_metadata() {
   local selected_pinned_ref="$2"
   local selected_digest="$3"
   local manifest="${OUT}/manifest.env"
-  local OURBOX_AIRGAP_PLATFORM_SOURCE=""
-  local OURBOX_AIRGAP_PLATFORM_REVISION=""
-  local OURBOX_AIRGAP_PLATFORM_VERSION=""
-  local OURBOX_AIRGAP_PLATFORM_CREATED=""
-  local OURBOX_PLATFORM_CONTRACT_REF=""
-  local OURBOX_PLATFORM_CONTRACT_DIGEST=""
-  local AIRGAP_PLATFORM_ARCH=""
-  local K3S_VERSION=""
-  local OURBOX_PLATFORM_PROFILE=""
-  local OURBOX_PLATFORM_IMAGES_LOCK_SHA256=""
+  local strict_metadata_parser="${ROOT}/tools/strict-kv-metadata.py"
+  local manifest_dump=""
+  local -a manifest_fields=()
 
   [[ -f "${manifest}" ]] || die "missing manifest.env in ${OUT}"
-  # shellcheck disable=SC1090
-  source "${manifest}"
+  [[ -f "${strict_metadata_parser}" ]] || die "strict metadata parser not found: ${strict_metadata_parser}"
+  manifest_dump="$(
+    python3 "${strict_metadata_parser}" "${manifest}" \
+      --allow OURBOX_AIRGAP_PLATFORM_SCHEMA \
+      --allow OURBOX_AIRGAP_PLATFORM_KIND \
+      --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
+      --allow OURBOX_AIRGAP_PLATFORM_REVISION \
+      --allow OURBOX_AIRGAP_PLATFORM_VERSION \
+      --allow OURBOX_AIRGAP_PLATFORM_CREATED \
+      --allow OURBOX_PLATFORM_CONTRACT_REF \
+      --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
+      --allow AIRGAP_PLATFORM_ARCH \
+      --allow K3S_VERSION \
+      --allow OURBOX_PLATFORM_PROFILE \
+      --allow OURBOX_PLATFORM_IMAGES_LOCK_PATH \
+      --allow OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
+      --require OURBOX_AIRGAP_PLATFORM_SOURCE \
+      --require OURBOX_AIRGAP_PLATFORM_REVISION \
+      --require OURBOX_AIRGAP_PLATFORM_VERSION \
+      --require OURBOX_AIRGAP_PLATFORM_CREATED \
+      --require OURBOX_PLATFORM_CONTRACT_DIGEST \
+      --require AIRGAP_PLATFORM_ARCH \
+      --require K3S_VERSION \
+      --require OURBOX_PLATFORM_PROFILE \
+      --require OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
+      --print OURBOX_AIRGAP_PLATFORM_SOURCE \
+      --print OURBOX_AIRGAP_PLATFORM_REVISION \
+      --print OURBOX_AIRGAP_PLATFORM_VERSION \
+      --print OURBOX_AIRGAP_PLATFORM_CREATED \
+      --print OURBOX_PLATFORM_CONTRACT_REF \
+      --print OURBOX_PLATFORM_CONTRACT_DIGEST \
+      --print AIRGAP_PLATFORM_ARCH \
+      --print K3S_VERSION \
+      --print OURBOX_PLATFORM_PROFILE \
+      --print OURBOX_PLATFORM_IMAGES_LOCK_SHA256
+  )"
+  mapfile -t manifest_fields <<<"${manifest_dump}"
+  [[ "${#manifest_fields[@]}" -eq 10 ]] || die "failed to parse ${manifest}"
 
-  [[ "${AIRGAP_PLATFORM_ARCH}" == "amd64" ]] || die "airgap-platform arch mismatch: expected amd64, got ${AIRGAP_PLATFORM_ARCH:-unknown}"
-  [[ "${OURBOX_PLATFORM_CONTRACT_DIGEST}" == "${expected_contract_digest}" ]] || die "airgap-platform contract digest mismatch: expected ${expected_contract_digest}, got ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
-  [[ -n "${OURBOX_AIRGAP_PLATFORM_SOURCE}" ]] || die "airgap-platform manifest missing OURBOX_AIRGAP_PLATFORM_SOURCE"
-  [[ -n "${OURBOX_AIRGAP_PLATFORM_REVISION}" ]] || die "airgap-platform manifest missing OURBOX_AIRGAP_PLATFORM_REVISION"
-  [[ -n "${OURBOX_AIRGAP_PLATFORM_VERSION}" ]] || die "airgap-platform manifest missing OURBOX_AIRGAP_PLATFORM_VERSION"
-  [[ -n "${OURBOX_AIRGAP_PLATFORM_CREATED}" ]] || die "airgap-platform manifest missing OURBOX_AIRGAP_PLATFORM_CREATED"
-  [[ -n "${K3S_VERSION}" ]] || die "airgap-platform manifest missing K3S_VERSION"
-  [[ -n "${OURBOX_PLATFORM_PROFILE}" ]] || die "airgap-platform manifest missing OURBOX_PLATFORM_PROFILE"
-  [[ "${OURBOX_PLATFORM_IMAGES_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "airgap-platform manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
+  [[ "${manifest_fields[6]}" == "amd64" ]] || die "airgap-platform arch mismatch: expected amd64, got ${manifest_fields[6]:-unknown}"
+  [[ "${manifest_fields[5]}" == "${expected_contract_digest}" ]] || die "airgap-platform contract digest mismatch: expected ${expected_contract_digest}, got ${manifest_fields[5]:-unknown}"
+  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "airgap-platform manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
 
   cat > "${OUT}/selected-bundle.env" <<EOF
 OURBOX_AIRGAP_PLATFORM_REF=${selected_pinned_ref}
 OURBOX_AIRGAP_PLATFORM_DIGEST=${selected_digest}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE}
-OURBOX_AIRGAP_PLATFORM_REVISION=${OURBOX_AIRGAP_PLATFORM_REVISION}
-OURBOX_AIRGAP_PLATFORM_VERSION=${OURBOX_AIRGAP_PLATFORM_VERSION}
-OURBOX_AIRGAP_PLATFORM_CREATED=${OURBOX_AIRGAP_PLATFORM_CREATED}
-OURBOX_AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${OURBOX_PLATFORM_PROFILE}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${K3S_VERSION}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${OURBOX_PLATFORM_IMAGES_LOCK_SHA256}
-OURBOX_PLATFORM_CONTRACT_REF=${OURBOX_PLATFORM_CONTRACT_REF}
-OURBOX_PLATFORM_CONTRACT_DIGEST=${OURBOX_PLATFORM_CONTRACT_DIGEST}
+OURBOX_AIRGAP_PLATFORM_SOURCE=${manifest_fields[0]}
+OURBOX_AIRGAP_PLATFORM_REVISION=${manifest_fields[1]}
+OURBOX_AIRGAP_PLATFORM_VERSION=${manifest_fields[2]}
+OURBOX_AIRGAP_PLATFORM_CREATED=${manifest_fields[3]}
+OURBOX_AIRGAP_PLATFORM_ARCH=${manifest_fields[6]}
+OURBOX_AIRGAP_PLATFORM_PROFILE=${manifest_fields[8]}
+OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${manifest_fields[7]}
+OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${manifest_fields[9]}
+OURBOX_PLATFORM_CONTRACT_REF=${manifest_fields[4]}
+OURBOX_PLATFORM_CONTRACT_DIGEST=${manifest_fields[5]}
 EOF
 }
 

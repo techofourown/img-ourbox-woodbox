@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # Build the OurBox Woodbox installer ISO.
 #
-# The installer ISO is a thin installer: it contains the installer tooling,
-# ORAS binary (for artifact pulls at install time), and local fallback defaults.
-# It does NOT embed the full OS payload by default — the payload is resolved
-# and pulled at install time by ourbox-preinstall.
+# This script now produces one of two objects:
+# - installer substrate: the target-owned boot/install runtime with no mission bytes
+# - mission media: substrate plus an embedded OS payload and mission directory
 #
-# For fully local/offline builds (--build-local mode), a local OS payload
-# tarball can be baked into the ISO for offline operation. In that case the
-# preinstaller detects the local payload and uses it directly, applying the
-# same verification flow.
+# The supported install path is mission media only. A substrate-only ISO remains
+# useful as a host-composition input, but it is not a standalone install path.
 #
 # Flags:
-#   --embed-payload PATH  Embed the specified OS payload tar.gz into the ISO
-#                         (for offline/local-build operation).
+#   --embed-payload PATH      Embed the specified OS payload tar.gz into the ISO
+#                             as part of a composed mission medium.
+#   --embed-payload-meta PATH Embed the metadata sidecar that must land at
+#                             /cdrom/ourbox/payload/payload.meta.env.
+#   --embed-mission-dir PATH  Copy a prepared mission directory into
+#                             /cdrom/ourbox/mission/ inside the ISO.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,27 +26,6 @@ source "${ROOT}/tools/installer-ssh-helper.sh"
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
-# shellcheck disable=SC1091
-# Official pinned inputs take precedence over versions.env defaults.
-CALLER_AIRGAP_PLATFORM_REF_SET="${AIRGAP_PLATFORM_REF+x}"
-CALLER_AIRGAP_PLATFORM_REF_VALUE="${AIRGAP_PLATFORM_REF-}"
-CALLER_AIRGAP_PLATFORM_DEFAULT_REF_SET="${AIRGAP_PLATFORM_DEFAULT_REF+x}"
-CALLER_AIRGAP_PLATFORM_DEFAULT_REF_VALUE="${AIRGAP_PLATFORM_DEFAULT_REF-}"
-
-OFFICIAL_INPUTS_ENV="${ROOT}/release/official-inputs.env"
-OFFICIAL_AIRGAP_PLATFORM_REF=""
-if [[ -f "${OFFICIAL_INPUTS_ENV}" ]]; then
-  # shellcheck disable=SC1090
-  source "${OFFICIAL_INPUTS_ENV}"
-  OFFICIAL_AIRGAP_PLATFORM_REF="${AIRGAP_PLATFORM_REF:-}"
-  if [[ -n "${CALLER_AIRGAP_PLATFORM_REF_SET}" ]]; then
-    AIRGAP_PLATFORM_REF="${CALLER_AIRGAP_PLATFORM_REF_VALUE}"
-  fi
-  if [[ -n "${CALLER_AIRGAP_PLATFORM_DEFAULT_REF_SET}" ]]; then
-    AIRGAP_PLATFORM_DEFAULT_REF="${CALLER_AIRGAP_PLATFORM_DEFAULT_REF_VALUE}"
-  fi
-fi
-
 need_cmd curl
 need_cmd xorriso
 need_cmd 7z
@@ -57,22 +37,8 @@ need_cmd awk
 need_cmd bash
 
 EMBED_PAYLOAD=""
-# OS_CHANNEL controls the default channel baked into the installer defaults.
-# For nightly installer builds, set OS_CHANNEL=nightly so that the baked
-# fallback points at the nightly OS lane rather than stable.
-: "${OS_CHANNEL:=stable}"
-: "${OS_DEFAULT_REF:=}"
-: "${AIRGAP_PLATFORM_REPO:=ghcr.io/techofourown/sw-ourbox-os/airgap-platform}"
-: "${AIRGAP_PLATFORM_ARCH:=amd64}"
-: "${AIRGAP_PLATFORM_CHANNEL:=stable}"
-: "${AIRGAP_PLATFORM_REF:=}"
-: "${AIRGAP_PLATFORM_DEFAULT_REF:=}"
-: "${AIRGAP_PLATFORM_CATALOG_ENABLED:=1}"
-: "${AIRGAP_PLATFORM_CATALOG_TAG:=catalog-${AIRGAP_PLATFORM_ARCH}}"
-: "${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG:=stable-${AIRGAP_PLATFORM_ARCH}}"
-: "${AIRGAP_PLATFORM_CHANNEL_BETA_TAG:=beta-${AIRGAP_PLATFORM_ARCH}}"
-: "${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG:=nightly-${AIRGAP_PLATFORM_ARCH}}"
-: "${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG:=exp-labs-${AIRGAP_PLATFORM_ARCH}}"
+EMBED_PAYLOAD_META=""
+EMBED_MISSION_DIR=""
 : "${OURBOX_VARIANT:=prod}"
 : "${DEFAULT_INSTALLER_SSH_MODE:=both}"
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
@@ -91,9 +57,14 @@ while [[ $# -gt 0 ]]; do
       EMBED_PAYLOAD="$2"
       shift 2
       ;;
-    --os-channel)
-      [[ $# -ge 2 ]] || die "--os-channel requires a value"
-      OS_CHANNEL="$2"
+    --embed-payload-meta)
+      [[ $# -ge 2 ]] || die "--embed-payload-meta requires a path"
+      EMBED_PAYLOAD_META="$2"
+      shift 2
+      ;;
+    --embed-mission-dir)
+      [[ $# -ge 2 ]] || die "--embed-mission-dir requires a path"
+      EMBED_MISSION_DIR="$2"
       shift 2
       ;;
     *)
@@ -101,13 +72,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-if [[ -z "${CALLER_AIRGAP_PLATFORM_REF_SET}" && -n "${OFFICIAL_AIRGAP_PLATFORM_REF}" && -n "${AIRGAP_PLATFORM_REF}" && "${AIRGAP_PLATFORM_REF}" == "${OFFICIAL_AIRGAP_PLATFORM_REF}" ]]; then
-  if [[ -z "${AIRGAP_PLATFORM_DEFAULT_REF}" ]]; then
-    AIRGAP_PLATFORM_DEFAULT_REF="${AIRGAP_PLATFORM_REF}"
-  fi
-  AIRGAP_PLATFORM_REF=""
-fi
 
 ourbox_installer_ssh_normalize_inputs
 ourbox_installer_ssh_validate_requested_posture
@@ -126,7 +90,40 @@ fi
 
 if [[ -n "${EMBED_PAYLOAD}" ]]; then
   [[ -f "${EMBED_PAYLOAD}" ]] || die "embedded payload not found: ${EMBED_PAYLOAD}"
-  log "Local-build mode: embedding OS payload from ${EMBED_PAYLOAD}"
+fi
+
+if [[ -n "${EMBED_PAYLOAD_META}" ]]; then
+  [[ -f "${EMBED_PAYLOAD_META}" ]] || die "embedded payload metadata not found: ${EMBED_PAYLOAD_META}"
+fi
+
+if [[ -n "${EMBED_MISSION_DIR}" ]]; then
+  [[ -d "${EMBED_MISSION_DIR}" ]] || die "embedded mission dir not found: ${EMBED_MISSION_DIR}"
+  [[ -f "${EMBED_MISSION_DIR}/mission-manifest.json" ]] \
+    || die "embedded mission dir is missing mission-manifest.json: ${EMBED_MISSION_DIR}"
+fi
+
+if [[ -n "${EMBED_PAYLOAD}" && -z "${EMBED_MISSION_DIR}" ]]; then
+  die "--embed-payload requires --embed-mission-dir for a supported Woodbox mission medium"
+fi
+
+if [[ -n "${EMBED_PAYLOAD}" && -z "${EMBED_PAYLOAD_META}" ]]; then
+  die "--embed-payload requires --embed-payload-meta for a supported Woodbox mission medium"
+fi
+
+if [[ -z "${EMBED_PAYLOAD}" && -n "${EMBED_PAYLOAD_META}" ]]; then
+  die "--embed-payload-meta requires --embed-payload for a supported Woodbox mission medium"
+fi
+
+if [[ -z "${EMBED_PAYLOAD}" && -n "${EMBED_MISSION_DIR}" ]]; then
+  die "--embed-mission-dir requires --embed-payload for a supported Woodbox mission medium"
+fi
+
+if [[ -n "${EMBED_PAYLOAD}" ]]; then
+  log "Embedding mission payload from ${EMBED_PAYLOAD}"
+  log "Embedding mission payload metadata from ${EMBED_PAYLOAD_META}"
+  log "Embedding mission directory from ${EMBED_MISSION_DIR}"
+else
+  log "Building installer substrate only (no mission bytes embedded)"
 fi
 
 mkdir -p "${ROOT}/deploy" "${ROOT}/artifacts"
@@ -222,12 +219,12 @@ log "Staging OurBox pre-installer assets"
 mkdir -p "${ISO_DIR}/ourbox/tools"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall"
-install -m 0644 "${ROOT}/tools/installer-selection-resolver.sh" \
-  "${ISO_DIR}/ourbox/tools/installer-selection-resolver.sh"
 install -m 0644 "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall.service" \
   "${ISO_DIR}/ourbox/tools/ourbox-preinstall.service"
 install -m 0644 "${ROOT}/tools/lib.sh" \
   "${ISO_DIR}/ourbox/tools/lib.sh"
+install -m 0755 "${ROOT}/tools/strict-kv-metadata.py" \
+  "${ISO_DIR}/ourbox/tools/strict-kv-metadata.py"
 install -m 0644 "${ROOT}/tools/installer-ssh-helper.sh" \
   "${ISO_DIR}/ourbox/tools/installer-ssh-helper.sh"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/format-data-disk.sh" \
@@ -237,90 +234,17 @@ install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-monitor.py
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh" \
   "${ISO_DIR}/ourbox/tools/ourbox-installer-ssh-bootstrap.sh"
 
-# Bundle the linux-amd64 ORAS binary for use at install time (offline-capable).
-# Always download the target-arch binary explicitly — never copy the host oras
-# binary, which may be arm64 if building on a non-x86 host.
-log "Bundling linux-amd64 ORAS binary into installer"
-: "${ORAS_VERSION:=1.3.0}"
-ORAS_BASE_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}"
-ORAS_TARBALL="oras_${ORAS_VERSION}_linux_amd64.tar.gz"
-ORAS_TMP="${WORKDIR}/oras-download"
-mkdir -p "${ORAS_TMP}"
-log "  Downloading ORAS ${ORAS_VERSION} linux-amd64"
-curl -fsSL --retry 3 --retry-delay 2 \
-  -o "${ORAS_TMP}/${ORAS_TARBALL}" \
-  "${ORAS_BASE_URL}/${ORAS_TARBALL}"
-log "  Verifying ORAS ${ORAS_VERSION} checksum"
-curl -fsSL --retry 3 --retry-delay 2 \
-  -o "${ORAS_TMP}/checksums.txt" \
-  "${ORAS_BASE_URL}/oras_${ORAS_VERSION}_checksums.txt"
-ORAS_EXPECTED_SHA="$(grep " ${ORAS_TARBALL}\$" "${ORAS_TMP}/checksums.txt" | awk '{print $1}')"
-[[ -n "${ORAS_EXPECTED_SHA}" ]] || die "oras checksum not found in checksums.txt for ${ORAS_TARBALL}"
-ORAS_ACTUAL_SHA="$(sha256sum "${ORAS_TMP}/${ORAS_TARBALL}" | awk '{print $1}')"
-if [[ "${ORAS_EXPECTED_SHA}" != "${ORAS_ACTUAL_SHA}" ]]; then
-  die "ORAS binary checksum mismatch
-  Expected: ${ORAS_EXPECTED_SHA}
-  Actual:   ${ORAS_ACTUAL_SHA}
-  File:     ${ORAS_TMP}/${ORAS_TARBALL}"
-fi
-log "  ORAS checksum verified: ${ORAS_ACTUAL_SHA}"
-tar -xzf "${ORAS_TMP}/${ORAS_TARBALL}" -C "${ORAS_TMP}" oras
-[[ -f "${ORAS_TMP}/oras" ]] || die "oras binary not found after extraction"
-install -m 0755 "${ORAS_TMP}/oras" "${ISO_DIR}/ourbox/tools/oras"
-log "  oras: ${ORAS_VERSION} linux-amd64 bundled and verified"
-
-# Stage installer defaults (baked fallback for offline operation)
+# Stage installer defaults (installer identity, SSH posture, and monitor settings)
 log "Staging installer defaults"
 mkdir -p "${ISO_DIR}/ourbox/installer"
 
 OURBOX_RECIPE_GIT_HASH="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 
-# Build the baked defaults.env for the installer.
-# This is the local fallback loaded by ourbox-preinstall when the remote
-# install-defaults bundle cannot be fetched (offline/degraded-network mode).
-# OS_CHANNEL must reflect the build context: stable for release, nightly for
-# nightly builds (so the baked fallback points at the correct OS lane).
-#
-# INSTALL_DEFAULTS_REF resolution:
-#   1. INSTALL_DEFAULTS_REF env var (set in release/official-inputs.env or by caller)
-#   2. contracts/install-defaults.ref legacy fallback
-#   3. empty (no remote defaults bundle configured)
-INSTALL_DEFAULTS_REF_BAKED="${INSTALL_DEFAULTS_REF:-}"
-if [[ -z "${INSTALL_DEFAULTS_REF+x}" && -z "${INSTALL_DEFAULTS_REF_BAKED}" ]]; then
-  _idr_file="${ROOT}/contracts/install-defaults.ref"
-  if [[ -f "${_idr_file}" ]]; then
-    # Read first non-comment non-blank line
-    _idr_val="$(grep -v '^[[:space:]]*#' "${_idr_file}" | grep -v '^[[:space:]]*$' | head -n1 || true)"
-    INSTALL_DEFAULTS_REF_BAKED="${_idr_val:-}"
-    unset _idr_val
-  fi
-  unset _idr_file
-fi
 cat > "${ISO_DIR}/ourbox/installer/defaults.env" <<EOT
-# OurBox Woodbox installer baked defaults.
-# Remote install-defaults (INSTALL_DEFAULTS_REF) override these at install time
-# if the registry is reachable. This file is the offline/no-network fallback for
-# both OS payload and airgap-platform discovery.
+# OurBox Woodbox installer local defaults.
+# This file carries only installer-local posture. Artifact selection and staging
+# happen on the trusted host before mission media is composed.
 INSTALLER_ID=woodbox
-OS_REPO=${OFFICIAL_OS_REPO:-ghcr.io/techofourown/ourbox-woodbox-os}
-OS_TARGET=${OURBOX_TARGET}
-OS_CHANNEL=${OS_CHANNEL}
-OS_DEFAULT_REF=${OS_DEFAULT_REF}
-OS_CATALOG_ENABLED=1
-OS_CATALOG_TAG=${OURBOX_TARGET}-catalog
-AIRGAP_PLATFORM_REPO=${AIRGAP_PLATFORM_REPO}
-AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH}
-AIRGAP_PLATFORM_CHANNEL=${AIRGAP_PLATFORM_CHANNEL}
-AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF}
-AIRGAP_PLATFORM_DEFAULT_REF=${AIRGAP_PLATFORM_DEFAULT_REF}
-AIRGAP_PLATFORM_CATALOG_ENABLED=${AIRGAP_PLATFORM_CATALOG_ENABLED}
-AIRGAP_PLATFORM_CATALOG_TAG=${AIRGAP_PLATFORM_CATALOG_TAG}
-AIRGAP_PLATFORM_CHANNEL_STABLE_TAG=${AIRGAP_PLATFORM_CHANNEL_STABLE_TAG}
-AIRGAP_PLATFORM_CHANNEL_BETA_TAG=${AIRGAP_PLATFORM_CHANNEL_BETA_TAG}
-AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG=${AIRGAP_PLATFORM_CHANNEL_NIGHTLY_TAG}
-AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG=${AIRGAP_PLATFORM_CHANNEL_EXP_LABS_TAG}
-INSTALL_DEFAULTS_REF=${INSTALL_DEFAULTS_REF_BAKED}
-OS_ORAS_VERSION=${ORAS_VERSION:-1.3.0}
 INSTALLER_VERSION=${OURBOX_VERSION}
 INSTALLER_GIT_HASH=${OURBOX_RECIPE_GIT_HASH}
 OURBOX_VARIANT='${OURBOX_VARIANT}'
@@ -336,19 +260,24 @@ OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR='${OURBOX_INSTALLER_MONITOR_BROADCAST_AD
 OURBOX_INSTALLER_MONITOR_BROADCAST_PORT='${OURBOX_INSTALLER_MONITOR_BROADCAST_PORT}'
 EOT
 
-# If an OS payload is being embedded (local/offline build), stage it
+# If mission media is being composed, stage the selected OS payload.
 if [[ -n "${EMBED_PAYLOAD}" ]]; then
   log "Embedding OS payload: $(basename "${EMBED_PAYLOAD}")"
   mkdir -p "${ISO_DIR}/ourbox/payload"
   cp "${EMBED_PAYLOAD}" "${ISO_DIR}/ourbox/payload/os-payload.tar.gz"
   sha256sum "${ISO_DIR}/ourbox/payload/os-payload.tar.gz" \
     | awk '{print $1}' > "${ISO_DIR}/ourbox/payload/os-payload.tar.gz.sha256"
-  # Copy meta.env if it exists alongside the payload
-  PAYLOAD_META="${EMBED_PAYLOAD%.tar.gz}.meta.env"
-  if [[ -f "${PAYLOAD_META}" ]]; then
-    cp "${PAYLOAD_META}" "${ISO_DIR}/ourbox/payload/payload.meta.env"
-  fi
-  log "  payload baked into ISO for offline operation"
+  cp "${EMBED_PAYLOAD_META}" "${ISO_DIR}/ourbox/payload/payload.meta.env"
+  log "  payload staged into mission media"
+fi
+
+if [[ -n "${EMBED_MISSION_DIR}" ]]; then
+  log "Embedding mission directory"
+  mkdir -p "${ISO_DIR}/ourbox/mission"
+  rsync -a "${EMBED_MISSION_DIR}/" "${ISO_DIR}/ourbox/mission/"
+  [[ -f "${ISO_DIR}/ourbox/mission/mission-manifest.json" ]] \
+    || die "mission-manifest.json missing after mission embed"
+  log "  mission metadata staged into mission media"
 fi
 
 # Patch bootloader configs to force autoinstall
@@ -431,8 +360,8 @@ log "Computing sha256"
 
 log "Installer ISO ready: ${OUT_ISO}"
 log "SHA256: ${OUT_SHA}"
-if [[ -n "${EMBED_PAYLOAD}" ]]; then
-  log "Mode: local-build (OS payload embedded)"
+if [[ -n "${EMBED_MISSION_DIR}" ]]; then
+  log "Mode: mission media (payload + mission embedded)"
 else
-  log "Mode: thin installer (OS payload resolved at install time)"
+  log "Mode: installer substrate only (not a standalone install path)"
 fi

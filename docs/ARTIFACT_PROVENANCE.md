@@ -12,7 +12,7 @@ and
 | Artifact | Description |
 |---|---|
 | OS payload | Rootfs overlay + airgap bundle for Woodbox x86-64 (`.tar.gz` + SHA-256 checksum + metadata) |
-| Installer media | Bootable Ubuntu autoinstall ISO that stages and installs the OS payload (`.iso` + SHA-256 checksum + metadata) |
+| Installer substrate | Bootable Ubuntu autoinstall ISO used as the base for host-composed Woodbox mission media (`.iso` + SHA-256 checksum + metadata) |
 
 Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
@@ -57,19 +57,19 @@ These are the only authorized triggers for the official publication lane.
 
 | Operation | Entrypoint |
 |---|---|
-| Prepare + flash installer media (default: pull from registry) | `./tools/prepare-installer-media.sh` |
-| Prepare + flash installer media (local build) | `./tools/prepare-installer-media.sh --build-local` |
+| Compose + optionally flash Woodbox mission media | `sw-ourbox-installer/tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox` |
 | Fetch upstream platform inputs | `./tools/fetch-airgap-platform.sh` |
 | Build OS payload only | `./tools/build-os-payload.sh` |
-| Build installer ISO only | `./tools/build-installer-iso.sh` |
+| Build installer substrate ISO only | `./tools/build-installer-iso.sh` |
 | Publish OS artifact | `./tools/publish-os-artifact.sh deploy` |
-| Publish installer artifact | `./tools/publish-installer-artifact.sh deploy` |
+| Publish installer substrate artifact | `./tools/publish-installer-artifact.sh deploy` |
 | Pull OS artifact from registry | `./tools/pull-os-artifact.sh IMAGE_REF` |
-| Pull installer artifact from registry | `./tools/pull-installer-artifact.sh --channel stable` |
+| Pull installer substrate artifact from registry | `./tools/pull-installer-artifact.sh --channel stable` |
 
-All build logic lives in this repository. Official and compatible builds use the same entrypoints.
-Official status derives from the publication identity (TOOO-controlled GHCR namespace), not from
-hidden build logic.
+Mission composition now lives in `sw-ourbox-installer`. This repository still
+owns the Woodbox substrate, OS payload build, and media adapter surfaces.
+Official status derives from the publication identity (TOOO-controlled GHCR
+namespace), not from hidden build logic.
 
 ---
 

@@ -13,7 +13,6 @@ CACHE_DIR="${TMP}/cache"
 mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${CACHE_DIR}"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
-cp "${ROOT}/tools/installer-selection-resolver.sh" "${TOOLS_DIR}/installer-selection-resolver.sh"
 cp "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" "${PREINSTALL_DIR}/ourbox-preinstall"
 
 # shellcheck disable=SC1091
@@ -30,8 +29,6 @@ export OS_ARTIFACT_REF="ghcr.io/techofourown/ourbox-woodbox-os@sha256:aaaaaaaaaa
 export OS_ARTIFACT_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 export OS_IMAGE_SHA256="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 export RELEASE_CHANNEL="stable"
-export INSTALL_DEFAULTS_SOURCE="baked"
-export INSTALL_DEFAULTS_REF=""
 export INSTALL_SELECTION_SOURCE="os-default-ref"
 export OURBOX_AIRGAP_PLATFORM_SOURCE="https://github.com/techofourown/sw-ourbox-os"
 export OURBOX_AIRGAP_PLATFORM_REVISION="fixture-airgap-revision"
@@ -65,7 +62,15 @@ write_install_provenance
 grep -F "AIRGAP_PLATFORM_ARTIFACT_SOURCE=registry" "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=\${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
 # shellcheck disable=SC2016
-grep -F 'if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" != "registry" ]; then' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+grep -F 'if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
+  echo "legacy install-defaults provenance fields must not be written" >&2
+  exit 1
+fi
+if grep -Fq "OURBOX_INSTALL_DEFAULTS_" "${CACHE_DIR}/append-provenance.sh"; then
+  echo "legacy install-defaults release fields must not be appended" >&2
+  exit 1
+fi
 if grep -F 'contract.digest' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null; then
   echo "override helper must not replace platform contract files" >&2
   exit 1

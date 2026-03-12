@@ -45,11 +45,6 @@ bootcmd:
   - "echo '[ourbox-bootcmd] avahi-daemon start queued' >> /run/ourbox-installer.log"
   # --- End network monitoring setup ----------------------------------------
 
-  # Make ORAS available to ourbox-preinstall for installer-time artifact pulls
-  - cp /cdrom/ourbox/tools/oras /usr/local/bin/oras
-  - chmod 0755 /usr/local/bin/oras
-  - "echo '[ourbox-bootcmd] oras installed' >> /run/ourbox-installer.log"
-
   - mkdir -p /opt/ourbox/tools
   - cp /cdrom/ourbox/tools/ourbox-preinstall /opt/ourbox/tools/ourbox-preinstall
   - chmod +x /opt/ourbox/tools/ourbox-preinstall
