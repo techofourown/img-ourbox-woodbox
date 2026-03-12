@@ -86,8 +86,14 @@ export PATH="${BIN_DIR}:${PATH}"
 export OURBOX_GIT_SHA="fedcba987654"
 export OURBOX_VERSION="test-publish-smoke"
 export OURBOX_PLATFORM_CONTRACT_DIGEST="${OVERRIDE_CONTRACT_DIGEST}"
+export GITHUB_WORKFLOW="Official Candidate Build & Publish (Woodbox)"
 
 "${ROOT}/tools/publish-os-artifact.sh" "${DEPLOY_DIR}"
+
+python3 "${ROOT}/tools/strict-kv-metadata.py" "${DEPLOY_DIR}/os-artifact.meta.env" --json >/dev/null
+if grep -F 'GITHUB_WORKFLOW=' "${DEPLOY_DIR}/os-artifact.meta.env" >/dev/null; then
+  die "strict os-artifact.meta.env must not contain free-form GITHUB_WORKFLOW"
+fi
 
 python3 - "${DEPLOY_DIR}/os-artifact.meta.json" "${DEPLOY_DIR}/os-artifact.publish.json" "${STATE_DIR}/latest-catalog.tsv" "${OVERRIDE_CONTRACT_DIGEST}" "${RAW_CONTRACT_DIGEST}" "${AIRGAP_BUNDLE_DIGEST}" "${AIRGAP_LOCK_SHA}" "${FIXTURE_K3S_VERSION}" <<'PY'
 import json
@@ -110,16 +116,20 @@ assert meta["OURBOX_AIRGAP_PLATFORM_ARCH"] == "amd64"
 assert meta["OURBOX_AIRGAP_PLATFORM_PROFILE"] == "demo-apps"
 assert meta["OURBOX_AIRGAP_PLATFORM_K3S_VERSION"] == k3s_version
 assert meta["OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256"] == lock_sha
+assert "GITHUB_WORKFLOW" not in meta
 assert publish["control_fields"]["platform_contract_digest"] == override_digest
 assert publish["meta_env"]["OURBOX_PLATFORM_CONTRACT_DIGEST"] == override_digest
 assert publish["meta_env"]["OURBOX_AIRGAP_PLATFORM_DIGEST"] == airgap_digest
 assert publish["meta_env"]["OURBOX_AIRGAP_PLATFORM_K3S_VERSION"] == k3s_version
+assert "GITHUB_WORKFLOW" not in publish["meta_env"]
 assert override_digest in catalog
 assert raw_digest not in catalog
 PY
 
 grep -F "techofourown.platform-contract.digest=${OVERRIDE_CONTRACT_DIGEST}" "${ORAS_STUB_LOG}" >/dev/null \
   || die "ORAS push did not use the effective platform contract digest override"
+grep -F "techofourown.build.workflow=${GITHUB_WORKFLOW}" "${ORAS_STUB_LOG}" >/dev/null \
+  || die "ORAS push did not preserve the workflow annotation"
 if grep -F "techofourown.platform-contract.digest=${RAW_CONTRACT_DIGEST}" "${ORAS_STUB_LOG}" >/dev/null; then
   die "ORAS push used the raw contract digest instead of the effective override"
 fi

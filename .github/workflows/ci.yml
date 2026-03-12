@@ -92,6 +92,16 @@ jobs:
       - name: Run OS publish smoke test
         run: bash tools/check-publish-os-artifact-smoke.sh
 
+  installer-publish-smoke:
+    name: Installer publish smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run installer publish smoke test
+        run: bash tools/check-publish-installer-artifact-smoke.sh
+
   installer-seed:
     name: Installer seed validation
     runs-on: ubuntu-latest
