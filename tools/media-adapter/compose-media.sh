@@ -74,6 +74,9 @@ bash "${WOODBOX_ADAPTER_ROOT}/validate-media.sh" \
   --os-meta-env "${OS_META_ENV}"
 
 STRICT_METADATA_PARSER="${WOODBOX_ADAPTER_ROOT}/strict-kv-metadata.py"
+if [[ ! -f "${STRICT_METADATA_PARSER}" ]]; then
+  STRICT_METADATA_PARSER="${ROOT}/tools/strict-kv-metadata.py"
+fi
 [[ -f "${STRICT_METADATA_PARSER}" ]] || die "strict metadata parser not found: ${STRICT_METADATA_PARSER}"
 
 payload_meta_dump="$(

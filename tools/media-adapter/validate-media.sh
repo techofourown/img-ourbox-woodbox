@@ -10,6 +10,9 @@ source "${ROOT}/tools/lib.sh"
 
 ADAPTER_JSON="${WOODBOX_ADAPTER_ROOT}/adapter.json"
 STRICT_METADATA_PARSER="${WOODBOX_ADAPTER_ROOT}/strict-kv-metadata.py"
+if [[ ! -f "${STRICT_METADATA_PARSER}" ]]; then
+  STRICT_METADATA_PARSER="${ROOT}/tools/strict-kv-metadata.py"
+fi
 MISSION_DIR=""
 OS_PAYLOAD=""
 OS_META_ENV=""
@@ -115,23 +118,24 @@ if (mission_dir / os_payload_relpath).resolve() != expected_payload:
     raise SystemExit("mission selected_os.payload.relpath must match the explicit --os-payload input")
 if (mission_dir / os_meta_relpath).resolve() != expected_meta:
     raise SystemExit("mission selected_os.metadata_relpath must match the explicit --os-meta-env input")
-selected_airgap = manifest.get("selected_airgap", {})
-if selected_airgap:
-    if selected_airgap.get("arch") != expected_arch:
-        raise SystemExit(f"mission selected_airgap.arch must be {expected_arch}")
-    airgap_contract = selected_airgap.get("platform_contract_digest")
-    if airgap_contract not in ("", None) and airgap_contract != contract:
-        raise SystemExit("mission selected_airgap.platform_contract_digest must match selected_os.platform_contract_digest")
-    payload_relpath = selected_airgap.get("payload_relpath")
-    manifest_relpath = selected_airgap.get("manifest_relpath")
-    if not payload_relpath:
-        raise SystemExit("mission selected_airgap.payload_relpath must be set")
-    if not manifest_relpath:
-        raise SystemExit("mission selected_airgap.manifest_relpath must be set")
-    if not (mission_dir / payload_relpath).is_file():
-        raise SystemExit("mission selected_airgap.payload_relpath must point to a staged file")
-    if not (mission_dir / manifest_relpath).is_file():
-        raise SystemExit("mission selected_airgap.manifest_relpath must point to a staged file")
+selected_airgap = manifest.get("selected_airgap")
+if not isinstance(selected_airgap, dict) or not selected_airgap:
+    raise SystemExit("mission selected_airgap must be present")
+if selected_airgap.get("arch") != expected_arch:
+    raise SystemExit(f"mission selected_airgap.arch must be {expected_arch}")
+airgap_contract = selected_airgap.get("platform_contract_digest")
+if airgap_contract not in ("", None) and airgap_contract != contract:
+    raise SystemExit("mission selected_airgap.platform_contract_digest must match selected_os.platform_contract_digest")
+payload_relpath = selected_airgap.get("payload_relpath")
+manifest_relpath = selected_airgap.get("manifest_relpath")
+if not payload_relpath:
+    raise SystemExit("mission selected_airgap.payload_relpath must be set")
+if not manifest_relpath:
+    raise SystemExit("mission selected_airgap.manifest_relpath must be set")
+if not (mission_dir / payload_relpath).is_file():
+    raise SystemExit("mission selected_airgap.payload_relpath must point to a staged file")
+if not (mission_dir / manifest_relpath).is_file():
+    raise SystemExit("mission selected_airgap.manifest_relpath must point to a staged file")
 PY
 
 payload_check="$(
