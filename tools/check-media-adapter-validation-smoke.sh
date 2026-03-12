@@ -228,6 +228,11 @@ expect_validation_failure "mission airgap payloads missing airgap-platform.tar.g
 
 build_airgap_bundle valid
 write_manifest 1
+printf 'OURBOX_AIRGAP_PLATFORM_VERSION=v9.9.9\n' >> "${AIRGAP_MANIFEST}"
+expect_validation_failure "mission airgap payloads whose staged manifest sidecar differs from the tarball manifest"
+
+build_airgap_bundle valid
+write_manifest 1
 printf '%s  %s\n' 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' 'airgap-platform.tar.gz' > "${AIRGAP_PAYLOAD}.sha256"
 expect_validation_failure "mission airgap payloads with mismatched airgap-platform.tar.gz.sha256"
 
