@@ -115,6 +115,26 @@ jobs:
       - name: Validate Woodbox media adapter contract
         run: bash tools/check-media-adapter-validation-smoke.sh
 
+  preinstall-provenance-smoke:
+    name: Preinstall provenance smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox preinstall provenance helpers
+        run: bash tools/check-preinstall-provenance-smoke.sh
+
+  preinstall-mission-airgap-smoke:
+    name: Preinstall mission airgap smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox preinstall mission airgap handling
+        run: bash tools/check-preinstall-mission-airgap-smoke.sh
+
   commitlint:
     name: Commit message lint
     runs-on: ubuntu-latest
