@@ -66,7 +66,6 @@ GIT_SHA="$(resolve_git_sha)"
 BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 export BASE SHA256 SIZE_BYTES INSTALLER_ARTIFACT_TYPE OURBOX_TARGET OURBOX_VARIANT OURBOX_VERSION OURBOX_SKU BUILD_TS GIT_SHA
-export GITHUB_WORKFLOW="${GITHUB_WORKFLOW:-}"
 export GITHUB_RUN_ID="${GITHUB_RUN_ID:-}"
 export GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"
 
@@ -86,10 +85,11 @@ payload = {
     "OURBOX_SKU": os.environ["OURBOX_SKU"],
     "BUILD_TS": os.environ["BUILD_TS"],
     "GIT_SHA": os.environ["GIT_SHA"],
-    "GITHUB_WORKFLOW": os.environ["GITHUB_WORKFLOW"],
-    "GITHUB_RUN_ID": os.environ["GITHUB_RUN_ID"],
-    "GITHUB_RUN_ATTEMPT": os.environ["GITHUB_RUN_ATTEMPT"],
 }
+if os.environ["GITHUB_RUN_ID"]:
+    payload["GITHUB_RUN_ID"] = os.environ["GITHUB_RUN_ID"]
+if os.environ["GITHUB_RUN_ATTEMPT"]:
+    payload["GITHUB_RUN_ATTEMPT"] = os.environ["GITHUB_RUN_ATTEMPT"]
 with open(sys.argv[1], "w", encoding="utf-8") as fh:
     json.dump(payload, fh, indent=2)
     fh.write("\n")

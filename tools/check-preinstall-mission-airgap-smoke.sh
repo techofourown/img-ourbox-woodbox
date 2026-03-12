@@ -149,4 +149,14 @@ prepare_selected_airgap_platform_bundle
   exit 1
 }
 
+rm -f "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz.sha256"
+set +e
+(prepare_selected_airgap_platform_bundle >/dev/null 2>&1)
+rc=$?
+set -e
+if [[ "${rc}" -eq 0 ]]; then
+  echo "expected prepare_selected_airgap_platform_bundle to reject mission airgap payloads missing a checksum sidecar" >&2
+  exit 1
+fi
+
 printf '[%s] Woodbox preinstall mission-airgap smoke passed\n' "$(date -Is)"

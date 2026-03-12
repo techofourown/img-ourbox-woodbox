@@ -92,6 +92,16 @@ jobs:
       - name: Run OS publish smoke test
         run: bash tools/check-publish-os-artifact-smoke.sh
 
+  installer-publish-smoke:
+    name: Installer publish smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run installer publish smoke test
+        run: bash tools/check-publish-installer-artifact-smoke.sh
+
   installer-seed:
     name: Installer seed validation
     runs-on: ubuntu-latest
@@ -114,6 +124,26 @@ jobs:
 
       - name: Validate Woodbox media adapter contract
         run: bash tools/check-media-adapter-validation-smoke.sh
+
+  preinstall-provenance-smoke:
+    name: Preinstall provenance smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox preinstall provenance helpers
+        run: bash tools/check-preinstall-provenance-smoke.sh
+
+  preinstall-mission-airgap-smoke:
+    name: Preinstall mission airgap smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox preinstall mission airgap handling
+        run: bash tools/check-preinstall-mission-airgap-smoke.sh
 
   commitlint:
     name: Commit message lint
