@@ -45,7 +45,6 @@ OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=cccccccccccccccccccccccccccccccccccccc
 OURBOX_BASE_ISO_URL=https://example.invalid/ubuntu.iso
 OURBOX_BASE_ISO_SHA256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 K3S_VERSION=v1.35.0+k3s1
-GITHUB_WORKFLOW=
 GITHUB_RUN_ID=
 GITHUB_RUN_ATTEMPT=
 EOF
@@ -72,6 +71,9 @@ write_manifest() {
     "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "selected_os": {
+    "selection_source": "catalog",
+    "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "artifact_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "artifact_type": "application/vnd.techofourown.ourbox.woodbox.os-payload.v1",
     "platform_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "payload": {
@@ -84,10 +86,15 @@ EOF
     cat >> "${MISSION_MANIFEST}" <<'EOF'
 ,
   "selected_airgap": {
+    "selection_mode": "host-selected",
+    "selection_source": "catalog",
+    "artifact_ref": "ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "arch": "amd64",
     "platform_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
-    "manifest_relpath": "artifacts/airgap/manifest.env"
+    "manifest_relpath": "artifacts/airgap/manifest.env",
+    "present_in_selected_os_payload": false
   }
 EOF
   fi
@@ -108,6 +115,27 @@ if bash "${ROOT}/tools/media-adapter/validate-media.sh" \
   --os-payload "${OS_PAYLOAD}" \
   --os-meta-env "${OS_META_ENV}" >/dev/null 2>&1; then
   echo "expected validate-media.sh to reject mission manifests missing selected_airgap" >&2
+  exit 1
+fi
+
+write_manifest 1
+python3 - <<'PY' "${MISSION_MANIFEST}"
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+del manifest["selected_airgap"]["artifact_digest"]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle, indent=2)
+    handle.write("\n")
+PY
+if bash "${ROOT}/tools/media-adapter/validate-media.sh" \
+  --mission-dir "${MISSION_DIR}" \
+  --os-payload "${OS_PAYLOAD}" \
+  --os-meta-env "${OS_META_ENV}" >/dev/null 2>&1; then
+  echo "expected validate-media.sh to reject mission manifests missing selected_airgap.artifact_digest" >&2
   exit 1
 fi
 

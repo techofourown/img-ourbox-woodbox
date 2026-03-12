@@ -547,7 +547,6 @@ load_selected_payload_airgap_metadata() {
       --allow OURBOX_BASE_ISO_URL \
       --allow OURBOX_BASE_ISO_SHA256 \
       --allow K3S_VERSION \
-      --allow GITHUB_WORKFLOW \
       --allow GITHUB_RUN_ID \
       --allow GITHUB_RUN_ATTEMPT \
       --require OURBOX_PLATFORM_CONTRACT_DIGEST \

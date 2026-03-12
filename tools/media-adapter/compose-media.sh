@@ -111,7 +111,6 @@ payload_meta_dump="$(
     --allow OURBOX_BASE_ISO_URL \
     --allow OURBOX_BASE_ISO_SHA256 \
     --allow K3S_VERSION \
-    --allow GITHUB_WORKFLOW \
     --allow GITHUB_RUN_ID \
     --allow GITHUB_RUN_ATTEMPT \
     --print OURBOX_PRODUCT \

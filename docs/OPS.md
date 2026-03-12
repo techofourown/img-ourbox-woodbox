@@ -104,6 +104,7 @@ sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.)
 # Or: build mission media by embedding both payload and mission directory
 ./tools/build-installer-iso.sh \
   --embed-payload deploy/os-payload-ourbox-woodbox-x86-*.tar.gz \
+  --embed-payload-meta deploy/os-payload-ourbox-woodbox-x86-*.meta.env \
   --embed-mission-dir /path/to/prepared-mission-dir
 ```
 

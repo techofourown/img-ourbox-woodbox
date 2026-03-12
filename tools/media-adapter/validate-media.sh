@@ -65,6 +65,7 @@ done
 python3 - <<'PY' "${ADAPTER_JSON}" "${MISSION_DIR}/mission-manifest.json" "${OS_PAYLOAD}" "${OS_META_ENV}"
 import json
 import pathlib
+import re
 import sys
 
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
@@ -78,6 +79,8 @@ expected_meta = pathlib.Path(sys.argv[4]).resolve()
 
 expected_type = adapter["expected_os_artifact_type"]
 expected_arch = adapter["expected_airgap_arch"]
+sha256_re = re.compile(r"^sha256:[0-9a-f]{64}$")
+pinned_ref_re = re.compile(r"^[^\s]+@sha256:[0-9a-f]{64}$")
 
 if manifest.get("schema") != 1:
     raise SystemExit("mission manifest schema must be 1")
@@ -98,8 +101,17 @@ if not platform_digest.startswith("sha256:") or len(platform_digest) != 71:
 selected_os = manifest.get("selected_os", {})
 if selected_os.get("artifact_type") != expected_type:
     raise SystemExit(f"mission selected_os.artifact_type must be {expected_type}")
+os_selection_source = str(selected_os.get("selection_source", ""))
+if not os_selection_source:
+    raise SystemExit("mission selected_os.selection_source must be set")
+os_artifact_ref = str(selected_os.get("artifact_ref", ""))
+if not pinned_ref_re.fullmatch(os_artifact_ref):
+    raise SystemExit("mission selected_os.artifact_ref must be a digest-pinned OCI ref")
+os_artifact_digest = str(selected_os.get("artifact_digest", ""))
+if not sha256_re.fullmatch(os_artifact_digest):
+    raise SystemExit("mission selected_os.artifact_digest must be a sha256 digest")
 contract = str(selected_os.get("platform_contract_digest", ""))
-if not contract.startswith("sha256:") or len(contract) != 71:
+if not sha256_re.fullmatch(contract):
     raise SystemExit("mission selected_os.platform_contract_digest must be a sha256 digest")
 if contract != platform_digest:
     raise SystemExit("mission selected_os.platform_contract_digest must match mission platform_contract.digest")
@@ -121,11 +133,27 @@ if (mission_dir / os_meta_relpath).resolve() != expected_meta:
 selected_airgap = manifest.get("selected_airgap")
 if not isinstance(selected_airgap, dict) or not selected_airgap:
     raise SystemExit("mission selected_airgap must be present")
+airgap_selection_mode = str(selected_airgap.get("selection_mode", ""))
+if not airgap_selection_mode:
+    raise SystemExit("mission selected_airgap.selection_mode must be set")
+airgap_selection_source = str(selected_airgap.get("selection_source", ""))
+if not airgap_selection_source:
+    raise SystemExit("mission selected_airgap.selection_source must be set")
+airgap_artifact_ref = str(selected_airgap.get("artifact_ref", ""))
+if not pinned_ref_re.fullmatch(airgap_artifact_ref):
+    raise SystemExit("mission selected_airgap.artifact_ref must be a digest-pinned OCI ref")
+airgap_artifact_digest = str(selected_airgap.get("artifact_digest", ""))
+if not sha256_re.fullmatch(airgap_artifact_digest):
+    raise SystemExit("mission selected_airgap.artifact_digest must be a sha256 digest")
 if selected_airgap.get("arch") != expected_arch:
     raise SystemExit(f"mission selected_airgap.arch must be {expected_arch}")
-airgap_contract = selected_airgap.get("platform_contract_digest")
-if airgap_contract not in ("", None) and airgap_contract != contract:
+airgap_contract = str(selected_airgap.get("platform_contract_digest", ""))
+if not sha256_re.fullmatch(airgap_contract):
+    raise SystemExit("mission selected_airgap.platform_contract_digest must be a sha256 digest")
+if airgap_contract != contract:
     raise SystemExit("mission selected_airgap.platform_contract_digest must match selected_os.platform_contract_digest")
+if not isinstance(selected_airgap.get("present_in_selected_os_payload"), bool):
+    raise SystemExit("mission selected_airgap.present_in_selected_os_payload must be a boolean")
 payload_relpath = selected_airgap.get("payload_relpath")
 manifest_relpath = selected_airgap.get("manifest_relpath")
 if not payload_relpath:
@@ -170,7 +198,6 @@ payload_check="$(
     --allow OURBOX_BASE_ISO_URL \
     --allow OURBOX_BASE_ISO_SHA256 \
     --allow K3S_VERSION \
-    --allow GITHUB_WORKFLOW \
     --allow GITHUB_RUN_ID \
     --allow GITHUB_RUN_ATTEMPT \
     --require OS_ARTIFACT_TYPE \
