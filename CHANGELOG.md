@@ -1,3 +1,17 @@
+# [0.10.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.9.2...v0.10.0) (2026-03-12)
+
+
+### Bug Fixes
+
+* **adapter:** validate mission airgap contract ([2148aca](https://github.com/techofourown/img-ourbox-woodbox/commit/2148aca040ab8081e4af2cf226af5c26aecc448d))
+* **installer:** align mission metadata contract ([20f1930](https://github.com/techofourown/img-ourbox-woodbox/commit/20f19302659fa8c204b1db926832370a1c96c06b))
+* **installer:** harden woodbox mission metadata contract ([1f7317b](https://github.com/techofourown/img-ourbox-woodbox/commit/1f7317b0ae79f15d57b258ab83b5f3b1aeee7069))
+
+
+### Features
+
+* **installer:** make woodbox mission-media-only ([fa479c0](https://github.com/techofourown/img-ourbox-woodbox/commit/fa479c0c4c4c34ba83c4842b56ef20fcbed65b32))
+
 ## [0.9.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.9.1...v0.9.2) (2026-03-12)
 
 
