@@ -33,7 +33,10 @@ EOF
 dpkg-deb --build "${DEB_SRC}/avahi-daemon" "${DEB_SRC}/avahi-daemon_1.0-1_amd64.deb" >/dev/null
 dpkg-deb --build "${DEB_SRC}/avahi-utils" "${DEB_SRC}/avahi-utils_1.0-1_amd64.deb" >/dev/null
 
-bash "${ROOT}/tools/prepare-installer-target-apt-repo.sh" \
+[[ -x "${ROOT}/tools/prepare-installer-target-apt-repo.sh" ]] \
+  || die "prepare-installer-target-apt-repo.sh must be executable"
+
+"${ROOT}/tools/prepare-installer-target-apt-repo.sh" \
   --output-dir "${REPO_OUT}" \
   --source-deb-dir "${DEB_SRC}" \
   --package avahi-daemon \
