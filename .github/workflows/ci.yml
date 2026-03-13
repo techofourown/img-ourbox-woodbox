@@ -197,6 +197,16 @@ jobs:
       - name: Verify installer SSH leak detector
         run: bash tools/check-installer-ssh-log-leak-smoke.sh
 
+  installer-cloud-init-gate-smoke:
+    name: Installer cloud-init gate smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer cloud-init readiness gate
+        run: bash tools/check-installer-cloud-init-gate-smoke.sh
+
   preinstall-provenance-smoke:
     name: Preinstall provenance smoke
     runs-on: ubuntu-latest
