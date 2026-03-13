@@ -39,6 +39,7 @@ jobs:
           shellcheck installer/ourbox-preinstall/ourbox-preinstall
           shellcheck installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh
           shellcheck installer/ourbox-preinstall/format-data-disk.sh
+          shellcheck installer/ourbox-preinstall/install-offline-target-packages.sh
 
       - name: Check shell syntax (bash -n)
         run: |
@@ -51,6 +52,7 @@ jobs:
           bash -n installer/ourbox-preinstall/ourbox-preinstall && echo "OK: ourbox-preinstall"
           bash -n installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh && echo "OK: ourbox-installer-ssh-bootstrap.sh"
           bash -n installer/ourbox-preinstall/format-data-disk.sh && echo "OK: format-data-disk.sh"
+          bash -n installer/ourbox-preinstall/install-offline-target-packages.sh && echo "OK: install-offline-target-packages.sh"
 
   installer-ssh-vendoring:
     name: Vendored installer SSH helper sync
@@ -115,6 +117,36 @@ jobs:
       - name: Validate rendered installer seed
         run: bash tools/validate-installer-seed.sh
 
+  offline-install-contract:
+    name: Offline install contract smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate offline install contract
+        run: bash tools/check-offline-install-contract-smoke.sh
+
+  target-netplan-renderer:
+    name: Target netplan renderer smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate target netplan renderer
+        run: bash tools/check-render-target-netplan-smoke.sh
+
+  installer-target-apt-repo:
+    name: Installer target APT repo smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate installer target APT repo builder
+        run: bash tools/check-prepare-installer-target-apt-repo-smoke.sh
+
   media-adapter-validation:
     name: Media adapter validation smoke
     runs-on: ubuntu-latest
@@ -154,6 +186,16 @@ jobs:
 
       - name: Verify Woodbox preinstall mission airgap handling
         run: bash tools/check-preinstall-mission-airgap-smoke.sh
+
+  preinstall-offline-helpers:
+    name: Preinstall offline helper smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox offline helper generation
+        run: bash tools/check-preinstall-offline-helpers-smoke.sh
 
   commitlint:
     name: Commit message lint

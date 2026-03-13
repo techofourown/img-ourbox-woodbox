@@ -132,6 +132,21 @@ if not isinstance(autoinstall, dict):
     print(f"ERROR: rendered seed {rendered_path} is missing the autoinstall mapping", file=sys.stderr)
     sys.exit(1)
 
+if "packages" in autoinstall:
+    print(
+        f"ERROR: rendered seed {rendered_path} must not declare autoinstall packages; target installs must stay offline",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+ssh_cfg = autoinstall.get("ssh")
+if isinstance(ssh_cfg, dict) and ssh_cfg.get("install-server") is True:
+    print(
+        f"ERROR: rendered seed {rendered_path} must not enable install-server via autoinstall",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 print(f"YAML OK: {rendered_path}")
 PY
 }

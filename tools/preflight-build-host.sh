@@ -19,6 +19,9 @@ need_cmd sed
 need_cmd awk
 need_cmd git
 need_cmd tar
+need_cmd apt
+need_cmd apt-cache
+need_cmd dpkg-deb
 
 mkdir -p "${ROOT}/deploy"
 [[ -w "${ROOT}/deploy" ]] || die "deploy/ directory is not writable"

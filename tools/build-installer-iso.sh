@@ -35,6 +35,8 @@ need_cmd envsubst
 need_cmd sed
 need_cmd awk
 need_cmd bash
+: "${OURBOX_INSTALLER_TARGET_PACKAGES:=avahi-daemon avahi-utils}"
+: "${OURBOX_INSTALLER_TARGET_APT_REPO_SOURCE_DIR:=}"
 
 EMBED_PAYLOAD=""
 EMBED_PAYLOAD_META=""
@@ -246,6 +248,24 @@ install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-monitor.py
   "${ISO_DIR}/ourbox/tools/ourbox-installer-monitor.py"
 install -m 0755 "${ROOT}/installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh" \
   "${ISO_DIR}/ourbox/tools/ourbox-installer-ssh-bootstrap.sh"
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/render-target-netplan.py" \
+  "${ISO_DIR}/ourbox/tools/render-target-netplan.py"
+install -m 0755 "${ROOT}/installer/ourbox-preinstall/install-offline-target-packages.sh" \
+  "${ISO_DIR}/ourbox/tools/install-offline-target-packages.sh"
+
+log "Staging offline target package repo"
+mkdir -p "${ISO_DIR}/ourbox/apt"
+apt_repo_cmd=(
+  "${ROOT}/tools/prepare-installer-target-apt-repo.sh"
+  --output-dir "${ISO_DIR}/ourbox/apt"
+)
+if [[ -n "${OURBOX_INSTALLER_TARGET_APT_REPO_SOURCE_DIR}" ]]; then
+  apt_repo_cmd+=(--source-deb-dir "${OURBOX_INSTALLER_TARGET_APT_REPO_SOURCE_DIR}")
+fi
+for pkg in ${OURBOX_INSTALLER_TARGET_PACKAGES}; do
+  apt_repo_cmd+=(--package "${pkg}")
+done
+"${apt_repo_cmd[@]}"
 
 # Stage installer defaults (installer identity, SSH posture, and monitor settings)
 log "Staging installer defaults"

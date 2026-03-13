@@ -36,6 +36,10 @@ INSTALLER_MONITOR_BROADCAST_PORT="9999"
 MISSION_DIR="/cdrom/ourbox/mission"
 MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
 STRICT_METADATA_PARSER="${TOOLS_ROOT}/strict-kv-metadata.py"
+OFFLINE_TARGET_APT_REPO_DIR="${OURBOX_PREINSTALL_OFFLINE_TARGET_APT_REPO_DIR:-/cdrom/ourbox/apt}"
+TARGET_NETPLAN_RENDERER="${TOOLS_ROOT}/render-target-netplan.py"
+OFFLINE_TARGET_PACKAGE_INSTALLER="${TOOLS_ROOT}/install-offline-target-packages.sh"
+SYS_CLASS_NET_ROOT="${OURBOX_PREINSTALL_SYS_CLASS_NET_ROOT:-/sys/class/net}"
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -919,6 +923,44 @@ SCRIPT
   chmod +x "${cache_dir}/apply-airgap-platform-override.sh"
 }
 
+write_offline_install_helpers() {
+  local cache_dir="${INSTALLER_CACHE_DIR:-/opt/ourbox/installer/cache}"
+  local target_netplan="${cache_dir}/target-netplan.yaml"
+  mkdir -p "${cache_dir}"
+
+  [[ -d "${OFFLINE_TARGET_APT_REPO_DIR}" ]] || die "offline target APT repo missing: ${OFFLINE_TARGET_APT_REPO_DIR}"
+  [[ -f "${OFFLINE_TARGET_APT_REPO_DIR}/target-packages.txt" ]] || die "offline target package manifest missing: ${OFFLINE_TARGET_APT_REPO_DIR}/target-packages.txt"
+  [[ -f "${OFFLINE_TARGET_APT_REPO_DIR}/Packages" || -f "${OFFLINE_TARGET_APT_REPO_DIR}/Packages.gz" ]] \
+    || die "offline target APT repo is missing Packages metadata: ${OFFLINE_TARGET_APT_REPO_DIR}"
+  [[ -f "${TARGET_NETPLAN_RENDERER}" ]] || die "missing target netplan renderer: ${TARGET_NETPLAN_RENDERER}"
+  [[ -f "${OFFLINE_TARGET_PACKAGE_INSTALLER}" ]] || die "missing offline target package installer: ${OFFLINE_TARGET_PACKAGE_INSTALLER}"
+
+  python3 "${TARGET_NETPLAN_RENDERER}" --sys-class-net "${SYS_CLASS_NET_ROOT}" --output "${target_netplan}"
+  [[ -f "${target_netplan}" ]] || die "target netplan renderer did not produce ${target_netplan}"
+
+  cat > "${cache_dir}/apply-target-netplan.sh" <<'SCRIPT'
+#!/bin/sh
+set -e
+TARGET="${1:-/target}"
+NETPLAN_SRC="/opt/ourbox/installer/cache/target-netplan.yaml"
+[ -f "${NETPLAN_SRC}" ] || { echo "missing prepared target netplan: ${NETPLAN_SRC}" >&2; exit 1; }
+mkdir -p "${TARGET}/etc/netplan"
+cp -f "${NETPLAN_SRC}" "${TARGET}/etc/netplan/00-installer-config.yaml"
+SCRIPT
+  chmod +x "${cache_dir}/apply-target-netplan.sh"
+
+  cat > "${cache_dir}/install-target-packages.sh" <<'SCRIPT'
+#!/bin/sh
+set -e
+TARGET="${1:-/target}"
+exec /cdrom/ourbox/tools/install-offline-target-packages.sh \
+  --target "${TARGET}" \
+  --repo-dir /cdrom/ourbox/apt \
+  --package-manifest /cdrom/ourbox/apt/target-packages.txt
+SCRIPT
+  chmod +x "${cache_dir}/install-target-packages.sh"
+}
+
 # ---------------------------------------------------------------------------
 # identity
 # ---------------------------------------------------------------------------
@@ -1105,6 +1147,7 @@ main() {
   prepare_selected_airgap_platform_bundle
   show_airgap_platform_panel
   write_install_provenance
+  write_offline_install_helpers
 
   # --- Step 4: Identity ---
   banner
@@ -1141,7 +1184,7 @@ main() {
     echo "  Apps lane    : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
   fi
   echo "  Apps digest  : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Contract     : ${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Contract     : ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
     configured-hash)
