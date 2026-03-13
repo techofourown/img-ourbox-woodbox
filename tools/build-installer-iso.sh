@@ -39,6 +39,7 @@ need_cmd bash
 EMBED_PAYLOAD=""
 EMBED_PAYLOAD_META=""
 EMBED_MISSION_DIR=""
+OUT_ISO_PATH=""
 : "${OURBOX_VARIANT:=prod}"
 : "${DEFAULT_INSTALLER_SSH_MODE:=both}"
 : "${OURBOX_INSTALLER_SSH_MODE:=${DEFAULT_INSTALLER_SSH_MODE}}"
@@ -65,6 +66,11 @@ while [[ $# -gt 0 ]]; do
     --embed-mission-dir)
       [[ $# -ge 2 ]] || die "--embed-mission-dir requires a path"
       EMBED_MISSION_DIR="$2"
+      shift 2
+      ;;
+    --out-iso)
+      [[ $# -ge 2 ]] || die "--out-iso requires a path"
+      OUT_ISO_PATH="$2"
       shift 2
       ;;
     *)
@@ -144,7 +150,12 @@ OURBOX_SKU_SLUG="$(echo "${OURBOX_SKU}" | tr '[:upper:]' '[:lower:]')"
 OURBOX_VARIANT_SLUG="$(echo "${OURBOX_VARIANT}" | tr '[:upper:]' '[:lower:]')"
 OURBOX_TARGET_SLUG="$(echo "${OURBOX_TARGET}" | tr '[:upper:]' '[:lower:]')"
 
-OUT_ISO="${ROOT}/deploy/installer-${OURBOX_PRODUCT}-${OURBOX_DEVICE}-${OURBOX_TARGET_SLUG}-${OURBOX_SKU_SLUG}-${OURBOX_VARIANT_SLUG}-${OURBOX_VERSION}.iso"
+if [[ -n "${OUT_ISO_PATH}" ]]; then
+  OUT_ISO="$(readlink -m "${OUT_ISO_PATH}")"
+else
+  OUT_ISO="${ROOT}/deploy/installer-${OURBOX_PRODUCT}-${OURBOX_DEVICE}-${OURBOX_TARGET_SLUG}-${OURBOX_SKU_SLUG}-${OURBOX_VARIANT_SLUG}-${OURBOX_VERSION}.iso"
+fi
+mkdir -p "$(dirname "${OUT_ISO}")"
 OUT_SHA="${OUT_ISO}.sha256"
 
 ISO_STORE="${ROOT}/artifacts/ubuntu"
@@ -179,7 +190,9 @@ BASE_VOLID="$(xorriso -indev "${BASE_ISO}" -pvd_info 2>/dev/null \
   | sed -E "s/[[:space:]]*$//; s/^'//; s/'$//")"
 : "${OURBOX_ISO_VOLID:=${BASE_VOLID}}"
 
-WORKDIR="$(mktemp -d)"
+WORKDIR_ROOT="${ROOT}/artifacts/work"
+mkdir -p "${WORKDIR_ROOT}"
+WORKDIR="$(mktemp -d "${WORKDIR_ROOT}/build-installer-iso.XXXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 ISO_DIR="${WORKDIR}/iso"
 mkdir -p "${ISO_DIR}"

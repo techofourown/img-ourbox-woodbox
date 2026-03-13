@@ -57,7 +57,7 @@ These are the only authorized triggers for the official publication lane.
 
 | Operation | Entrypoint |
 |---|---|
-| Compose + optionally flash Woodbox mission media | `sw-ourbox-installer/tools/prepare-installer-media.sh --target woodbox --adapter-repo-root ../img-ourbox-woodbox` |
+| Compose + optionally flash Woodbox mission media | `sw-ourbox-installer/tools/prepare-installer-media.sh` |
 | Fetch upstream platform inputs | `./tools/fetch-airgap-platform.sh` |
 | Build OS payload only | `./tools/build-os-payload.sh` |
 | Build installer substrate ISO only | `./tools/build-installer-iso.sh` |

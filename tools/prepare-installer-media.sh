@@ -36,4 +36,4 @@ esac
 
 [[ -x "${UNIFIED_PREPARE}" ]] || die "Woodbox mission media is now composed by sw-ourbox-installer, but ${UNIFIED_PREPARE} was not found. Check out sw-ourbox-installer and run its prepare-installer-media.sh with --target woodbox."
 
-exec "${UNIFIED_PREPARE}" --target woodbox --adapter-repo-root "${ROOT}" "$@"
+exec "${UNIFIED_PREPARE}" --target woodbox "$@"
