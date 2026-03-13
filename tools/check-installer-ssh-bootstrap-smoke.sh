@@ -44,12 +44,12 @@ grep -Fxq -- "--no-block restart ssh" "${SYSTEMCTL_LOG}" \
 grep -Fxq -- "--no-block start ssh" "${SYSTEMCTL_LOG}" \
   || { echo "missing non-blocking start attempt for ssh"; exit 1; }
 
-OURBOX_INSTALLER_SSH_STATUS="ready"
-OURBOX_INSTALLER_SSH_USER="ourbox-installer"
-OURBOX_INSTALLER_SSH_MODE="both"
-OURBOX_INSTALLER_SSH_ALLOW_ROOT="0"
-OURBOX_INSTALLER_SSH_PASSWORD_STATE="configured-hash"
-OURBOX_INSTALLER_SSH_KEY_STATE="configured"
+export OURBOX_INSTALLER_SSH_STATUS="ready"
+export OURBOX_INSTALLER_SSH_USER="ourbox-installer"
+export OURBOX_INSTALLER_SSH_MODE="both"
+export OURBOX_INSTALLER_SSH_ALLOW_ROOT="0"
+export OURBOX_INSTALLER_SSH_PASSWORD_STATE="configured-hash"
+export OURBOX_INSTALLER_SSH_KEY_STATE="configured"
 write_status_file
 
 status_mode="$(stat -c '%a' "${STATUS_FILE}")"
