@@ -43,3 +43,17 @@ grep -Fxq -- "--no-block restart ssh" "${SYSTEMCTL_LOG}" \
   || { echo "missing non-blocking restart attempt for ssh"; exit 1; }
 grep -Fxq -- "--no-block start ssh" "${SYSTEMCTL_LOG}" \
   || { echo "missing non-blocking start attempt for ssh"; exit 1; }
+
+OURBOX_INSTALLER_SSH_STATUS="ready"
+OURBOX_INSTALLER_SSH_USER="ourbox-installer"
+OURBOX_INSTALLER_SSH_MODE="both"
+OURBOX_INSTALLER_SSH_ALLOW_ROOT="0"
+OURBOX_INSTALLER_SSH_PASSWORD_STATE="configured-hash"
+OURBOX_INSTALLER_SSH_KEY_STATE="configured"
+write_status_file
+
+status_mode="$(stat -c '%a' "${STATUS_FILE}")"
+[[ "${status_mode}" == "644" ]] || {
+  echo "expected installer SSH status file mode 644, got ${status_mode}" >&2
+  exit 1
+}

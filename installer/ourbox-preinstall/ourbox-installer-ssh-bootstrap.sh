@@ -25,7 +25,7 @@ log() {
 }
 
 write_status_file() {
-  umask 077
+  umask 022
   printf '%s\n' \
     "OURBOX_INSTALLER_SSH_STATUS=${OURBOX_INSTALLER_SSH_STATUS}" \
     "OURBOX_INSTALLER_SSH_USER=${OURBOX_INSTALLER_SSH_USER}" \
@@ -34,7 +34,7 @@ write_status_file() {
     "OURBOX_INSTALLER_SSH_PASSWORD_STATE=${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" \
     "OURBOX_INSTALLER_SSH_KEY_STATE=${OURBOX_INSTALLER_SSH_KEY_STATE}" \
     > "${STATUS_FILE}"
-  chmod 0600 "${STATUS_FILE}" >/dev/null 2>&1 || true
+  chmod 0644 "${STATUS_FILE}" >/dev/null 2>&1 || true
 }
 
 clear_password_file() {
