@@ -276,6 +276,7 @@ main() {
 }
 
 if [[ "${OURBOX_INSTALLER_SSH_BOOTSTRAP_LIBRARY_ONLY:-0}" == "1" ]]; then
+  # shellcheck disable=SC2317
   return 0 2>/dev/null || exit 0
 fi
 

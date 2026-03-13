@@ -30,9 +30,12 @@ chmod +x "${FAKEBIN}/systemctl"
 export PATH="${FAKEBIN}:${PATH}"
 export SYSTEMCTL_LOG
 export OURBOX_INSTALLER_SSH_BOOTSTRAP_LIBRARY_ONLY=1
+export STATUS_FILE="${TMPDIR}/ssh-status.env"
+export PASSWORD_FILE="${TMPDIR}/ssh-password.txt"
 
 # shellcheck disable=SC1091
 source "${ROOT}/installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh"
+trap - EXIT TERM INT HUP
 
 restart_ssh_service
 
