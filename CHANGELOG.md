@@ -1,3 +1,10 @@
+## [0.10.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.3...v0.10.4) (2026-03-13)
+
+
+### Bug Fixes
+
+* **installer:** support vendored flash helper ([5f735a2](https://github.com/techofourown/img-ourbox-woodbox/commit/5f735a257abebea802d0702b1c5d7bb786e269b2))
+
 ## [0.10.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.2...v0.10.3) (2026-03-13)
 
 
