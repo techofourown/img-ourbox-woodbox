@@ -126,10 +126,20 @@ generate_installer_ssh_password() {
 }
 
 restart_ssh_service() {
-  systemctl restart ssh >/dev/null 2>&1 \
-    || systemctl restart openssh-server >/dev/null 2>&1 \
-    || systemctl start ssh >/dev/null 2>&1 \
-    || systemctl start openssh-server >/dev/null 2>&1
+  local unit=""
+  local action=""
+
+  for unit in ssh openssh-server; do
+    for action in restart start; do
+      log "installer SSH attempting: systemctl --no-block ${action} ${unit}"
+      if timeout 15 systemctl --no-block "${action}" "${unit}" >/dev/null 2>&1; then
+        log "installer SSH requested: systemctl --no-block ${action} ${unit}"
+        return 0
+      fi
+    done
+  done
+
+  return 1
 }
 
 main() {
@@ -264,5 +274,9 @@ main() {
   log "SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT} password=${OURBOX_INSTALLER_SSH_PASSWORD_STATE} key=${OURBOX_INSTALLER_SSH_KEY_STATE})"
   finalize_status
 }
+
+if [[ "${OURBOX_INSTALLER_SSH_BOOTSTRAP_LIBRARY_ONLY:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 main "$@"
