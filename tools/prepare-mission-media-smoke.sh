@@ -82,6 +82,8 @@ need_cmd git
 
 STRICT_METADATA_PARSER="${ROOT}/tools/strict-kv-metadata.py"
 [[ -f "${STRICT_METADATA_PARSER}" ]] || die "strict metadata parser not found: ${STRICT_METADATA_PARSER}"
+ENSURE_AIRGAP_APPLICATION_METADATA="${ROOT}/tools/ensure-airgap-application-metadata.sh"
+[[ -f "${ENSURE_AIRGAP_APPLICATION_METADATA}" ]] || die "airgap application metadata helper not found: ${ENSURE_AIRGAP_APPLICATION_METADATA}"
 
 WORK_ROOT="${ROOT}/artifacts/work"
 mkdir -p "${WORK_ROOT}"
@@ -99,6 +101,11 @@ mkdir -p "${PAYLOAD_ROOT}" "${MISSION_OS_DIR}" "${MISSION_AIRGAP_DIR}" "${BUNDLE
 tar -xzf "${OS_PAYLOAD}" -C "${PAYLOAD_ROOT}"
 [[ -f "${PAYLOAD_ROOT}/airgap/manifest.env" ]] || die "OS payload missing airgap/manifest.env"
 [[ -x "${PAYLOAD_ROOT}/airgap/k3s/k3s" ]] || die "OS payload missing airgap/k3s/k3s"
+if [[ -d "${PAYLOAD_ROOT}/rootfs/opt/ourbox/airgap/platform" ]]; then
+  bash "${ENSURE_AIRGAP_APPLICATION_METADATA}" \
+    --bundle-dir "${PAYLOAD_ROOT}/airgap" \
+    --contract-root "${PAYLOAD_ROOT}/rootfs/opt/ourbox/airgap/platform"
+fi
 [[ -f "${PAYLOAD_ROOT}/airgap/platform/catalog.json" ]] || die "OS payload missing airgap/platform/catalog.json"
 
 meta_dump="$(

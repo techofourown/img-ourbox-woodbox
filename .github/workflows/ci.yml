@@ -247,6 +247,16 @@ jobs:
       - name: Verify mission-media smoke helper
         run: bash tools/check-prepare-mission-media-smoke.sh
 
+  baked-airgap-application-metadata:
+    name: Baked airgap application metadata smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify baked airgap metadata synthesis
+        run: bash tools/check-ensure-airgap-application-metadata-smoke.sh
+
   commitlint:
     name: Commit message lint
     runs-on: ubuntu-latest
