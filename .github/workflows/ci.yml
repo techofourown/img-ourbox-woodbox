@@ -211,7 +211,7 @@ jobs:
           node-version: '20'
 
       - name: Install commitlint
-        run: npm install --no-save @commitlint/cli @commitlint/config-conventional tinyexec
+        run: npm install --no-save @commitlint/cli @commitlint/config-conventional tinyexec@1.0.2
 
       - name: Lint PR commits
         run: |
