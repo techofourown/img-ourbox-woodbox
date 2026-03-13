@@ -1,3 +1,10 @@
+## [0.10.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.5...v0.10.6) (2026-03-13)
+
+
+### Bug Fixes
+
+* **installer:** align apt repo helper execution path ([2dffcff](https://github.com/techofourown/img-ourbox-woodbox/commit/2dffcff35d2187ae2b46592364cd1bc84e12b23e))
+
 ## [0.10.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.4...v0.10.5) (2026-03-13)
 
 
