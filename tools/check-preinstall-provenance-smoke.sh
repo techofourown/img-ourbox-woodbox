@@ -75,6 +75,7 @@ grep -F "OURBOX_APPLICATION_CATALOG_ID=\${APPLICATION_CATALOG_ID:-}" "${CACHE_DI
 grep -F "OURBOX_SELECTED_APPLICATION_IDS=\${SELECTED_APPLICATION_IDS:-}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
 # shellcheck disable=SC2016
 grep -F 'if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+# shellcheck disable=SC2016
 grep -F 'cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
   echo "legacy install-defaults provenance fields must not be written" >&2
