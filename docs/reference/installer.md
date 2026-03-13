@@ -14,8 +14,9 @@ Woodbox now distinguishes two different objects:
 ### Mission media
 
 - composed on a trusted host
-- substrate plus selected OS payload, selected application-catalog bundle,
-  selected-app metadata, and `mission-manifest.json`
+- substrate plus selected OS payload, a synthesized application bundle derived
+  from one or more selected application catalogs, selected-app metadata, and
+  `mission-manifest.json`
 - the only supported Woodbox install path
 - installs fully offline on the target
 
@@ -131,7 +132,7 @@ Step 4:
 
 - reads the selected `airgap-platform` identity from the embedded mission
   manifest
-- reads the selected application catalog id and selected app ids from the
+- reads the selected application catalog ids and selected app ids from the
   embedded mission manifest when present
 - if the mission-selected airgap bundle matches the baked bundle already inside
   the OS payload, uses the baked bundle
@@ -204,8 +205,9 @@ The supported operator install flow is not “flash the published substrate and
 let the target resolve artifacts.” Instead:
 
 - `sw-ourbox-installer` resolves the selected OS payload and selected
-  application-catalog bundle on the host
-- `sw-ourbox-installer` chooses the selected app set from that catalog on the host
+  application catalogs on the host
+- `sw-ourbox-installer` merges those catalogs into one effective catalog on the host
+- `sw-ourbox-installer` chooses the selected app set from that merged catalog on the host
 - `sw-ourbox-installer` composes mission media using the Woodbox adapter in this
   repo
 - the target installs from those local mission bytes only

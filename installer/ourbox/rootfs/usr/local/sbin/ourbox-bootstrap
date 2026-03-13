@@ -15,6 +15,8 @@ RENDER_DIR="/run/ourbox-platform-rendered"
 DESIRED_CONTRACT_STATE=""
 PLATFORM_PROFILE_INPUT="${OURBOX_PLATFORM_PROFILE:-demo-apps}"
 SELECTED_APPS_FILE="${PLATFORM_CONTRACT_DIR}/selected-apps.json"
+APPLICATION_CATALOG_FILE="${PLATFORM_CONTRACT_DIR}/catalog.json"
+IMAGES_LOCK_FILE="${PLATFORM_CONTRACT_DIR}/images.lock.json"
 
 cleanup() {
   if [[ -n "${DESIRED_CONTRACT_STATE}" && -f "${DESIRED_CONTRACT_STATE}" ]]; then
@@ -189,6 +191,14 @@ render_cmd=(
 if [[ -f "${SELECTED_APPS_FILE}" ]]; then
   log "Applying mission-selected application set from ${SELECTED_APPS_FILE}"
   render_cmd+=(--selected-apps-file "${SELECTED_APPS_FILE}")
+fi
+if [[ -f "${APPLICATION_CATALOG_FILE}" ]]; then
+  log "Applying host-selected application catalog override from ${APPLICATION_CATALOG_FILE}"
+  render_cmd+=(--application-catalog "${APPLICATION_CATALOG_FILE}")
+fi
+if [[ -f "${IMAGES_LOCK_FILE}" ]]; then
+  log "Applying host-selected images lock override from ${IMAGES_LOCK_FILE}"
+  render_cmd+=(--images-lock-file "${IMAGES_LOCK_FILE}")
 fi
 "${render_cmd[@]}"
 
