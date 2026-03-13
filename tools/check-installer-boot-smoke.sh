@@ -340,12 +340,12 @@ wait_for_cloud_init_ready() {
     status="$(installer_ssh "cloud-init status --long 2>/dev/null" 2>/dev/null || true)"
     datasource="$(installer_ssh "cloud-id 2>/dev/null || true" 2>/dev/null || true)"
     if installer_ssh "
-      systemctl is-active --quiet cloud-init-local.service && exit 1
-      systemctl is-active --quiet cloud-init.service && exit 1
-      systemctl is-active --quiet cloud-config.service && exit 1
-      systemctl is-failed --quiet cloud-init-local.service && exit 1
-      systemctl is-failed --quiet cloud-init.service && exit 1
-      systemctl is-failed --quiet cloud-config.service && exit 1
+      for unit in cloud-init-local.service cloud-init.service cloud-config.service; do
+        show=\"\$(systemctl show --property LoadState,SubState,Result \"\$unit\" 2>/dev/null || true)\"
+        grep -q '^LoadState=loaded$' <<<\"\$show\" || exit 1
+        grep -q '^Result=success$' <<<\"\$show\" || exit 1
+        grep -Eq '^SubState=(exited|dead)$' <<<\"\$show\" || exit 1
+      done
       exit 0
     " >/dev/null 2>&1 \
       && ! grep -q '^status: error$' <<<"${status}" \

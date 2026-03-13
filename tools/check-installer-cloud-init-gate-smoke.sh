@@ -7,23 +7,20 @@ SMOKE="${ROOT}/tools/check-installer-boot-smoke.sh"
 grep -Fq 'wait_for_cloud_init_ready() {' "${SMOKE}" \
   || { echo "boot smoke does not define wait_for_cloud_init_ready" >&2; exit 1; }
 
-grep -Fq 'systemctl is-active --quiet cloud-init-local.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not wait for cloud-init-local.service to finish" >&2; exit 1; }
+grep -Fq 'for unit in cloud-init-local.service cloud-init.service cloud-config.service; do' "${SMOKE}" \
+  || { echo "boot smoke does not iterate over the required cloud-init one-shot units" >&2; exit 1; }
 
-grep -Fq 'systemctl is-active --quiet cloud-init.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not wait for cloud-init.service to finish" >&2; exit 1; }
+grep -Fq "systemctl show --property LoadState,SubState,Result" "${SMOKE}" \
+  || { echo "boot smoke does not inspect cloud-init unit state via systemctl show" >&2; exit 1; }
 
-grep -Fq 'systemctl is-active --quiet cloud-config.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not wait for cloud-config.service to finish" >&2; exit 1; }
+grep -Fq "grep -q '^LoadState=loaded$'" "${SMOKE}" \
+  || { echo "boot smoke does not require loaded cloud-init units" >&2; exit 1; }
 
-grep -Fq 'systemctl is-failed --quiet cloud-init-local.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not reject failed cloud-init-local.service" >&2; exit 1; }
+grep -Fq "grep -q '^Result=success$'" "${SMOKE}" \
+  || { echo "boot smoke does not require successful cloud-init unit results" >&2; exit 1; }
 
-grep -Fq 'systemctl is-failed --quiet cloud-init.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not reject failed cloud-init.service" >&2; exit 1; }
-
-grep -Fq 'systemctl is-failed --quiet cloud-config.service && exit 1' "${SMOKE}" \
-  || { echo "boot smoke does not reject failed cloud-config.service" >&2; exit 1; }
+grep -Fq "grep -Eq '^SubState=(exited|dead)$'" "${SMOKE}" \
+  || { echo "boot smoke does not accept completed one-shot cloud-init unit substates" >&2; exit 1; }
 
 grep -Fq 'cloud-id 2>/dev/null || true' "${SMOKE}" \
   || { echo "boot smoke does not capture cloud-id datasource diagnostics" >&2; exit 1; }
