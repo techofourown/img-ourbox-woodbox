@@ -1,3 +1,12 @@
+## [0.10.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.2...v0.10.3) (2026-03-13)
+
+
+### Bug Fixes
+
+* **adapter:** parse substrate iso volume id robustly ([74cb5f1](https://github.com/techofourown/img-ourbox-woodbox/commit/74cb5f19bf480ebac0fcda907e3c0e66abe75159))
+* **installer:** consume published woodbox substrate ([5cc0cf4](https://github.com/techofourown/img-ourbox-woodbox/commit/5cc0cf4bdb015f35e6cbf47c2a2f57fa68e5dcc3))
+* **installer:** reduce flash-path disk churn ([f0e5414](https://github.com/techofourown/img-ourbox-woodbox/commit/f0e5414afe8914342becfbb387372369004b66c7))
+
 ## [0.10.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.1...v0.10.2) (2026-03-12)
 
 
