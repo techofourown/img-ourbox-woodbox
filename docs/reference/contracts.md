@@ -86,6 +86,7 @@ Mission media contains:
 
 - installer substrate
 - embedded OS payload
+- substrate-local target package repo
 - embedded mission manifest
 - embedded selected `airgap-platform` bundle
 
@@ -97,10 +98,13 @@ Install flow:
 3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
 4. `ourbox-preinstall` stages the embedded OS payload into `/opt/ourbox/installer/cache/payload/`
 5. `ourbox-preinstall` reads mission-selected OS and `airgap-platform` provenance from the embedded mission manifest
-6. Operator confirms disk selection, identity, and `INSTALL`
-7. Autoinstall late-commands extract the staged OS payload to `/target/`
+6. `ourbox-preinstall` prepares the offline target helpers, including local package installation and netplan rendering from hardware inventory
+7. Operator confirms disk selection, identity, and `INSTALL`
+8. Autoinstall late-commands extract the staged OS payload to `/target/`
 
 The target does not browse catalogs, resolve refs, or pull artifacts during install.
+The target also does not consult remote package mirrors during install; any
+required Ubuntu packages come only from the substrate-local APT repo.
 
 Installer substrate artifacts may still exist as host-composition inputs, but they are not a
 supported standalone install path.

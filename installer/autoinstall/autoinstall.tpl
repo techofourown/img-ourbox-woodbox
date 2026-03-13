@@ -39,25 +39,12 @@ ${OURBOX_STORAGE_MATCH}
     username: ${OURBOX_USERNAME}
     password: ${OURBOX_PASSWORD_HASH}
 
-  ssh:
-    install-server: true
-    allow-pw: true
-
-  packages:
-    - curl
-    - ca-certificates
-    - openssl
-    - xz-utils
-    - jq
-    - avahi-daemon
-    - avahi-utils
-
   late-commands:
     # -----------------------------------------------------------------------
-    # [1/8] Extract staged OS payload (rootfs overlay + airgap artifacts).
-    #       Payload staged by ourbox-preinstall from embedded ISO or registry.
+    # [1/10] Extract staged OS payload (rootfs overlay + airgap artifacts).
+    #        Payload staged by ourbox-preinstall from embedded mission media.
     # -----------------------------------------------------------------------
-    - echo "==> [1/8] Extracting OS payload"
+    - echo "==> [1/10] Extracting OS payload"
     - 'echo "==>       payload: $(ls -lh /opt/ourbox/installer/cache/payload/os-payload.tar.gz 2>/dev/null || echo NOT FOUND)"'
     - rm -rf /opt/ourbox/installer/cache/payload-staging
     - mkdir -p /opt/ourbox/installer/cache/payload-staging
@@ -70,30 +57,38 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       rootfs + airgap copied to /target"
 
     # -----------------------------------------------------------------------
-    # [2/9] Apply optional airgap-platform override (mutable subset only).
+    # [2/10] Install the remaining target packages from the substrate-local
+    #        APT repo only. No remote mirrors are allowed in the official path.
     # -----------------------------------------------------------------------
-    - echo "==> [2/9] Applying optional airgap-platform override"
+    - echo "==> [2/10] Installing required target packages from local repo"
+    - /bin/bash /opt/ourbox/installer/cache/install-target-packages.sh
+    - echo "==>       target packages installed from local substrate repo"
+
+    # -----------------------------------------------------------------------
+    # [3/10] Apply optional airgap-platform override (mutable subset only).
+    # -----------------------------------------------------------------------
+    - echo "==> [3/10] Applying optional airgap-platform override"
     - /bin/bash /opt/ourbox/installer/cache/apply-airgap-platform-override.sh
     - echo "==>       airgap override step complete"
 
     # -----------------------------------------------------------------------
-    # [3/9] Install k3s binary from the final selected airgap payload
+    # [4/10] Install k3s binary from the final selected airgap payload
     # -----------------------------------------------------------------------
-    - echo "==> [3/9] Installing k3s binary"
+    - echo "==> [4/10] Installing k3s binary"
     - install -D -m 0755 /target/opt/ourbox/airgap/k3s/k3s /target/usr/local/bin/k3s
     - 'echo "==>       k3s installed: $(ls -lh /target/usr/local/bin/k3s 2>/dev/null)"'
 
     # -----------------------------------------------------------------------
-    # [4/9] Append install-time provenance to /etc/ourbox/release
+    # [5/10] Append install-time provenance to /etc/ourbox/release
     # -----------------------------------------------------------------------
-    - echo "==> [4/9] Appending install provenance"
+    - echo "==> [5/10] Appending install provenance"
     - /bin/bash /opt/ourbox/installer/cache/append-provenance.sh
     - echo "==>       provenance appended"
 
     # -----------------------------------------------------------------------
-    # [5/9] Enable required services
+    # [6/10] Enable required services
     # -----------------------------------------------------------------------
-    - echo "==> [5/9] Enabling OurBox services"
+    - echo "==> [6/10] Enabling OurBox services"
     - curtin in-target --target=/target -- systemctl enable ourbox-bootstrap.service
     - curtin in-target --target=/target -- systemctl enable ourbox-status.service
     - curtin in-target --target=/target -- systemctl enable avahi-daemon.service
@@ -102,30 +97,31 @@ ${OURBOX_STORAGE_MATCH}
     - echo "==>       services enabled"
 
     # -----------------------------------------------------------------------
-    # [6/9] OurBox DATA mount contract (by label).
-    #       Written directly to /target/etc/fstab.
+    # [7/10] OurBox DATA mount contract (by label).
+    #        Written directly to /target/etc/fstab.
     # -----------------------------------------------------------------------
-    - echo "==> [6/9] Writing OURBOX_DATA fstab entry"
+    - echo "==> [7/10] Writing OURBOX_DATA fstab entry"
     - 'mkdir -p /target/var/lib/ourbox && grep -qF "LABEL=OURBOX_DATA" /target/etc/fstab || echo "LABEL=OURBOX_DATA /var/lib/ourbox ext4 defaults,noatime,nofail,x-systemd.device-timeout=10 0 2" >> /target/etc/fstab'
     - echo "==>       fstab entry written"
 
     # -----------------------------------------------------------------------
-    # [7/9] Rewrite netplan to match NIC by MAC address.
+    # [8/10] Install the prepared target netplan rendered from hardware
+    #        inventory, not from live link state.
     # -----------------------------------------------------------------------
-    - echo "==> [7/9] Rewriting netplan (MAC-based)"
-    - 'iface=$(ip route show default 2>/dev/null | awk "{print \$5; exit}"); mac=$(cat /sys/class/net/"$iface"/address 2>/dev/null); echo "==>       iface=${iface} mac=${mac}"; [ -n "$mac" ] && printf "network:\n  version: 2\n  ethernets:\n    id0:\n      match:\n        macaddress: %s\n      dhcp4: true\n" "$mac" > /target/etc/netplan/00-installer-config.yaml'
-    - echo "==>       netplan written"
+    - echo "==> [8/10] Installing prepared target netplan"
+    - /bin/bash /opt/ourbox/installer/cache/apply-target-netplan.sh
+    - echo "==>       netplan written from hardware inventory"
 
     # -----------------------------------------------------------------------
-    # [8/9] Verify DATA disk prepared by pre-installer after INSTALL confirmation.
+    # [9/10] Verify DATA disk prepared by pre-installer after INSTALL confirmation.
     # -----------------------------------------------------------------------
-    - 'echo "==> [8/9] Verifying DATA disk prepared in preinstall"'
+    - 'echo "==> [9/10] Verifying DATA disk prepared in preinstall"'
     - 'test -n "$(blkid -L OURBOX_DATA 2>/dev/null)"'
     - 'echo "==>       OURBOX_DATA present on $(blkid -L OURBOX_DATA)"'
     - 'lsblk -o NAME,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$(blkid -L OURBOX_DATA)" || true'
 
     # -----------------------------------------------------------------------
-    # [9/9] Prefer the installed EFI entry on the selected target disk.
+    # [10/10] Prefer the installed EFI entry on the selected target disk.
     #       Do not use BootCurrent here: during external-media installs it
     #       identifies the installer transport, not the desired post-install
     #       default. Instead, resolve the target ESP mounted at /target/boot/efi,
@@ -133,7 +129,7 @@ ${OURBOX_STORAGE_MATCH}
     #       immediate next boot, and move that entry to the front of BootOrder
     #       while preserving the relative order of everything else.
     # -----------------------------------------------------------------------
-    - echo "==> [9/9] Preferring installed EFI boot entry"
+    - echo "==> [10/10] Preferring installed EFI boot entry"
     - |
         set -e
         EFI_STATUS_FILE="/run/ourbox-efi-boot-preference.env"
@@ -287,11 +283,6 @@ ${OURBOX_STORAGE_MATCH}
 
     # Clear static MOTD so only our dynamic status script runs
     - truncate -s 0 /target/etc/motd
-
-    # Try to install NVIDIA drivers (requires internet); safe to fail.
-    # If you are fully airgapped, remove this line.
-    - echo "==> Attempting NVIDIA driver install (safe to fail if no internet)"
-    - curtin in-target --target=/target -- /bin/bash -lc 'ubuntu-drivers install --gpgpu || true'
 
     - echo "==> =================================================================="
     - echo "==> OurBox late-commands complete. Machine powering off."

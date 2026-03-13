@@ -94,7 +94,3 @@ autoinstall:
       name: lvm
       match:
         ssd: true
-
-  ssh:
-    install-server: true
-    allow-pw: true

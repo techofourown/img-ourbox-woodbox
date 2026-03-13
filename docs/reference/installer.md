@@ -77,6 +77,8 @@ Mission media embeds:
 - `/cdrom/ourbox/payload/os-payload.tar.gz`
 - `/cdrom/ourbox/payload/os-payload.tar.gz.sha256`
 - `/cdrom/ourbox/payload/payload.meta.env`
+- `/cdrom/ourbox/apt/Packages.gz`
+- `/cdrom/ourbox/apt/target-packages.txt`
 - `/cdrom/ourbox/mission/mission-manifest.json`
 - `/cdrom/ourbox/mission/artifacts/os/...`
 - `/cdrom/ourbox/mission/artifacts/airgap/...`
@@ -130,6 +132,13 @@ Step 4:
   - required bundle shape and manifest fields
 
 There is no target-side fallback selection path.
+
+Before Subiquity handoff, `ourbox-preinstall` also:
+
+- renders the final target netplan from sysfs Ethernet inventory
+- stages wrappers for late-commands to:
+  - install required target packages from `/cdrom/ourbox/apt` only
+  - copy the prepared netplan into `/target/etc/netplan/00-installer-config.yaml`
 
 At the end of late-commands, the installer attempts to identify the installed
 EFI entry on the target ESP, set `BootNext` to it for the immediate next boot,
@@ -218,18 +227,16 @@ target-side runtime input.
 
 Late-commands in `autoinstall.tpl`:
 
-1. Extract `os-payload.tar.gz` from `/opt/ourbox/installer/cache/payload/`
-2. Copy `rootfs/` overlay into `/target/`
-3. Copy the baked airgap bundle into `/target/opt/ourbox/airgap/`
+1. Extract `os-payload.tar.gz` and copy the payload rootfs + baked airgap bytes into `/target/`
+2. Install the remaining target packages from the substrate-local APT repo only
+3. If the mission-selected airgap bundle differs from the baked bundle, overlay the validated mutable airgap subset from the override cache
 4. Install the `k3s` binary from `airgap/k3s/k3s`
-5. If the mission-selected airgap bundle differs from the baked bundle, overlay
-   the validated mutable airgap subset from the override cache
-6. Append install-time provenance to `/target/etc/ourbox/release`
-7. Enable required systemd services
-8. Write DATA disk `fstab` entry
-9. Configure netplan by MAC address
-10. Format the DATA disk as `OURBOX_DATA`
-11. Prefer the installed EFI entry for the next and future UEFI boots
+5. Append install-time provenance to `/target/etc/ourbox/release`
+6. Enable required systemd services
+7. Write DATA disk `fstab` entry
+8. Copy the prepared netplan rendered from NIC hardware inventory
+9. Verify the DATA disk prepared by `ourbox-preinstall`
+10. Prefer the installed EFI entry for the next and future UEFI boots
 
 ## Provenance written at install time
 

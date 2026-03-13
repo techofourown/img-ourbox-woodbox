@@ -33,9 +33,17 @@ check_k3s_api() {
 }
 
 check_traefik() {
-  local rc
-  rc=$(curl -s -o /dev/null -w '%{http_code}' -m 2 http://127.0.0.1/ 2>/dev/null) || true
-  [[ -n "$rc" && "$rc" != "000" ]]
+  python3 - <<'PY' >/dev/null 2>&1
+import sys
+import urllib.error
+import urllib.request
+
+try:
+    with urllib.request.urlopen("http://127.0.0.1/", timeout=2) as response:
+        sys.exit(0 if getattr(response, "status", 200) else 0)
+except (OSError, urllib.error.URLError):
+    sys.exit(1)
+PY
 }
 
 check_mdns() {
