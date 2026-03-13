@@ -18,6 +18,7 @@ OURBOX_INSTALLER_SSH_PASSWORD_HASH=""
 OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS=""
 
 GENERATED_PASSWORD=""
+: "${OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS:=180}"
 
 log() {
   printf '[ourbox-bootcmd] %s\n' "$*"
@@ -87,7 +88,7 @@ trap on_signal INT
 trap on_signal HUP
 
 wait_for_local_ssh_banner() {
-  local deadline=$((SECONDS + 30))
+  local deadline=$((SECONDS + OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS))
 
   while (( SECONDS < deadline )); do
     if python3 - <<'PY' >/dev/null 2>&1
