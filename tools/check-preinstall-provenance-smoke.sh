@@ -67,9 +67,10 @@ write_install_provenance
   exit 1
 }
 
-grep -F "AIRGAP_PLATFORM_ARTIFACT_SOURCE=registry" "${CACHE_DIR}/install-provenance.env" >/dev/null
-grep -F "APPLICATION_CATALOG_ID=demo-apps" "${CACHE_DIR}/install-provenance.env" >/dev/null
-grep -F "SELECTED_APPLICATION_IDS=landing,dufs" "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'APPLICATION_CATALOG_ID="demo-apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'APPLICATION_CATALOG_NAME="Demo Apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'SELECTED_APPLICATION_IDS="landing,dufs"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=\${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
 grep -F "OURBOX_APPLICATION_CATALOG_ID=\${APPLICATION_CATALOG_ID:-}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
 grep -F "OURBOX_SELECTED_APPLICATION_IDS=\${SELECTED_APPLICATION_IDS:-}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
