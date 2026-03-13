@@ -38,7 +38,7 @@ bootcmd:
   # shell body out of cloud-config avoids YAML regressions from inline heredocs.
   - "install -m 0755 /cdrom/ourbox/tools/ourbox-installer-ssh-bootstrap.sh /run/ourbox-installer-ssh-bootstrap.sh 2>/dev/null || true"
   - "echo '[ourbox-bootcmd] installer SSH bootstrap starting' >> /run/ourbox-installer.log"
-  - "OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS=180 timeout 240 /bin/bash /run/ourbox-installer-ssh-bootstrap.sh >> /run/ourbox-installer.log 2>&1 && echo '[ourbox-bootcmd] installer SSH bootstrap completed' >> /run/ourbox-installer.log || echo '[ourbox-bootcmd] ERROR: installer SSH bootstrap failed or timed out' >> /run/ourbox-installer.log"
+  - "OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS=180 timeout 60 /bin/bash /run/ourbox-installer-ssh-bootstrap.sh >> /run/ourbox-installer.log 2>&1 && echo '[ourbox-bootcmd] installer SSH bootstrap queued readiness watcher' >> /run/ourbox-installer.log || echo '[ourbox-bootcmd] ERROR: installer SSH bootstrap failed or timed out' >> /run/ourbox-installer.log"
 
   # Start avahi-daemon if available for mDNS (.local) discoverability.
   - "systemctl --no-block start avahi-daemon 2>/dev/null || true"

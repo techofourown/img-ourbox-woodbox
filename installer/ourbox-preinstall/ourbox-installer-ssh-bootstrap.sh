@@ -8,16 +8,16 @@ PASSWORD_FILE="${PASSWORD_FILE:-/run/ourbox-installer-ssh-password.txt}"
 CONFIG_FILE="${CONFIG_FILE:-/etc/ssh/sshd_config.d/60-ourbox-installer.conf}"
 HELPER_FILE="${HELPER_FILE:-/cdrom/ourbox/tools/installer-ssh-helper.sh}"
 
-OURBOX_INSTALLER_SSH_STATUS="pending"
-OURBOX_INSTALLER_SSH_USER="ourbox-installer"
-OURBOX_INSTALLER_SSH_MODE="both"
-OURBOX_INSTALLER_SSH_ALLOW_ROOT="0"
-OURBOX_INSTALLER_SSH_PASSWORD_STATE="disabled"
-OURBOX_INSTALLER_SSH_KEY_STATE="disabled"
-OURBOX_INSTALLER_SSH_PASSWORD_HASH=""
-OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS=""
+OURBOX_INSTALLER_SSH_STATUS="${OURBOX_INSTALLER_SSH_STATUS:-pending}"
+OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
+OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE:-both}"
+OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+OURBOX_INSTALLER_SSH_PASSWORD_STATE="${OURBOX_INSTALLER_SSH_PASSWORD_STATE:-disabled}"
+OURBOX_INSTALLER_SSH_KEY_STATE="${OURBOX_INSTALLER_SSH_KEY_STATE:-disabled}"
+OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-}"
+OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
 
-GENERATED_PASSWORD=""
+GENERATED_PASSWORD="${GENERATED_PASSWORD:-}"
 : "${OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS:=180}"
 
 log() {
@@ -143,6 +143,54 @@ restart_ssh_service() {
   return 1
 }
 
+spawn_ready_watcher() {
+  local child_pid=""
+
+  child_pid="$(
+    env \
+      LOG_FILE="${LOG_FILE}" \
+      DEFAULTS_FILE="${DEFAULTS_FILE}" \
+      STATUS_FILE="${STATUS_FILE}" \
+      PASSWORD_FILE="${PASSWORD_FILE}" \
+      CONFIG_FILE="${CONFIG_FILE}" \
+      HELPER_FILE="${HELPER_FILE}" \
+      OURBOX_INSTALLER_SSH_STATUS="${OURBOX_INSTALLER_SSH_STATUS}" \
+      OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER}" \
+      OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE}" \
+      OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" \
+      OURBOX_INSTALLER_SSH_PASSWORD_STATE="${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" \
+      OURBOX_INSTALLER_SSH_KEY_STATE="${OURBOX_INSTALLER_SSH_KEY_STATE}" \
+      OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH}" \
+      OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" \
+      OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS="${OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS}" \
+      GENERATED_PASSWORD="${GENERATED_PASSWORD}" \
+      OURBOX_INSTALLER_SSH_READY_WATCHER=1 \
+      nohup /bin/bash "$0" >> "${LOG_FILE}" 2>&1 &
+    printf '%s' "$!"
+  )"
+
+  [[ "${child_pid}" =~ ^[0-9]+$ ]] || return 1
+  log "installer SSH readiness watcher spawned (pid=${child_pid})"
+}
+
+ready_watcher_main() {
+  log "installer SSH readiness watcher begin"
+
+  if ! wait_for_local_ssh_banner; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "disabled" ]]; then
+      OURBOX_INSTALLER_SSH_PASSWORD_STATE="error"
+    fi
+    log "ERROR: sshd start was requested but no local SSH banner was observed within ${OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS}s"
+    finalize_status
+    return 1
+  fi
+
+  OURBOX_INSTALLER_SSH_STATUS="ready"
+  log "SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT} password=${OURBOX_INSTALLER_SSH_PASSWORD_STATE} key=${OURBOX_INSTALLER_SSH_KEY_STATE})"
+  finalize_status
+}
+
 main() {
   log "installer SSH bootstrap begin"
 
@@ -264,15 +312,13 @@ main() {
     return 0
   fi
 
-  if ! wait_for_local_ssh_banner; then
+  if ! spawn_ready_watcher; then
     OURBOX_INSTALLER_SSH_STATUS="error"
-    log "ERROR: sshd start was requested but no local SSH banner was observed"
+    log "ERROR: failed to launch installer SSH readiness watcher"
     finalize_status
     return 1
   fi
 
-  OURBOX_INSTALLER_SSH_STATUS="ready"
-  log "SSH ready (user=${OURBOX_INSTALLER_SSH_USER} mode=${OURBOX_INSTALLER_SSH_MODE} root=${OURBOX_INSTALLER_SSH_ALLOW_ROOT} password=${OURBOX_INSTALLER_SSH_PASSWORD_STATE} key=${OURBOX_INSTALLER_SSH_KEY_STATE})"
   finalize_status
 }
 
@@ -281,4 +327,8 @@ if [[ "${OURBOX_INSTALLER_SSH_BOOTSTRAP_LIBRARY_ONLY:-0}" == "1" ]]; then
   return 0 2>/dev/null || exit 0
 fi
 
-main "$@"
+if [[ "${OURBOX_INSTALLER_SSH_READY_WATCHER:-0}" == "1" ]]; then
+  ready_watcher_main "$@"
+else
+  main "$@"
+fi

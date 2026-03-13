@@ -17,6 +17,7 @@ Environment overrides:
   VM_MEMORY_MB=4096
   VM_CPUS=2
   BOOT_TIMEOUT_SECS=600
+  INITIAL_MONITOR_TIMEOUT_SECS=300
   OURBOX_INSTALLER_SSH_USER=ourbox-installer
   OURBOX_INSTALLER_SSH_MODE=both
   OURBOX_INSTALLER_SSH_KEY=/path/to/private_key
@@ -46,6 +47,7 @@ VM_UDP_PORT="${VM_UDP_PORT:-19999}"
 VM_MEMORY_MB="${VM_MEMORY_MB:-4096}"
 VM_CPUS="${VM_CPUS:-2}"
 BOOT_TIMEOUT_SECS="${BOOT_TIMEOUT_SECS:-600}"
+INITIAL_MONITOR_TIMEOUT_SECS="${INITIAL_MONITOR_TIMEOUT_SECS:-300}"
 OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
 OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE:-both}"
 OURBOX_INSTALLER_SSH_KEY="${OURBOX_INSTALLER_SSH_KEY:-}"
@@ -381,7 +383,7 @@ QEMU_PID="$!"
 log "Waiting for installer monitor to serve initial status page"
 if ! wait_for_http_response_contains \
   "http://127.0.0.1:${VM_HTTP_PORT}/" \
-  180 \
+  "${INITIAL_MONITOR_TIMEOUT_SECS}" \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer"; then
   log_failure_diagnostics
