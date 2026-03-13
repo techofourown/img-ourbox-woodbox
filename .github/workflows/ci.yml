@@ -125,6 +125,16 @@ jobs:
       - name: Validate Woodbox media adapter contract
         run: bash tools/check-media-adapter-validation-smoke.sh
 
+  flash-helper-smoke:
+    name: Flash helper smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox flash helper
+        run: bash tools/check-flash-installer-media-smoke.sh
+
   preinstall-provenance-smoke:
     name: Preinstall provenance smoke
     runs-on: ubuntu-latest
