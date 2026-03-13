@@ -1,8 +1,8 @@
 # img-ourbox-woodbox
 
 Build repository for **OurBox Woodbox** — a local-first x86-64 appliance running the OurBox
-software platform. This repo produces a bootable USB installer and distributable OS payload
-artifacts for Woodbox hardware.
+software platform. This repo produces the Woodbox OS payload and the Woodbox installer
+substrate consumed by the unified host-side installer.
 
 **Hardware**: x86-64 desktop-class PC, UEFI, NVMe system disk, SATA data disk
 **OS base**: Ubuntu Server LTS 24.04 (x86-64), autoinstall via cloud-init
@@ -14,29 +14,45 @@ artifacts for Woodbox hardware.
 - **Default SKU**: `TOO-OBX-WBX-BASE-JU3XK8`
 - **Build target**: `x86`
 
-## Quick start
+## If You Want To Install A Woodbox
 
-### Compose Woodbox mission media
+Do not start from this repo.
 
-Woodbox mission media is now composed by the unified host-side installer repo,
-`sw-ourbox-installer`. This repo is no longer the operator front door for
-artifact selection or USB composition.
+Woodbox installation now goes through the unified host-side installer:
 
-Use the unified host-side composer:
+- repo: `https://github.com/techofourown/sw-ourbox-installer`
+- normal operator command:
 
 ```bash
 cd sw-ourbox-installer
 ./tools/prepare-installer-media.sh
 ```
 
-That flow resolves the selected OS payload and `airgap-platform` bundle on the
-trusted host, pulls the published Woodbox installer substrate artifact,
-stages the exact bytes onto mission media, and produces a USB that installs
-fully offline on the target.
+That flow:
+
+- chooses the Woodbox OS artifact on the trusted host
+- chooses the `airgap-platform` bundle on the trusted host
+- pulls the published Woodbox installer substrate artifact
+- composes mission media
+- flashes removable media
+- installs fully offline on the target
+
+This repo is not the operator front door for artifact selection or USB
+composition anymore.
 
 The helper at [tools/prepare-installer-media.sh](/techofourown/img-ourbox-woodbox/tools/prepare-installer-media.sh)
 now delegates to `sw-ourbox-installer`; it does not maintain a separate
 Woodbox-only operator flow.
+
+## What This Repo Owns
+
+This repo still owns the Woodbox-specific surfaces below the hardware seam:
+
+- Woodbox OS payload build and publish
+- Woodbox installer substrate build and publish
+- Woodbox target runtime install behavior
+- Woodbox storage, boot, and hardware-specific installation logic
+- Woodbox host-side media adapter surface used by `sw-ourbox-installer`
 
 ## Operator runbook
 
@@ -49,14 +65,26 @@ See [`docs/OPS.md`](./docs/OPS.md) for the full operator runbook including:
 
 ## Artifact model
 
-Woodbox produces two distributable artifacts:
+Woodbox now has a two-layer model:
+
+- this repo publishes target-owned artifacts
+- `sw-ourbox-installer` composes final mission media from those artifacts
+
+Published artifacts from this repo:
 
 | Artifact | ORAS artifact type | Registry |
 |---|---|---|
 | OS payload (`.tar.gz`) | `application/vnd.techofourown.ourbox.woodbox.os-payload.v1` | `ghcr.io/techofourown/ourbox-woodbox-os` |
-| Installer ISO (`.iso`) | `application/vnd.techofourown.ourbox.woodbox.installer.v1` | `ghcr.io/techofourown/ourbox-woodbox-installer` |
+| Installer substrate ISO (`.iso`) | `application/vnd.techofourown.ourbox.woodbox.installer.v1` | `ghcr.io/techofourown/ourbox-woodbox-installer` |
 
 Official channel tags: `x86-stable`, `x86-nightly`, `x86-installer-stable`, `x86-installer-nightly`
+
+Important distinction:
+
+- the published installer ISO is a substrate artifact, not the supported standalone install path
+- the supported install path is host-composed mission media created by `sw-ourbox-installer`
+- mission media embeds the selected OS payload, selected `airgap-platform` bundle, and mission manifest
+- the target then installs from those local mission bytes only
 
 See [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) for the full provenance model
 and official release policy.
@@ -72,16 +100,26 @@ Official artifacts are produced by organization-controlled build infrastructure 
 - Exp-labs promotion: GitHub Release `prereleased` via `.github/workflows/official-exp-labs.yml`
 - Heavy-build runners: `[self-hosted, official-heavy, x86-image]` (organization-controlled)
 
-Official Woodbox builds still publish the OS payload first and also publish a
-bootable installer substrate artifact for host-side composition workflows.
-Candidate builds consume the pinned refs in `release/official-inputs.env`;
-scheduled nightly integration builds resolve the latest `sw-ourbox-os`
+Official Woodbox builds publish:
+
+- the OS payload artifact
+- the Woodbox installer substrate artifact used by host-side mission composition
+
+Candidate builds consume the pinned refs in `release/official-inputs.env`.
+Scheduled nightly integration builds resolve the latest `sw-ourbox-os`
 nightly/platform inputs at workflow time.
+
+The offline-install contract now lives in the Woodbox substrate itself:
+
+- target package installation comes from substrate-local media, not Ubuntu mirrors
+- target netplan is rendered from hardware inventory, not the live installer's default route
+- target-side OS and `airgap-platform` browsing/pulling are removed from the supported path
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
+| [`sw-ourbox-installer`](https://github.com/techofourown/sw-ourbox-installer) | Unified host-side installer and mission-media composer |
 | [`sw-ourbox-os`](https://github.com/techofourown/sw-ourbox-os) | Upstream platform-contract and install-defaults producer |
 | [`docs/OPS.md`](./docs/OPS.md) | Operator runbook |
 | [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) | Artifact provenance and release policy |
