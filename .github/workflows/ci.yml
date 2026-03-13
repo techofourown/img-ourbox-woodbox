@@ -197,6 +197,16 @@ jobs:
       - name: Verify Woodbox offline helper generation
         run: bash tools/check-preinstall-offline-helpers-smoke.sh
 
+  mission-media-helper:
+    name: Mission media helper smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify mission-media smoke helper
+        run: bash tools/check-prepare-mission-media-smoke.sh
+
   commitlint:
     name: Commit message lint
     runs-on: ubuntu-latest

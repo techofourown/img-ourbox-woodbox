@@ -114,6 +114,40 @@ jobs:
           VM_UDP_PORT: "19999"
           OURBOX_SMOKE_ARTIFACT_DIR: deploy/smoke-diag
 
+      - name: Compose mission media smoke ISO
+        run: |
+          set -euo pipefail
+          PAYLOAD="$(ls -1t deploy/os-payload-ourbox-woodbox-x86-*.tar.gz 2>/dev/null | head -n1 || true)"
+          META_ENV="$(ls -1t deploy/os-payload-ourbox-woodbox-x86-*.meta.env 2>/dev/null | head -n1 || true)"
+          SUBSTRATE_ISO="$(ls -1t deploy/installer-ourbox-woodbox-x86-*-smoke.iso 2>/dev/null | head -n1 || true)"
+          if [[ -z "${PAYLOAD}" || -z "${META_ENV}" || -z "${SUBSTRATE_ISO}" ]]; then
+            echo "ERROR: missing payload, metadata, or smoke substrate ISO for mission-media compose" >&2
+            exit 1
+          fi
+          bash ./tools/prepare-mission-media-smoke.sh \
+            --os-payload "${PAYLOAD}" \
+            --os-meta-env "${META_ENV}" \
+            --substrate-iso "${SUBSTRATE_ISO}" \
+            --output-dir deploy/mission-smoke
+
+      - name: Boot mission media ISO smoke test
+        run: |
+          set -euo pipefail
+          ISO="$(ls -1t deploy/mission-smoke/media/*.iso 2>/dev/null | head -n1 || true)"
+          if [[ -z "${ISO}" ]]; then
+            echo "ERROR: mission-media smoke ISO not found" >&2
+            exit 1
+          fi
+          bash ./tools/check-installer-boot-smoke.sh "${ISO}"
+        env:
+          OURBOX_INSTALLER_SSH_KEY: ${{ env.OURBOX_INSTALLER_SMOKE_KEY }}
+          OURBOX_INSTALLER_SSH_PASSWORD: ${{ env.OURBOX_INSTALLER_SMOKE_PASSWORD }}
+          OURBOX_INSTALLER_SSH_PASSWORD_STATE: configured-hash
+          OURBOX_INSTALLER_SSH_MODE: both
+          OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
+          VM_UDP_PORT: "20999"
+          OURBOX_SMOKE_ARTIFACT_DIR: deploy/mission-smoke-diag
+
       - name: Build installer ISO
         run: ./tools/build-installer-iso.sh
         env:
@@ -156,4 +190,7 @@ jobs:
           name: smoke-diag-woodbox-${{ github.run_id }}
           path: |
             deploy/smoke-diag/**
+            deploy/mission-smoke/mission/**
+            deploy/mission-smoke/media/*.sha256
+            deploy/mission-smoke-diag/**
           if-no-files-found: warn
