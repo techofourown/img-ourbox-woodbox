@@ -1,3 +1,10 @@
+## [0.10.7](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.6...v0.10.7) (2026-03-13)
+
+
+### Bug Fixes
+
+* **ci:** derive platform contract ref from airgap bundle manifest ([af79a54](https://github.com/techofourown/img-ourbox-woodbox/commit/af79a54dd76942710969f422c5ee63cb79bc8040))
+
 ## [0.10.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.5...v0.10.6) (2026-03-13)
 
 
