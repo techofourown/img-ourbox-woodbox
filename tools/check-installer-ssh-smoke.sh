@@ -56,6 +56,10 @@ ssh_opts=(
 
 installer_auth="none"
 
+shell_single_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\"'\"'/g")"
+}
+
 installer_ssh() {
   local remote_cmd="${1:?remote command required}"
   case "${installer_auth}" in
@@ -146,7 +150,16 @@ echo "==> [3/3] Checking for leaked secrets in installer log"
 if [[ "${installer_auth}" == "none" ]]; then
   echo "WARN: no installer login method available; skipped remote log scan"
 else
-  installer_ssh "if [ -f '${remote_log_path}' ]; then ! grep -E -q 'ourbox-install|password:|sshpass -p ' '${remote_log_path}'; fi"
+  remote_log_path_q="$(shell_single_quote "${remote_log_path}")"
+  if [[ -n "${installer_password}" ]]; then
+    installer_password_q="$(shell_single_quote "${installer_password}")"
+    installer_ssh "if [ -f ${remote_log_path_q} ]; then ! grep -Fq -- ${installer_password_q} ${remote_log_path_q}; fi"
+  fi
+  if [[ -n "${root_password}" ]]; then
+    root_password_q="$(shell_single_quote "${root_password}")"
+    installer_ssh "if [ -f ${remote_log_path_q} ]; then ! grep -Fq -- ${root_password_q} ${remote_log_path_q}; fi"
+  fi
+  installer_ssh "if [ -f ${remote_log_path_q} ]; then ! grep -Fq -- 'BEGIN OPENSSH PRIVATE KEY' ${remote_log_path_q}; fi"
   echo "PASS: no known secret patterns in ${remote_log_path}"
 fi
 

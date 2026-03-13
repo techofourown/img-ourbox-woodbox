@@ -177,6 +177,16 @@ jobs:
       - name: Verify installer SSH bootstrap service control
         run: bash tools/check-installer-ssh-bootstrap-smoke.sh
 
+  installer-ssh-log-leak-smoke:
+    name: Installer SSH log leak smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer SSH leak detector
+        run: bash tools/check-installer-ssh-log-leak-smoke.sh
+
   preinstall-provenance-smoke:
     name: Preinstall provenance smoke
     runs-on: ubuntu-latest
