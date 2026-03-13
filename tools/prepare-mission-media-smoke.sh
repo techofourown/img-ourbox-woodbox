@@ -122,6 +122,7 @@ meta_dump="$(
     --allow OURBOX_VERSION \
     --allow OURBOX_RECIPE_GIT_HASH \
     --allow BUILD_TS \
+    --allow GIT_SHA \
     --allow OURBOX_PLATFORM_CONTRACT_SOURCE \
     --allow OURBOX_PLATFORM_CONTRACT_REVISION \
     --allow OURBOX_PLATFORM_CONTRACT_VERSION \
@@ -139,6 +140,9 @@ meta_dump="$(
     --allow OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
     --allow OURBOX_BASE_ISO_URL \
     --allow OURBOX_BASE_ISO_SHA256 \
+    --allow K3S_VERSION \
+    --allow GITHUB_RUN_ID \
+    --allow GITHUB_RUN_ATTEMPT \
     --require OS_ARTIFACT_TYPE \
     --require OURBOX_PLATFORM_CONTRACT_DIGEST \
     --require OURBOX_AIRGAP_PLATFORM_REF \
