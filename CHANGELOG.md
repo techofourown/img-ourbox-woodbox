@@ -1,3 +1,10 @@
+## [0.10.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.4...v0.10.5) (2026-03-13)
+
+
+### Bug Fixes
+
+* **installer:** make woodbox install path fully offline ([b050a91](https://github.com/techofourown/img-ourbox-woodbox/commit/b050a91f47433573edbc38430986a2951022d336))
+
 ## [0.10.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.3...v0.10.4) (2026-03-13)
 
 
