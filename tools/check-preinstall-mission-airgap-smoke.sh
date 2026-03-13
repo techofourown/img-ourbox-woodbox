@@ -15,8 +15,9 @@ OVERRIDE_DIR="${TMP}/cache/airgap-platform-override"
 MISSION_AIRGAP_DIR="${MISSION_ROOT}/artifacts/airgap"
 MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
 SOURCE_BUNDLE_DIR="${TMP}/source-airgap"
+INSTALLER_CACHE_DIR="${TMP}/cache"
 
-mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${PAYLOAD_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
+mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${PAYLOAD_DIR}" "${INSTALLER_CACHE_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
 cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
@@ -69,6 +70,40 @@ printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-airgap-images-amd64.tar"
 printf '{"images":[]}\n' > "${SOURCE_BUNDLE_DIR}/platform/images.lock.json"
 printf 'PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SOURCE_BUNDLE_DIR}/platform/images/platform-demo.tar"
+cat > "${MISSION_AIRGAP_DIR}/catalog.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing",
+    "dufs"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing"
+    },
+    {
+      "id": "dufs",
+      "display_name": "Dufs"
+    }
+  ]
+}
+EOF
+cat > "${MISSION_AIRGAP_DIR}/selected-apps.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "defaults",
+  "selected_app_ids": [
+    "landing",
+    "dufs"
+  ]
+}
+EOF
 
 tar -C "${SOURCE_BUNDLE_DIR}" -czf "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" k3s platform manifest.env
 sha256sum "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" | awk '{print $1"  airgap-platform.tar.gz"}' > "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz.sha256"
@@ -113,6 +148,17 @@ cat > "${MISSION_MANIFEST}" <<EOF
     "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
     "manifest_relpath": "artifacts/airgap/manifest.env",
     "present_in_selected_os_payload": false
+  },
+  "selected_applications": {
+    "catalog_id": "demo-apps",
+    "catalog_name": "Demo Apps",
+    "selection_mode": "defaults",
+    "selected_app_ids": [
+      "landing",
+      "dufs"
+    ],
+    "catalog_relpath": "artifacts/airgap/catalog.json",
+    "selection_relpath": "artifacts/airgap/selected-apps.json"
   }
 }
 EOF
@@ -130,8 +176,17 @@ load_selected_payload_airgap_metadata
   echo "unexpected mission OS artifact ref: ${OS_ARTIFACT_REF}" >&2
   exit 1
 }
+[[ "${OURBOX_APPLICATION_CATALOG_ID}" == "demo-apps" ]] || {
+  echo "unexpected application catalog id: ${OURBOX_APPLICATION_CATALOG_ID}" >&2
+  exit 1
+}
+[[ "${OURBOX_SELECTED_APPLICATION_IDS}" == "landing,dufs" ]] || {
+  echo "unexpected selected applications: ${OURBOX_SELECTED_APPLICATION_IDS}" >&2
+  exit 1
+}
 
 prepare_selected_airgap_platform_bundle
+stage_selected_application_metadata
 [[ "${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE}" == "mission" ]] || {
   echo "expected mission-local airgap override source, got ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE}" >&2
   exit 1
@@ -146,6 +201,14 @@ prepare_selected_airgap_platform_bundle
 }
 [[ -f "${AIRGAP_PLATFORM_OVERRIDE_DIR}/platform/images/platform-demo.tar" ]] || {
   echo "mission airgap platform image tar missing from override dir" >&2
+  exit 1
+}
+[[ -f "${INSTALLER_CACHE_DIR}/catalog.json" ]] || {
+  echo "mission application catalog was not staged into installer cache" >&2
+  exit 1
+}
+[[ -f "${INSTALLER_CACHE_DIR}/selected-apps.json" ]] || {
+  echo "mission selected-apps.json was not staged into installer cache" >&2
   exit 1
 }
 

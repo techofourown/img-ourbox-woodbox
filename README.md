@@ -31,7 +31,9 @@ cd sw-ourbox-installer
 That flow:
 
 - chooses the Woodbox OS artifact on the trusted host
-- chooses the `airgap-platform` bundle on the trusted host
+- chooses the application catalog bundle on the trusted host
+- chooses the default app set, all apps, or a custom app subset from that
+  catalog on the trusted host
 - pulls the published Woodbox installer substrate artifact
 - composes mission media
 - flashes removable media
@@ -83,7 +85,8 @@ Important distinction:
 
 - the published installer ISO is a substrate artifact, not the supported standalone install path
 - the supported install path is host-composed mission media created by `sw-ourbox-installer`
-- mission media embeds the selected OS payload, selected `airgap-platform` bundle, and mission manifest
+- mission media embeds the selected OS payload, selected application-catalog
+  bundle, selected-app metadata, and mission manifest
 - the target then installs from those local mission bytes only
 
 See [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) for the full provenance model
@@ -104,6 +107,12 @@ Official Woodbox builds publish:
 
 - the OS payload artifact
 - the Woodbox installer substrate artifact used by host-side mission composition
+
+Terminology note:
+
+- the transport artifact is still named `airgap-platform` in the current OCI
+  and runtime surfaces
+- the user-facing meaning is now “application catalog bundle”
 
 Candidate builds consume the pinned refs in `release/official-inputs.env`.
 Scheduled nightly integration builds resolve the latest `sw-ourbox-os`

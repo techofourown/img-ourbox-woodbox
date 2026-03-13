@@ -14,7 +14,8 @@ Woodbox now distinguishes two different objects:
 ### Mission media
 
 - composed on a trusted host
-- substrate plus selected OS payload, selected `airgap-platform` bundle, and `mission-manifest.json`
+- substrate plus selected OS payload, selected application-catalog bundle,
+  selected-app metadata, and `mission-manifest.json`
 - the only supported Woodbox install path
 - installs fully offline on the target
 
@@ -83,6 +84,12 @@ Mission media embeds:
 - `/cdrom/ourbox/mission/artifacts/os/...`
 - `/cdrom/ourbox/mission/artifacts/airgap/...`
 
+When the selected catalog advertises application-catalog metadata, the mission
+also carries:
+
+- `/cdrom/ourbox/mission/artifacts/airgap/catalog.json`
+- `/cdrom/ourbox/mission/artifacts/airgap/selected-apps.json`
+
 `ourbox-preinstall` requires both:
 
 - an embedded payload
@@ -100,6 +107,7 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 2. Prompts for the DATA disk
 3. Loads the staged OS payload from mission media
 4. Stages the selected `airgap-platform` bundle from mission media
+   and stages the selected application catalog / selected app set metadata
 5. Prompts for hostname, username, and password
 6. Prompts for final destructive confirmation (`INSTALL`)
 
@@ -123,6 +131,8 @@ Step 4:
 
 - reads the selected `airgap-platform` identity from the embedded mission
   manifest
+- reads the selected application catalog id and selected app ids from the
+  embedded mission manifest when present
 - if the mission-selected airgap bundle matches the baked bundle already inside
   the OS payload, uses the baked bundle
 - otherwise extracts the staged mission airgap bundle into the override cache
@@ -130,6 +140,8 @@ Step 4:
   - required `OURBOX_PLATFORM_CONTRACT_DIGEST`
   - expected `amd64` arch
   - required bundle shape and manifest fields
+- stages `catalog.json` and `selected-apps.json` into the installer cache when
+  the mission carries application-catalog metadata
 
 There is no target-side fallback selection path.
 
@@ -192,7 +204,8 @@ The supported operator install flow is not “flash the published substrate and
 let the target resolve artifacts.” Instead:
 
 - `sw-ourbox-installer` resolves the selected OS payload and selected
-  `airgap-platform` bundle on the host
+  application-catalog bundle on the host
+- `sw-ourbox-installer` chooses the selected app set from that catalog on the host
 - `sw-ourbox-installer` composes mission media using the Woodbox adapter in this
   repo
 - the target installs from those local mission bytes only
@@ -230,13 +243,14 @@ Late-commands in `autoinstall.tpl`:
 1. Extract `os-payload.tar.gz` and copy the payload rootfs + baked airgap bytes into `/target/`
 2. Install the remaining target packages from the substrate-local APT repo only
 3. If the mission-selected airgap bundle differs from the baked bundle, overlay the validated mutable airgap subset from the override cache
-4. Install the `k3s` binary from `airgap/k3s/k3s`
-5. Append install-time provenance to `/target/etc/ourbox/release`
-6. Enable required systemd services
-7. Write DATA disk `fstab` entry
-8. Copy the prepared netplan rendered from NIC hardware inventory
-9. Verify the DATA disk prepared by `ourbox-preinstall`
-10. Prefer the installed EFI entry for the next and future UEFI boots
+4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory when present
+5. Install the `k3s` binary from `airgap/k3s/k3s`
+6. Append install-time provenance to `/target/etc/ourbox/release`
+7. Enable required systemd services
+8. Write DATA disk `fstab` entry
+9. Copy the prepared netplan rendered from NIC hardware inventory
+10. Verify the DATA disk prepared by `ourbox-preinstall`
+11. Prefer the installed EFI entry for the next and future UEFI boots
 
 ## Provenance written at install time
 
@@ -264,3 +278,7 @@ Late-commands in `autoinstall.tpl`:
 - `OURBOX_AIRGAP_PLATFORM_DIGEST`
 - `OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE`
 - `OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL`
+- `OURBOX_APPLICATION_CATALOG_ID`
+- `OURBOX_APPLICATION_CATALOG_NAME`
+- `OURBOX_APPLICATION_SELECTION_MODE`
+- `OURBOX_SELECTED_APPLICATION_IDS`
