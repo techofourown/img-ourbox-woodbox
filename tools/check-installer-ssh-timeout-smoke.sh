@@ -5,9 +5,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BOOTSTRAP="${ROOT}/installer/ourbox-preinstall/ourbox-installer-ssh-bootstrap.sh"
 USER_DATA="${ROOT}/installer/autoinstall/user-data.tpl"
 
+# shellcheck disable=SC2016
 grep -Fq ': "${OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS:=180}"' "${BOOTSTRAP}" \
   || { echo "bootstrap does not default OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS to 180" >&2; exit 1; }
 
+# shellcheck disable=SC2016
 grep -Fq 'local deadline=$((SECONDS + OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS))' "${BOOTSTRAP}" \
   || { echo "bootstrap does not use OURBOX_INSTALLER_SSH_READY_TIMEOUT_SECS in wait_for_local_ssh_banner" >&2; exit 1; }
 
