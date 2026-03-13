@@ -234,6 +234,6 @@ log "Syncing pinned platform contract into installer tree"
 "${ROOT}/tools/sync-platform-contract-into-installer.sh"
 
 log "Ensuring baked application catalog metadata exists in fetched airgap bundle"
-"${ROOT}/tools/ensure-airgap-application-metadata.sh" \
+bash "${ROOT}/tools/ensure-airgap-application-metadata.sh" \
   --bundle-dir "${OUT}" \
   --contract-root "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform"
