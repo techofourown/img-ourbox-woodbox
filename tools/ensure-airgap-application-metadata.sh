@@ -8,6 +8,7 @@ source "${ROOT}/tools/lib.sh"
 BUNDLE_DIR=""
 CONTRACT_ROOT=""
 PROFILE_OVERRIDE=""
+FALLBACK_CATALOG=""
 
 usage() {
   cat <<'EOF'
@@ -41,6 +42,11 @@ while [[ $# -gt 0 ]]; do
     --profile)
       [[ $# -ge 2 ]] || die "--profile requires a value"
       PROFILE_OVERRIDE="$2"
+      shift 2
+      ;;
+    --fallback-catalog)
+      [[ $# -ge 2 ]] || die "--fallback-catalog requires a value"
+      FALLBACK_CATALOG="$2"
       shift 2
       ;;
     -h|--help)
@@ -111,11 +117,23 @@ PY
 PROFILE_NAME="${profile_dump}"
 PROFILE_DIR="${CONTRACT_ROOT}/profiles/${PROFILE_NAME}"
 PROFILE_CATALOG="${PROFILE_DIR}/catalog.json"
+DEFAULT_FALLBACK_CATALOG="${ROOT}/catalog-fallbacks/${PROFILE_NAME}.catalog.json"
+if [[ -n "${FALLBACK_CATALOG}" ]]; then
+  FALLBACK_CATALOG="$(readlink -m "${FALLBACK_CATALOG}")"
+else
+  FALLBACK_CATALOG="${DEFAULT_FALLBACK_CATALOG}"
+fi
 
 if [[ ! -f "${CATALOG_JSON}" ]]; then
-  [[ -f "${PROFILE_CATALOG}" ]] || die "bundle is missing platform/catalog.json and synced contract profile has no catalog: ${PROFILE_CATALOG}"
-  cp -f "${PROFILE_CATALOG}" "${CATALOG_JSON}"
-  log "Backfilled application catalog metadata into ${CATALOG_JSON} from ${PROFILE_CATALOG}"
+  if [[ -f "${PROFILE_CATALOG}" ]]; then
+    cp -f "${PROFILE_CATALOG}" "${CATALOG_JSON}"
+    log "Backfilled application catalog metadata into ${CATALOG_JSON} from ${PROFILE_CATALOG}"
+  elif [[ -f "${FALLBACK_CATALOG}" ]]; then
+    cp -f "${FALLBACK_CATALOG}" "${CATALOG_JSON}"
+    log "Backfilled application catalog metadata into ${CATALOG_JSON} from fallback ${FALLBACK_CATALOG}"
+  else
+    die "bundle is missing platform/catalog.json and neither synced contract profile nor fallback catalog exists for ${PROFILE_NAME}"
+  fi
 fi
 
 if [[ ! -f "${SELECTED_APPS_JSON}" ]]; then

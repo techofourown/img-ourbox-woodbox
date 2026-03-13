@@ -8,12 +8,16 @@ trap 'rm -rf "${TMP}"' EXIT
 
 FIXTURE_ROOT="${TMP}/repo"
 TOOLS_DIR="${FIXTURE_ROOT}/tools"
+FALLBACK_DIR="${FIXTURE_ROOT}/catalog-fallbacks"
 BIN_DIR="${TMP}/bin"
 BUNDLE_DIR="${TMP}/bundle"
-mkdir -p "${TOOLS_DIR}" "${BIN_DIR}" "${BUNDLE_DIR}"
+mkdir -p "${TOOLS_DIR}" "${FALLBACK_DIR}" "${BIN_DIR}" "${BUNDLE_DIR}"
 
 cp "${ROOT}/tools/fetch-airgap-platform.sh" "${TOOLS_DIR}/fetch-airgap-platform.sh"
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
+cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
+cp "${ROOT}/tools/ensure-airgap-application-metadata.sh" "${TOOLS_DIR}/ensure-airgap-application-metadata.sh"
+cp "${ROOT}/catalog-fallbacks/demo-apps.catalog.json" "${FALLBACK_DIR}/demo-apps.catalog.json"
 
 AIRGAP_DIGEST="sha256:1111111111111111111111111111111111111111111111111111111111111111"
 PLATFORM_CONTRACT_DIGEST="sha256:2222222222222222222222222222222222222222222222222222222222222222"
@@ -33,6 +37,7 @@ cat > "${TOOLS_DIR}/sync-platform-contract-into-installer.sh" <<'EOF'
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "${ROOT}/artifacts/platform-contract/synced"
+mkdir -p "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/profiles/demo-apps"
 printf 'synced\n' > "${ROOT}/artifacts/platform-contract/synced/status.txt"
 EOF
 chmod +x "${TOOLS_DIR}/sync-platform-contract-into-installer.sh"

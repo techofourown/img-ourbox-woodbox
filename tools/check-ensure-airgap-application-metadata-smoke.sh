@@ -9,6 +9,7 @@ trap 'rm -rf "${TMP}"' EXIT
 BUNDLE_DIR="${TMP}/bundle"
 CONTRACT_ROOT="${TMP}/contract"
 PROFILE_DIR="${CONTRACT_ROOT}/profiles/demo-apps"
+FALLBACK_CATALOG="${TMP}/demo-apps.catalog.json"
 
 mkdir -p "${BUNDLE_DIR}/k3s" "${BUNDLE_DIR}/platform/images" "${PROFILE_DIR}"
 
@@ -54,6 +55,8 @@ cat > "${PROFILE_DIR}/catalog.json" <<'EOF'
 }
 EOF
 
+cp -f "${PROFILE_DIR}/catalog.json" "${FALLBACK_CATALOG}"
+
 bash "${ROOT}/tools/ensure-airgap-application-metadata.sh" \
   --bundle-dir "${BUNDLE_DIR}" \
   --contract-root "${CONTRACT_ROOT}"
@@ -84,6 +87,28 @@ if selected["selection_mode"] != "defaults":
     raise SystemExit("unexpected synthesized selection_mode")
 if selected["selected_app_ids"] != ["landing", "dufs"]:
     raise SystemExit("unexpected synthesized selected_app_ids")
+PY
+
+rm -f "${BUNDLE_DIR}/platform/catalog.json" "${BUNDLE_DIR}/platform/selected-apps.json" "${PROFILE_DIR}/catalog.json"
+
+bash "${ROOT}/tools/ensure-airgap-application-metadata.sh" \
+  --bundle-dir "${BUNDLE_DIR}" \
+  --contract-root "${CONTRACT_ROOT}" \
+  --fallback-catalog "${FALLBACK_CATALOG}"
+
+python3 - <<'PY' "${BUNDLE_DIR}/platform/catalog.json" "${BUNDLE_DIR}/platform/selected-apps.json"
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+with open(sys.argv[2], "r", encoding="utf-8") as handle:
+    selected = json.load(handle)
+
+if catalog["catalog_id"] != "demo-apps":
+    raise SystemExit("unexpected fallback synthesized catalog id")
+if selected["selected_app_ids"] != ["landing", "dufs"]:
+    raise SystemExit("unexpected fallback synthesized selected_app_ids")
 PY
 
 printf '[%s] airgap application metadata synthesis smoke passed\n' "$(date -Is)"
