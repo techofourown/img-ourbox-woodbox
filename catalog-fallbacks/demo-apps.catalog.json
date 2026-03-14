@@ -13,6 +13,7 @@
   "apps": [
     {
       "id": "landing",
+      "app_uid": "techofourown/landing",
       "display_name": "Landing",
       "description": "Default landing page that links to the rest of the installed applications.",
       "renderer": "landing",
@@ -30,6 +31,7 @@
     },
     {
       "id": "todo-bloom",
+      "app_uid": "techofourown/todo-bloom",
       "display_name": "Todo Bloom",
       "description": "Static to-do demo app served from nginx.",
       "renderer": "todo-bloom",
@@ -47,6 +49,7 @@
     },
     {
       "id": "dufs",
+      "app_uid": "thirdparty/dufs",
       "display_name": "Dufs",
       "description": "Simple file browser rooted on the shared data volume.",
       "renderer": "dufs",
@@ -64,6 +67,7 @@
     },
     {
       "id": "flatnotes",
+      "app_uid": "thirdparty/flatnotes",
       "display_name": "Flatnotes",
       "description": "Simple note-taking app backed by the shared data volume.",
       "renderer": "flatnotes",
