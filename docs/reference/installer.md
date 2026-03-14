@@ -91,6 +91,11 @@ also carries:
 - `/cdrom/ourbox/mission/artifacts/airgap/catalog.json`
 - `/cdrom/ourbox/mission/artifacts/airgap/selected-apps.json`
 
+When the host-side composer stages installed-target SSH key auth, the mission
+also carries:
+
+- `/cdrom/ourbox/mission/artifacts/installed-target-ssh/authorized-key.pub`
+
 `ourbox-preinstall` requires both:
 
 - an embedded payload
@@ -109,7 +114,7 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 3. Loads the staged OS payload from mission media
 4. Stages the selected `airgap-platform` bundle from mission media
    and stages the selected application catalog / selected app set metadata
-5. Prompts for hostname, username, and password
+5. Prompts for hostname, username, password, and installed-target SSH password posture
 6. Prompts for final destructive confirmation (`INSTALL`)
 
 Critical boundary:
@@ -151,6 +156,7 @@ Before Subiquity handoff, `ourbox-preinstall` also:
 - renders the final target netplan from sysfs Ethernet inventory
 - stages wrappers for late-commands to:
   - install required target packages from `/cdrom/ourbox/apt` only
+  - optionally install and configure `openssh-server` from that same local repo
   - copy the prepared netplan into `/target/etc/netplan/00-installer-config.yaml`
 
 At the end of late-commands, the installer attempts to identify the installed
@@ -248,11 +254,12 @@ Late-commands in `autoinstall.tpl`:
 4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory when present
 5. Install the `k3s` binary from `airgap/k3s/k3s`
 6. Append install-time provenance to `/target/etc/ourbox/release`
-7. Enable required systemd services
-8. Write DATA disk `fstab` entry
-9. Copy the prepared netplan rendered from NIC hardware inventory
-10. Verify the DATA disk prepared by `ourbox-preinstall`
-11. Prefer the installed EFI entry for the next and future UEFI boots
+7. Configure installed-target SSH when a staged host key or target-side password SSH was requested
+8. Enable required systemd services
+9. Write DATA disk `fstab` entry
+10. Copy the prepared netplan rendered from NIC hardware inventory
+11. Verify the DATA disk prepared by `ourbox-preinstall`
+12. Prefer the installed EFI entry for the next and future UEFI boots
 
 ## Provenance written at install time
 
