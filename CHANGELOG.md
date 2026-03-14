@@ -1,3 +1,37 @@
+# [0.11.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.7...v0.11.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* **adapter:** accept contract created metadata ([2e889cf](https://github.com/techofourown/img-ourbox-woodbox/commit/2e889cf5ded35ba71848a52ad7178797548b734e))
+* **build:** backfill demo catalog metadata compat ([8a58adc](https://github.com/techofourown/img-ourbox-woodbox/commit/8a58adce4560ca40a0eb628b6a8ac27e1b23811d))
+* **build:** invoke metadata helper via bash ([6a0a6b5](https://github.com/techofourown/img-ourbox-woodbox/commit/6a0a6b5c7e946b8075fc9f5b20a8fc04d5aa56c8))
+* **ci:** export bootstrap smoke contract vars ([278db70](https://github.com/techofourown/img-ourbox-woodbox/commit/278db70fcf54d7ccd96020d865258eec9744d8c6))
+* **ci:** pin commitlint dependency ([be817d2](https://github.com/techofourown/img-ourbox-woodbox/commit/be817d289dc61ea15fefe63ae7590a099c594914))
+* **ci:** repair Woodbox PR checks ([4107136](https://github.com/techofourown/img-ourbox-woodbox/commit/41071366290d6dd81856c24f7414273212114318))
+* **ci:** silence timeout smoke shellcheck ([d7f51fa](https://github.com/techofourown/img-ourbox-woodbox/commit/d7f51fa377ca5e11b96baac07961836188c1ac64))
+* **payload:** emit full mission metadata contract ([01e1195](https://github.com/techofourown/img-ourbox-woodbox/commit/01e119567d46b8cbc425f1c6105326f281ba6b1c))
+* **smoke:** accept completed cloud-init units ([5b011ed](https://github.com/techofourown/img-ourbox-woodbox/commit/5b011ed3361a0bb0e442153ac28019268a70fbfb))
+* **smoke:** align cloud-init readiness gate ([883e376](https://github.com/techofourown/img-ourbox-woodbox/commit/883e376ee80cc0f87b28915e00b4c82bb33a6b4b))
+* **smoke:** align mission metadata allowlist ([cd569ef](https://github.com/techofourown/img-ourbox-woodbox/commit/cd569ef3d5528f1ddceb9a949ddd6860afc5a480))
+* **smoke:** align mission monitor port contract ([36e9be1](https://github.com/techofourown/img-ourbox-woodbox/commit/36e9be1823e4adc3575420570ff3d77a5555a8b3))
+* **smoke:** backfill baked app metadata ([9689182](https://github.com/techofourown/img-ourbox-woodbox/commit/96891824ffe0c76059870e5c9f6d3ba1f50a69b3))
+* **smoke:** bound installer ssh bootstrap restart ([2862845](https://github.com/techofourown/img-ourbox-woodbox/commit/2862845660f17035888255efb597bbfb8313989c))
+* **smoke:** expose installer ssh status contract ([2ca67e1](https://github.com/techofourown/img-ourbox-woodbox/commit/2ca67e1b2b57925e5e58580b7212cc32d431b1e5))
+* **smoke:** make installer ssh readiness async ([a271112](https://github.com/techofourown/img-ourbox-woodbox/commit/a271112d8d2c94d9522f63f66a4641e7613be84d))
+* **smoke:** match payload metadata contract ([aed4243](https://github.com/techofourown/img-ourbox-woodbox/commit/aed42432399e7e9499f0e32b387254f591c9b60b))
+* **smoke:** tighten installer ssh leak checks ([8b7e5ea](https://github.com/techofourown/img-ourbox-woodbox/commit/8b7e5ea8ff90f57a2a88e787d8583077f8b1ccbc))
+* **smoke:** widen installer ssh readiness window ([88b7252](https://github.com/techofourown/img-ourbox-woodbox/commit/88b725253efc52146cd912660e9224c068b6438e))
+* **test:** isolate bootstrap smoke traps ([a66ecd9](https://github.com/techofourown/img-ourbox-woodbox/commit/a66ecd950e9cbe5d625bca961cdc2fc08fbc54ad))
+* **woodbox:** harden selected application metadata ([f44f857](https://github.com/techofourown/img-ourbox-woodbox/commit/f44f85780c65693f2a94673673a0ab8aa042caef))
+* **woodbox:** refresh legacy fallback refs ([e360938](https://github.com/techofourown/img-ourbox-woodbox/commit/e3609384b9e5a4af23c33d508c6bcc82a07389bb))
+
+
+### Features
+
+* **installer:** honor mission-selected applications ([38f0461](https://github.com/techofourown/img-ourbox-woodbox/commit/38f04614b1b45e134679c89a422c41f53541435e))
+* **woodbox:** consume merged application catalogs ([bdf0683](https://github.com/techofourown/img-ourbox-woodbox/commit/bdf0683d92d8883ea7d8e1f7debab87c530cae8f))
+
 ## [0.10.7](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.6...v0.10.7) (2026-03-13)
 
 
