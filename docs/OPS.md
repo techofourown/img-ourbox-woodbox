@@ -30,6 +30,7 @@ During live installation, official/public media exposes a dedicated installer SS
 - user: `ourbox-installer`
 - readiness is shown truthfully in the TTY banner and installer monitor
 - when SSH is password-capable and no hash was baked, a one-time password is generated at boot and shown only on the attached console
+- when the mission media stages an installed-target SSH key, that same public key is also accepted by the live installer account
 
 ---
 
