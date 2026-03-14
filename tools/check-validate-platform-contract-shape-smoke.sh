@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UPSTREAM_ROOT="$(cd "${ROOT}/../sw-ourbox-os" && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
@@ -13,12 +12,65 @@ MANIFEST_DIR="${CONTRACT_DIR}/manifests"
 
 mkdir -p "${TOOLS_DIR}" "${PROFILE_DIR}" "${MANIFEST_DIR}"
 
-cp "${UPSTREAM_ROOT}/tools/platform-contract/check-target-prereqs.sh" "${TOOLS_DIR}/check-target-prereqs.sh"
-cp "${UPSTREAM_ROOT}/tools/platform-contract/contract-identity.sh" "${TOOLS_DIR}/contract-identity.sh"
-cp "${UPSTREAM_ROOT}/tools/platform-contract/render-contract.py" "${TOOLS_DIR}/render-contract.py"
-cp "${UPSTREAM_ROOT}/tools/platform-contract/verify-runtime.sh" "${TOOLS_DIR}/verify-runtime.sh"
-cp "${UPSTREAM_ROOT}/platform-contract/profiles/demo-apps/profile.env" "${PROFILE_DIR}/profile.env"
-cp "${UPSTREAM_ROOT}/platform-contract/profiles/demo-apps/images.lock.json" "${PROFILE_DIR}/images.lock.json"
+cat > "${TOOLS_DIR}/check-target-prereqs.sh" <<'EOF_CHECK_TARGET_PREREQS'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF_CHECK_TARGET_PREREQS
+
+cat > "${TOOLS_DIR}/contract-identity.sh" <<'EOF_GOOD_IDENTITY'
+#!/usr/bin/env bash
+set -euo pipefail
+cat <<'EOF_OUTPUT'
+OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
+OURBOX_PLATFORM_CONTRACT_REVISION=fixture-revision
+OURBOX_PLATFORM_CONTRACT_VERSION=fixture-version
+OURBOX_PLATFORM_CONTRACT_DIGEST=unknown
+OURBOX_PLATFORM_PROFILE=demo-apps
+OURBOX_PLATFORM_PROFILE_KIND=demo-apps
+OURBOX_PLATFORM_ROUTE_MODEL=ingress
+BOX_HOST=smoke.ourbox.local
+TLS_MODE=lan-http
+INGRESS_CLASS=traefik
+STORAGE_CLASS=local-path
+OURBOX_APPLICATION_CATALOG_ID=fixture-catalog
+OURBOX_APPLICATION_SELECTION_MODE=host-selected
+OURBOX_SELECTED_APPLICATION_IDS=landing,dufs
+OURBOX_APPLICATION_CATALOG_SHA256=sha256:1111111111111111111111111111111111111111111111111111111111111111
+OURBOX_APPLICATION_IMAGES_LOCK_SHA256=sha256:2222222222222222222222222222222222222222222222222222222222222222
+EOF_OUTPUT
+EOF_GOOD_IDENTITY
+
+cat > "${TOOLS_DIR}/render-contract.py" <<'EOF_GOOD_RENDER'
+#!/usr/bin/env python3
+import sys
+
+if "--help" in sys.argv:
+    print(
+        "usage: render-contract.py [--contract-root] [--output-dir] "
+        "[--selected-apps-file] [--application-catalog] [--images-lock-file]"
+    )
+    raise SystemExit(0)
+
+raise SystemExit("unexpected invocation")
+EOF_GOOD_RENDER
+
+cat > "${TOOLS_DIR}/verify-runtime.sh" <<'EOF_VERIFY_RUNTIME'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF_VERIFY_RUNTIME
+
+cat > "${PROFILE_DIR}/profile.env" <<'EOF_PROFILE'
+OURBOX_PLATFORM_PROFILE=demo-apps
+EOF_PROFILE
+
+cat > "${PROFILE_DIR}/images.lock.json" <<'EOF_IMAGES_LOCK'
+{
+  "schema": 1,
+  "images": []
+}
+EOF_IMAGES_LOCK
 
 chmod +x "${TOOLS_DIR}/check-target-prereqs.sh" "${TOOLS_DIR}/contract-identity.sh" "${TOOLS_DIR}/verify-runtime.sh"
 
@@ -63,7 +115,20 @@ grep -F -- "--application-catalog" "${TMP}/bad-render.log" >/dev/null || {
   exit 1
 }
 
-cp "${UPSTREAM_ROOT}/tools/platform-contract/render-contract.py" "${TOOLS_DIR}/render-contract.py"
+cat > "${TOOLS_DIR}/render-contract.py" <<'EOF_GOOD_RENDER'
+#!/usr/bin/env python3
+import sys
+
+if "--help" in sys.argv:
+    print(
+        "usage: render-contract.py [--contract-root] [--output-dir] "
+        "[--selected-apps-file] [--application-catalog] [--images-lock-file]"
+    )
+    raise SystemExit(0)
+
+raise SystemExit("unexpected invocation")
+EOF_GOOD_RENDER
+
 cat > "${TOOLS_DIR}/contract-identity.sh" <<'EOF_BAD_IDENTITY'
 #!/usr/bin/env bash
 set -euo pipefail
