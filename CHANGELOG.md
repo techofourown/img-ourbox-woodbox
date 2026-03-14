@@ -1,3 +1,10 @@
+## [0.12.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.0...v0.12.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* accept current platform contract manifest naming ([89182d1](https://github.com/techofourown/img-ourbox-woodbox/commit/89182d13d24789590ccee57bf9cc64876ae9cd28))
+
 # [0.12.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.11.0...v0.12.0) (2026-03-14)
 
 
