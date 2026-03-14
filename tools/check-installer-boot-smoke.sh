@@ -494,6 +494,7 @@ wait_for_http_response_contains \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer" \
   "ssh ${OURBOX_INSTALLER_SSH_USER}@" \
+  "UDP broadcast on port ${VM_UDP_PORT}" \
   || die "timed out waiting for installer HTTP monitor content"
 
 log "Waiting for UDP monitor output on port ${VM_UDP_PORT}"

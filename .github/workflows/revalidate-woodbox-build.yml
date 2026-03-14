@@ -22,6 +22,8 @@ jobs:
   revalidate:
     runs-on: [self-hosted, official-heavy, x86-image]
     timeout-minutes: 120
+    env:
+      SMOKE_MONITOR_BROADCAST_PORT: "19999"
 
     steps:
       - name: Checkout
@@ -94,7 +96,7 @@ jobs:
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
           OURBOX_INSTALLER_SMOKE_CONSOLE: "1"
           OURBOX_INSTALLER_MONITOR_BROADCAST_ADDR: 10.0.2.2
-          OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: "19999"
+          OURBOX_INSTALLER_MONITOR_BROADCAST_PORT: ${{ env.SMOKE_MONITOR_BROADCAST_PORT }}
 
       - name: Boot installer ISO smoke test
         run: |
@@ -111,7 +113,7 @@ jobs:
           OURBOX_INSTALLER_SSH_PASSWORD_STATE: configured-hash
           OURBOX_INSTALLER_SSH_MODE: both
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
-          VM_UDP_PORT: "19999"
+          VM_UDP_PORT: ${{ env.SMOKE_MONITOR_BROADCAST_PORT }}
           OURBOX_SMOKE_ARTIFACT_DIR: deploy/smoke-diag
 
       - name: Compose mission media smoke ISO
@@ -145,7 +147,7 @@ jobs:
           OURBOX_INSTALLER_SSH_PASSWORD_STATE: configured-hash
           OURBOX_INSTALLER_SSH_MODE: both
           OURBOX_INSTALLER_SSH_ALLOW_ROOT: "0"
-          VM_UDP_PORT: "20999"
+          VM_UDP_PORT: ${{ env.SMOKE_MONITOR_BROADCAST_PORT }}
           OURBOX_SMOKE_ARTIFACT_DIR: deploy/mission-smoke-diag
 
       - name: Build installer ISO
