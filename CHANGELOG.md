@@ -1,3 +1,16 @@
+# [0.12.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.11.0...v0.12.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* fail closed on malformed mission and contract metadata ([d976f7e](https://github.com/techofourown/img-ourbox-woodbox/commit/d976f7eedcfc365cef6b022e0851fee18a08dd99))
+* sync woodbox inputs and self-contain shape smoke ([56041f5](https://github.com/techofourown/img-ourbox-woodbox/commit/56041f5346c5037c647a383054da0a4e6bb1b48e))
+
+
+### Features
+
+* harden woodbox install bootstrap ([25d5396](https://github.com/techofourown/img-ourbox-woodbox/commit/25d5396a6cb743f870f4cfbba9cf2a270bec4bff))
+
 # [0.11.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.10.7...v0.11.0) (2026-03-14)
 
 
