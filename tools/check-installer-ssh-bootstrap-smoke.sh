@@ -50,6 +50,17 @@ expected_key="$(cat "${MISSION_AUTHORIZED_KEY_FILE}")"
   exit 1
 }
 
+export OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS=$'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBbakedexistingkey1234567890 baked@host'
+load_mission_authorized_key_if_present
+[[ "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" == *"AAAAC3NzaC1lZDI1NTE5AAAAIBbakedexistingkey1234567890 baked@host"* ]] || {
+  echo "expected baked installer SSH key to be preserved" >&2
+  exit 1
+}
+[[ "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS}" == *"${expected_key}"* ]] || {
+  echo "expected staged mission SSH key to be merged alongside baked installer SSH keys" >&2
+  exit 1
+}
+
 restart_ssh_service
 
 grep -Fxq -- "--no-block restart ssh" "${SYSTEMCTL_LOG}" \

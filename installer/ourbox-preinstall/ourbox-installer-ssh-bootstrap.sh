@@ -58,16 +58,20 @@ write_password_file_if_ready() {
   chmod 0600 "${PASSWORD_FILE}" >/dev/null 2>&1 || true
 }
 
+merge_unique_authorized_keys() {
+  awk 'NF && !seen[$0]++'
+}
+
 load_mission_authorized_key_if_present() {
   local key_path="${MISSION_AUTHORIZED_KEY_FILE:-}"
   local -a key_lines=()
+  local merged_keys=""
 
   case "${OURBOX_INSTALLER_SSH_MODE:-off}" in
     key|both) ;;
     *) return 0 ;;
   esac
 
-  [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}" ]] && return 0
   [[ -n "${key_path}" ]] || return 0
   [[ -f "${key_path}" ]] || return 0
 
@@ -85,8 +89,15 @@ load_mission_authorized_key_if_present() {
     return 1
   fi
 
-  OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${key_lines[0]}"
-  log "installer SSH authorized key loaded from staged mission media"
+  merged_keys="$(
+    printf '%s\n%s\n' "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}" "${key_lines[0]}" \
+      | merge_unique_authorized_keys
+  )"
+
+  if [[ "${merged_keys}" != "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}" ]]; then
+    OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${merged_keys}"
+    log "installer SSH authorized key loaded from staged mission media"
+  fi
 }
 
 finalize_status() {
@@ -174,7 +185,6 @@ restart_ssh_service() {
 
   return 1
 }
-
 spawn_ready_watcher() {
   local child_pid=""
 
