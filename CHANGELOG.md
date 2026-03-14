@@ -1,3 +1,11 @@
+## [0.12.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.1...v0.12.2) (2026-03-14)
+
+
+### Bug Fixes
+
+* honor staged mission ssh key in live installer ([fbab273](https://github.com/techofourown/img-ourbox-woodbox/commit/fbab273322c9c67f0f8f45c5b57a9d31f0649cbd))
+* merge staged installer mission SSH keys ([7acbc0a](https://github.com/techofourown/img-ourbox-woodbox/commit/7acbc0a936c216581eed2a572686addff22b0fed))
+
 ## [0.12.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.0...v0.12.1) (2026-03-14)
 
 
