@@ -17,6 +17,7 @@ PLATFORM_PROFILE_INPUT="${OURBOX_PLATFORM_PROFILE:-demo-apps}"
 SELECTED_APPS_FILE="${PLATFORM_CONTRACT_DIR}/selected-apps.json"
 APPLICATION_CATALOG_FILE="${PLATFORM_CONTRACT_DIR}/catalog.json"
 IMAGES_LOCK_FILE="${PLATFORM_CONTRACT_DIR}/images.lock.json"
+RENDER_CONTRACT_HELP_CACHE=""
 
 cleanup() {
   if [[ -n "${DESIRED_CONTRACT_STATE}" && -f "${DESIRED_CONTRACT_STATE}" ]]; then
@@ -28,6 +29,75 @@ trap cleanup EXIT
 ensure_k3s_running() {
   systemctl is-enabled --quiet k3s.service 2>/dev/null || systemctl enable k3s.service
   systemctl is-active --quiet k3s.service 2>/dev/null || systemctl start k3s.service
+}
+
+render_contract_help() {
+  if [[ -z "${RENDER_CONTRACT_HELP_CACHE}" ]]; then
+    RENDER_CONTRACT_HELP_CACHE="$(
+      python3 "${PLATFORM_CONTRACT_DIR}/tools/render-contract.py" --help 2>&1
+    )" || die "platform-contract render-contract.py is not runnable: ${PLATFORM_CONTRACT_DIR}/tools/render-contract.py"
+  fi
+  printf '%s\n' "${RENDER_CONTRACT_HELP_CACHE}"
+}
+
+render_contract_supports_option() {
+  local option="$1"
+  grep -Fq -- "${option}" <<<"$(render_contract_help)"
+}
+
+require_render_contract_option() {
+  local option="$1"
+  local reason="$2"
+  if ! render_contract_supports_option "${option}"; then
+    die "${reason}. Rebuild with a compatible platform-contract artifact."
+  fi
+}
+
+require_platform_contract_capabilities() {
+  local identity_output required_key=""
+
+  if [[ -f "${SELECTED_APPS_FILE}" ]]; then
+    require_render_contract_option \
+      "--selected-apps-file" \
+      "selected application metadata is present, but platform-contract render-contract.py does not support --selected-apps-file"
+  fi
+
+  if [[ -f "${APPLICATION_CATALOG_FILE}" ]]; then
+    require_render_contract_option \
+      "--application-catalog" \
+      "application catalog metadata is present, but platform-contract render-contract.py does not support --application-catalog"
+  fi
+
+  if [[ -f "${IMAGES_LOCK_FILE}" ]]; then
+    require_render_contract_option \
+      "--images-lock-file" \
+      "application image metadata is present, but platform-contract render-contract.py does not support --images-lock-file"
+  fi
+
+  if [[ ! -f "${SELECTED_APPS_FILE}" && ! -f "${APPLICATION_CATALOG_FILE}" && ! -f "${IMAGES_LOCK_FILE}" ]]; then
+    return 0
+  fi
+
+  identity_output="$(
+    "${PLATFORM_CONTRACT_DIR}/tools/contract-identity.sh" \
+      --contract-dir "${PLATFORM_CONTRACT_DIR}" \
+      --profile "${PLATFORM_PROFILE_INPUT}" \
+      --box-host "${OURBOX_BOX_HOST:-${HOSTNAME}.local}" \
+      --tls-mode "${OURBOX_TLS_MODE:-}" \
+      --ingress-class "${OURBOX_INGRESS_CLASS:-}" \
+      --storage-class "${OURBOX_STORAGE_CLASS:-}"
+  )" || die "platform-contract contract-identity.sh failed while validating application metadata support"
+
+  for required_key in \
+    "OURBOX_APPLICATION_CATALOG_ID=" \
+    "OURBOX_APPLICATION_SELECTION_MODE=" \
+    "OURBOX_SELECTED_APPLICATION_IDS=" \
+    "OURBOX_APPLICATION_CATALOG_SHA256=" \
+    "OURBOX_APPLICATION_IMAGES_LOCK_SHA256="; do
+    if ! grep -Fq -- "${required_key}" <<<"${identity_output}"; then
+      die "platform-contract contract-identity.sh does not emit ${required_key%=} required for application metadata state tracking. Rebuild with a compatible platform-contract artifact."
+    fi
+  done
 }
 
 resolve_desired_contract_state() {
@@ -61,6 +131,8 @@ mkdir -p \
   "/var/lib/ourbox/device" \
   "/var/lib/ourbox/secrets" \
   "/var/lib/ourbox/k3s/agent/images"
+
+require_platform_contract_capabilities
 
 resolve_desired_contract_state
 

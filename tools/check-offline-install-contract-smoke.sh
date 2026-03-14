@@ -11,10 +11,14 @@ iso_builder="${ROOT}/tools/build-installer-iso.sh"
 
 grep -q '/opt/ourbox/installer/cache/install-target-packages.sh' "${runtime_tpl}" \
   || die "runtime autoinstall must install required target packages from the local substrate repo"
+grep -q '/opt/ourbox/installer/cache/configure-installed-target-ssh.sh' "${runtime_tpl}" \
+  || die "runtime autoinstall must configure installed-target SSH from staged mission/runtime state when requested"
 grep -q '/opt/ourbox/installer/cache/apply-target-netplan.sh' "${runtime_tpl}" \
   || die "runtime autoinstall must apply the prepared target netplan helper"
 grep -q 'prepare-installer-target-apt-repo.sh' "${iso_builder}" \
   || die "installer substrate build must stage a local target APT repo"
+grep -q 'OURBOX_INSTALLER_TARGET_APT_REPO_EXTRA_PACKAGES' "${iso_builder}" \
+  || die "installer substrate build must include repo-only offline packages for optional install-time features"
 
 for forbidden in \
   'packages:' \

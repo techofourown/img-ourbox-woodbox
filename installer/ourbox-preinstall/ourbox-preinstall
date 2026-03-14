@@ -78,6 +78,15 @@ prompt_confirm_exact() {
   [[ "${ans}" == "${expected}" ]] || die "confirmation did not match (expected: ${expected})"
 }
 
+prompt_yes_no_default_no() {
+  local prompt="$1" ans=""
+  read -r -p "${prompt} [y/N]: " ans
+  case "${ans}" in
+    y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 strict_metadata_values() {
   local metadata_file="$1"
   shift
@@ -419,6 +428,56 @@ MISSION_APPLICATION_CATALOG_ID=""
 MISSION_APPLICATION_CATALOG_NAME=""
 MISSION_APPLICATION_SELECTION_MODE=""
 MISSION_SELECTED_APPLICATION_IDS=""
+MISSION_INSTALLED_TARGET_SSH_PRESENT=0
+MISSION_INSTALLED_TARGET_SSH_MODE=""
+MISSION_INSTALLED_TARGET_SSH_KEY_NAME=""
+MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH=""
+MISSION_INSTALLED_TARGET_SSH_KEY_TYPE=""
+MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT=""
+OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=0
+
+validate_installed_target_ssh_authorized_key() {
+  local key_path="$1"
+  local -a key_lines=()
+
+  [[ -f "${key_path}" ]] || die "installed-target SSH authorized key missing: ${key_path}"
+  mapfile -t key_lines < <(awk 'NF {print $0}' "${key_path}")
+  [[ "${#key_lines[@]}" -eq 1 ]] || die "installed-target SSH authorized key must contain exactly one non-empty public key line"
+  [[ "${key_lines[0]}" == ssh-ed25519\ * ]] || die "installed-target SSH authorized key must be an ssh-ed25519 public key"
+}
+
+prompt_installed_target_ssh_password_posture() {
+  OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=0
+
+  echo
+  echo "  Installed-system SSH"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    echo "  A host-staged SSH key will be authorized for ${OURBOX_USERNAME}:"
+    echo "    Key name    : ${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}"
+    echo "    Fingerprint : ${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT}"
+    if prompt_yes_no_default_no "  Also allow password SSH login for ${OURBOX_USERNAME}?"; then
+      OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=1
+    fi
+    return 0
+  fi
+
+  echo "  No host-staged SSH key is present on this mission media."
+  if prompt_yes_no_default_no "  Enable installed-system SSH password login for ${OURBOX_USERNAME}?"; then
+    OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=1
+  fi
+}
+
+installed_target_ssh_summary_mode() {
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" && "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED}" == "1" ]]; then
+    printf '%s\n' "key + password"
+  elif [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    printf '%s\n' "key-only"
+  elif [[ "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED}" == "1" ]]; then
+    printf '%s\n' "password-only"
+  else
+    printf '%s\n' "disabled"
+  fi
+}
 
 validate_extracted_airgap_platform_bundle() {
   local bundle_dir="$1"
@@ -637,11 +696,18 @@ load_embedded_mission_metadata() {
   MISSION_APPLICATION_CATALOG_NAME=""
   MISSION_APPLICATION_SELECTION_MODE=""
   MISSION_SELECTED_APPLICATION_IDS=""
+  MISSION_INSTALLED_TARGET_SSH_PRESENT=0
+  MISSION_INSTALLED_TARGET_SSH_MODE=""
+  MISSION_INSTALLED_TARGET_SSH_KEY_NAME=""
+  MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH=""
+  MISSION_INSTALLED_TARGET_SSH_KEY_TYPE=""
+  MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT=""
   [[ -f "${MISSION_MANIFEST}" ]] || return 0
 
   local mission_dump=""
   local app_catalog_relpath=""
   local app_selection_relpath=""
+  local installed_target_ssh_authorized_key_relpath=""
 
   mission_dump="$(
     python3 - <<'PY' "${MISSION_MANIFEST}"
@@ -667,6 +733,7 @@ if operator_mode.get("mode") != "install":
 selected_os = manifest.get("selected_os", {})
 selected_airgap = manifest.get("selected_airgap", {})
 selected_applications = manifest.get("selected_applications")
+installed_target_ssh = manifest.get("installed_target_ssh")
 
 app_present = False
 app_catalog_id = ""
@@ -675,6 +742,12 @@ app_selection_mode = ""
 app_selected_ids = ""
 app_catalog_relpath = ""
 app_selection_relpath = ""
+installed_target_ssh_present = False
+installed_target_ssh_mode = ""
+installed_target_ssh_key_name = ""
+installed_target_ssh_authorized_key_relpath = ""
+installed_target_ssh_key_type = ""
+installed_target_ssh_public_key_fingerprint = ""
 
 if selected_applications is not None:
     if not isinstance(selected_applications, dict) or not selected_applications:
@@ -710,6 +783,26 @@ if selected_applications is not None:
     app_selected_ids = ",".join(normalized_ids)
     app_present = True
 
+if installed_target_ssh is not None:
+    if not isinstance(installed_target_ssh, dict) or not installed_target_ssh:
+        raise SystemExit("embedded mission installed_target_ssh must be an object when present")
+    installed_target_ssh_mode = str(installed_target_ssh.get("mode", ""))
+    installed_target_ssh_key_name = str(installed_target_ssh.get("key_name", ""))
+    installed_target_ssh_authorized_key_relpath = str(installed_target_ssh.get("authorized_key_relpath", ""))
+    installed_target_ssh_key_type = str(installed_target_ssh.get("key_type", ""))
+    installed_target_ssh_public_key_fingerprint = str(installed_target_ssh.get("public_key_fingerprint", ""))
+    if installed_target_ssh_mode != "host-generated-authorized-key":
+        raise SystemExit("embedded mission installed_target_ssh.mode must be 'host-generated-authorized-key'")
+    if not installed_target_ssh_key_name:
+        raise SystemExit("embedded mission installed_target_ssh.key_name must be set")
+    if not installed_target_ssh_authorized_key_relpath:
+        raise SystemExit("embedded mission installed_target_ssh.authorized_key_relpath must be set")
+    if installed_target_ssh_key_type != "ssh-ed25519":
+        raise SystemExit("embedded mission installed_target_ssh.key_type must be 'ssh-ed25519'")
+    if not installed_target_ssh_public_key_fingerprint.startswith("SHA256:"):
+        raise SystemExit("embedded mission installed_target_ssh.public_key_fingerprint must be a SHA256 fingerprint")
+    installed_target_ssh_present = True
+
 print(
     json.dumps(
         {
@@ -736,6 +829,12 @@ print(
             "selected_application_ids": app_selected_ids,
             "application_catalog_relpath": app_catalog_relpath,
             "selected_applications_relpath": app_selection_relpath,
+            "installed_target_ssh_present": "1" if installed_target_ssh_present else "0",
+            "installed_target_ssh_mode": installed_target_ssh_mode,
+            "installed_target_ssh_key_name": installed_target_ssh_key_name,
+            "installed_target_ssh_authorized_key_relpath": installed_target_ssh_authorized_key_relpath,
+            "installed_target_ssh_key_type": installed_target_ssh_key_type,
+            "installed_target_ssh_public_key_fingerprint": installed_target_ssh_public_key_fingerprint,
         },
         separators=(",", ":"),
     )
@@ -770,12 +869,20 @@ PY
   MISSION_APPLICATION_CATALOG_NAME="$(mission_json_field application_catalog_name)"
   MISSION_APPLICATION_SELECTION_MODE="$(mission_json_field application_selection_mode)"
   MISSION_SELECTED_APPLICATION_IDS="$(mission_json_field selected_application_ids)"
+  MISSION_INSTALLED_TARGET_SSH_PRESENT="$(mission_json_field installed_target_ssh_present)"
+  MISSION_INSTALLED_TARGET_SSH_MODE="$(mission_json_field installed_target_ssh_mode)"
+  MISSION_INSTALLED_TARGET_SSH_KEY_NAME="$(mission_json_field installed_target_ssh_key_name)"
+  MISSION_INSTALLED_TARGET_SSH_KEY_TYPE="$(mission_json_field installed_target_ssh_key_type)"
+  MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT="$(mission_json_field installed_target_ssh_public_key_fingerprint)"
   app_catalog_relpath="$(mission_json_field application_catalog_relpath)"
   app_selection_relpath="$(mission_json_field selected_applications_relpath)"
+  installed_target_ssh_authorized_key_relpath="$(mission_json_field installed_target_ssh_authorized_key_relpath)"
   MISSION_APPLICATION_CATALOG_PATH=""
   MISSION_SELECTED_APPLICATIONS_PATH=""
+  MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH=""
   [[ -n "${app_catalog_relpath}" ]] && MISSION_APPLICATION_CATALOG_PATH="${MISSION_DIR}/${app_catalog_relpath}"
   [[ -n "${app_selection_relpath}" ]] && MISSION_SELECTED_APPLICATIONS_PATH="${MISSION_DIR}/${app_selection_relpath}"
+  [[ -n "${installed_target_ssh_authorized_key_relpath}" ]] && MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH="${MISSION_DIR}/${installed_target_ssh_authorized_key_relpath}"
 
   [[ -n "${MISSION_OS_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_os.artifact_ref"
   [[ "${MISSION_OS_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_os.artifact_digest"
@@ -789,6 +896,16 @@ PY
   [[ "${MISSION_AIRGAP_ARCH}" == "amd64" ]] || die "embedded mission selected_airgap.arch mismatch: expected amd64, got ${MISSION_AIRGAP_ARCH:-unknown}"
   [[ -f "${MISSION_AIRGAP_PAYLOAD_PATH}" ]] || die "embedded mission airgap payload missing: ${MISSION_AIRGAP_PAYLOAD_PATH}"
   [[ -f "${MISSION_AIRGAP_MANIFEST_PATH}" ]] || die "embedded mission airgap manifest missing: ${MISSION_AIRGAP_MANIFEST_PATH}"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    [[ "${MISSION_INSTALLED_TARGET_SSH_MODE}" == "host-generated-authorized-key" ]] \
+      || die "embedded mission installed_target_ssh.mode must be host-generated-authorized-key"
+    [[ "${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] \
+      || die "embedded mission installed_target_ssh.key_name must match the supported key-name pattern"
+    [[ "${MISSION_INSTALLED_TARGET_SSH_KEY_TYPE}" == "ssh-ed25519" ]] || die "embedded mission installed_target_ssh.key_type must be ssh-ed25519"
+    [[ "${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT}" =~ ^SHA256:[A-Za-z0-9+/=]+$ ]] \
+      || die "embedded mission installed_target_ssh.public_key_fingerprint must be a SHA256 fingerprint"
+    validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
+  fi
 
   OS_ARTIFACT_SOURCE="mission"
   OS_ARTIFACT_REF="${MISSION_OS_ARTIFACT_REF}"
@@ -1074,45 +1191,57 @@ write_install_provenance() {
   # Write the provenance-append script called by autoinstall.tpl late-commands.
   # Single-quoted heredoc: variable references are literal in the script body
   # and expand at runtime (after sourcing install-provenance.env).
-  cat > "${cache_dir}/append-provenance.sh" <<'SCRIPT'
+cat > "${cache_dir}/append-provenance.sh" <<'SCRIPT'
 #!/bin/sh
 set -e
-PROV="/opt/ourbox/installer/cache/install-provenance.env"
+PROV="${OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env}"
 TARGET="${1:-/target}"
+RELEASE_FILE="${TARGET}/etc/ourbox/release"
 if [ ! -f "${PROV}" ]; then
   echo "append-provenance.sh: ${PROV} not found, skipping" >&2
   exit 0
 fi
 # shellcheck disable=SC1090
 . "${PROV}"
-cat >> "${TARGET}/etc/ourbox/release" <<EOT
-OURBOX_INSTALLER_ID=${INSTALLER_ID:-woodbox}
-OURBOX_INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
-OURBOX_INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
-OURBOX_OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
-OURBOX_OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
-OURBOX_OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
-OURBOX_OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
-OURBOX_RELEASE_CHANNEL=${RELEASE_CHANNEL:-}
-OURBOX_INSTALL_SELECTION_SOURCE=${INSTALL_SELECTION_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${AIRGAP_PLATFORM_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REVISION=${AIRGAP_PLATFORM_REVISION:-unknown}
-OURBOX_AIRGAP_PLATFORM_VERSION=${AIRGAP_PLATFORM_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_CREATED=${AIRGAP_PLATFORM_CREATED:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARCH=${AIRGAP_PLATFORM_ARCH:-unknown}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${AIRGAP_PLATFORM_PROFILE:-unknown}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${AIRGAP_PLATFORM_K3S_VERSION:-unknown}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF:-unknown}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_PLATFORM_DIGEST:-unknown}
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=${AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=${AIRGAP_PLATFORM_RELEASE_CHANNEL:-}
-OURBOX_APPLICATION_CATALOG_ID=${APPLICATION_CATALOG_ID:-}
-OURBOX_APPLICATION_CATALOG_NAME=${APPLICATION_CATALOG_NAME:-}
-OURBOX_APPLICATION_SELECTION_MODE=${APPLICATION_SELECTION_MODE:-}
-OURBOX_SELECTED_APPLICATION_IDS=${SELECTED_APPLICATION_IDS:-}
-EOT
+
+shell_quote_double() {
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\$"`]/\\&/g')"
+}
+
+append_release_value() {
+  key="$1"
+  value="$2"
+  printf '%s=%s\n' "${key}" "$(shell_quote_double "${value}")" >> "${RELEASE_FILE}"
+}
+
+mkdir -p "$(dirname "${RELEASE_FILE}")"
+touch "${RELEASE_FILE}"
+append_release_value "OURBOX_INSTALLER_ID" "${INSTALLER_ID:-woodbox}"
+append_release_value "OURBOX_INSTALLER_VERSION" "${INSTALLER_VERSION:-unknown}"
+append_release_value "OURBOX_INSTALLER_GIT_HASH" "${INSTALLER_GIT_HASH:-unknown}"
+append_release_value "OURBOX_OS_ARTIFACT_SOURCE" "${OS_ARTIFACT_SOURCE:-unknown}"
+append_release_value "OURBOX_OS_ARTIFACT_REF" "${OS_ARTIFACT_REF:-unknown}"
+append_release_value "OURBOX_OS_ARTIFACT_DIGEST" "${OS_ARTIFACT_DIGEST:-unknown}"
+append_release_value "OURBOX_OS_IMAGE_SHA256" "${OS_IMAGE_SHA256:-unknown}"
+append_release_value "OURBOX_RELEASE_CHANNEL" "${RELEASE_CHANNEL:-}"
+append_release_value "OURBOX_INSTALL_SELECTION_SOURCE" "${INSTALL_SELECTION_SOURCE:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_SOURCE" "${AIRGAP_PLATFORM_SOURCE:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_REVISION" "${AIRGAP_PLATFORM_REVISION:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_VERSION" "${AIRGAP_PLATFORM_VERSION:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_CREATED" "${AIRGAP_PLATFORM_CREATED:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_ARCH" "${AIRGAP_PLATFORM_ARCH:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_PROFILE" "${AIRGAP_PLATFORM_PROFILE:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_K3S_VERSION" "${AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256" "${AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE" "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_REF" "${AIRGAP_PLATFORM_REF:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_DIGEST" "${AIRGAP_PLATFORM_DIGEST:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE" "${AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
+append_release_value "OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL" "${AIRGAP_PLATFORM_RELEASE_CHANNEL:-}"
+append_release_value "OURBOX_APPLICATION_CATALOG_ID" "${APPLICATION_CATALOG_ID:-}"
+append_release_value "OURBOX_APPLICATION_CATALOG_NAME" "${APPLICATION_CATALOG_NAME:-}"
+append_release_value "OURBOX_APPLICATION_SELECTION_MODE" "${APPLICATION_SELECTION_MODE:-}"
+append_release_value "OURBOX_SELECTED_APPLICATION_IDS" "${SELECTED_APPLICATION_IDS:-}"
 SCRIPT
   chmod +x "${cache_dir}/append-provenance.sh"
 
@@ -1174,10 +1303,13 @@ SCRIPT
 write_offline_install_helpers() {
   local cache_dir="${INSTALLER_CACHE_DIR:-/opt/ourbox/installer/cache}"
   local target_netplan="${cache_dir}/target-netplan.yaml"
+  local install_target_packages_manifest="${OFFLINE_TARGET_APT_REPO_DIR}/target-packages.txt"
+  local installed_target_ssh_packages_manifest="${cache_dir}/installed-target-ssh-packages.txt"
+  local staged_installed_target_authorized_key="${cache_dir}/installed-target-authorized-key.pub"
   mkdir -p "${cache_dir}"
 
   [[ -d "${OFFLINE_TARGET_APT_REPO_DIR}" ]] || die "offline target APT repo missing: ${OFFLINE_TARGET_APT_REPO_DIR}"
-  [[ -f "${OFFLINE_TARGET_APT_REPO_DIR}/target-packages.txt" ]] || die "offline target package manifest missing: ${OFFLINE_TARGET_APT_REPO_DIR}/target-packages.txt"
+  [[ -f "${install_target_packages_manifest}" ]] || die "offline target package manifest missing: ${install_target_packages_manifest}"
   [[ -f "${OFFLINE_TARGET_APT_REPO_DIR}/Packages" || -f "${OFFLINE_TARGET_APT_REPO_DIR}/Packages.gz" ]] \
     || die "offline target APT repo is missing Packages metadata: ${OFFLINE_TARGET_APT_REPO_DIR}"
   [[ -f "${TARGET_NETPLAN_RENDERER}" ]] || die "missing target netplan renderer: ${TARGET_NETPLAN_RENDERER}"
@@ -1197,16 +1329,82 @@ cp -f "${NETPLAN_SRC}" "${TARGET}/etc/netplan/00-installer-config.yaml"
 SCRIPT
   chmod +x "${cache_dir}/apply-target-netplan.sh"
 
-  cat > "${cache_dir}/install-target-packages.sh" <<'SCRIPT'
+  cat > "${cache_dir}/install-target-packages.sh" <<SCRIPT
 #!/bin/sh
 set -e
-TARGET="${1:-/target}"
-exec /cdrom/ourbox/tools/install-offline-target-packages.sh \
-  --target "${TARGET}" \
-  --repo-dir /cdrom/ourbox/apt \
-  --package-manifest /cdrom/ourbox/apt/target-packages.txt
+TARGET="\${1:-/target}"
+exec $(shell_quote_sh "${OFFLINE_TARGET_PACKAGE_INSTALLER}") \
+  --target "\${TARGET}" \
+  --repo-dir $(shell_quote_sh "${OFFLINE_TARGET_APT_REPO_DIR}") \
+  --package-manifest $(shell_quote_sh "${install_target_packages_manifest}")
 SCRIPT
   chmod +x "${cache_dir}/install-target-packages.sh"
+
+  printf 'openssh-server\n' > "${installed_target_ssh_packages_manifest}"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
+    cp -f "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}" "${staged_installed_target_authorized_key}"
+  else
+    rm -f "${staged_installed_target_authorized_key}"
+  fi
+
+  cat > "${cache_dir}/configure-installed-target-ssh.sh" <<SCRIPT
+#!/bin/sh
+set -e
+TARGET="\${1:-/target}"
+SSH_PASSWORD_ENABLED=$(shell_quote_sh "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED:-0}")
+SSH_KEY_PRESENT=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_PRESENT:-0}")
+SSH_USERNAME=$(shell_quote_sh "${OURBOX_USERNAME:-ourbox}")
+SSH_KEY_NAME=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}")
+SSH_KEY_FINGERPRINT=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT}")
+AUTHORIZED_KEY_SRC=$(shell_quote_sh "${staged_installed_target_authorized_key}")
+SSH_PACKAGE_MANIFEST=$(shell_quote_sh "${installed_target_ssh_packages_manifest}")
+SSH_PACKAGE_INSTALLER=$(shell_quote_sh "${OFFLINE_TARGET_PACKAGE_INSTALLER}")
+SSH_REPO_DIR=$(shell_quote_sh "${OFFLINE_TARGET_APT_REPO_DIR}")
+
+if [ "\${SSH_PASSWORD_ENABLED}" != "1" ] && [ "\${SSH_KEY_PRESENT}" != "1" ]; then
+  echo "Installed-target SSH is disabled; skipping SSH package install and configuration"
+  exit 0
+fi
+
+"\${SSH_PACKAGE_INSTALLER}" \
+  --target "\${TARGET}" \
+  --repo-dir "\${SSH_REPO_DIR}" \
+  --package-manifest "\${SSH_PACKAGE_MANIFEST}"
+
+password_authentication="no"
+if [ "\${SSH_PASSWORD_ENABLED}" = "1" ]; then
+  password_authentication="yes"
+fi
+
+mkdir -p "\${TARGET}/etc/ssh/sshd_config.d"
+cat > "\${TARGET}/etc/ssh/sshd_config.d/60-ourbox-installed-target.conf" <<EOF
+PasswordAuthentication \${password_authentication}
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin no
+EOF
+
+if [ "\${SSH_KEY_PRESENT}" = "1" ]; then
+  [ -f "\${AUTHORIZED_KEY_SRC}" ] || { echo "missing staged installed-target SSH authorized key: \${AUTHORIZED_KEY_SRC}" >&2; exit 1; }
+  user_record="\$(awk -F: -v user="\${SSH_USERNAME}" '\$1 == user {print \$3 ":" \$4 ":" \$6; exit}' "\${TARGET}/etc/passwd")"
+  [ -n "\${user_record}" ] || { echo "installed target user not found in \${TARGET}/etc/passwd: \${SSH_USERNAME}" >&2; exit 1; }
+  user_uid="\$(printf '%s' "\${user_record}" | cut -d: -f1)"
+  user_gid="\$(printf '%s' "\${user_record}" | cut -d: -f2)"
+  user_home="\$(printf '%s' "\${user_record}" | cut -d: -f3)"
+  [ -n "\${user_home}" ] || { echo "installed target user home is empty for \${SSH_USERNAME}" >&2; exit 1; }
+  install -d -m 0700 "\${TARGET}\${user_home}/.ssh"
+  install -m 0600 "\${AUTHORIZED_KEY_SRC}" "\${TARGET}\${user_home}/.ssh/authorized_keys"
+  if [ "\$(id -u)" = "0" ]; then
+    chown "\${user_uid}:\${user_gid}" "\${TARGET}\${user_home}/.ssh" "\${TARGET}\${user_home}/.ssh/authorized_keys"
+  fi
+  echo "Installed-target SSH key staged for \${SSH_USERNAME} (\${SSH_KEY_NAME}: \${SSH_KEY_FINGERPRINT})"
+fi
+
+curtin in-target --target="\${TARGET}" -- systemctl enable ssh.service
+echo "Installed-target SSH configured (\$( [ "\${SSH_KEY_PRESENT}" = "1" ] && printf 'key' || printf 'no-key' ) / \$( [ "\${SSH_PASSWORD_ENABLED}" = "1" ] && printf 'password' || printf 'no-password' ))"
+SCRIPT
+  chmod +x "${cache_dir}/configure-installed-target-ssh.sh"
 }
 
 # ---------------------------------------------------------------------------
@@ -1397,12 +1595,11 @@ main() {
   show_airgap_platform_panel
   show_selected_applications_panel
   write_install_provenance
-  write_offline_install_helpers
 
-  # --- Step 4: Identity ---
+  # --- Step 5: Identity + installed-system SSH ---
   banner
-  echo "  Step 5 of 6: Set identity for the installed system"
-  echo "  (You can change hostname and password later.)"
+  echo "  Step 5 of 6: Set identity and installed-system SSH"
+  echo "  (You can change hostname, password, and SSH posture later.)"
   echo
 
   OURBOX_HOSTNAME="$(prompt_nonempty "Hostname" "ourbox-woodbox")"
@@ -1411,6 +1608,8 @@ main() {
   echo
   echo "  Set the login password for ${OURBOX_USERNAME}:"
   OURBOX_PASSWORD_HASH="$(prompt_password_hash)"
+  prompt_installed_target_ssh_password_posture
+  write_offline_install_helpers
 
   # --- Step 6: Summary + final confirmation ---
   banner
@@ -1451,6 +1650,10 @@ main() {
   esac
   echo "  Hostname     : ${OURBOX_HOSTNAME}"
   echo "  Username     : ${OURBOX_USERNAME}"
+  echo "  Target SSH   : $(installed_target_ssh_summary_mode)"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    echo "  SSH key      : ${MISSION_INSTALLED_TARGET_SSH_KEY_NAME} (${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT})"
+  fi
   echo
   echo "  WARNING: ALL DATA ON ${TARGET_DISK} AND ${DATA_DISK} WILL BE PERMANENTLY ERASED."
   echo "  This includes old LVM, RAID, encrypted, swap, and filesystem metadata on the DATA disk."
@@ -1507,6 +1710,10 @@ main() {
   fi
   echo "  Hostname      : ${OURBOX_HOSTNAME}"
   echo "  Username      : ${OURBOX_USERNAME}"
+  echo "  Target SSH    : $(installed_target_ssh_summary_mode)"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    echo "  SSH key       : ${MISSION_INSTALLED_TARGET_SSH_KEY_NAME} (${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT})"
+  fi
   echo "  Autoinstall   : ${AUTOINSTALL_OUT}"
   echo "  =================================================================="
   echo

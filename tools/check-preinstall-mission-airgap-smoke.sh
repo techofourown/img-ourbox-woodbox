@@ -14,10 +14,11 @@ PAYLOAD_DIR="${TMP}/cache/payload"
 OVERRIDE_DIR="${TMP}/cache/airgap-platform-override"
 MISSION_AIRGAP_DIR="${MISSION_ROOT}/artifacts/airgap"
 MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
+MISSION_SSH_DIR="${MISSION_ROOT}/artifacts/installed-target-ssh"
 SOURCE_BUNDLE_DIR="${TMP}/source-airgap"
 INSTALLER_CACHE_DIR="${TMP}/cache"
 
-mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${PAYLOAD_DIR}" "${INSTALLER_CACHE_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
+mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${MISSION_SSH_DIR}" "${PAYLOAD_DIR}" "${INSTALLER_CACHE_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
 cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
@@ -111,6 +112,7 @@ cp "${SOURCE_BUNDLE_DIR}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
 
 printf 'fixture os payload\n' > "${MISSION_OS_DIR}/os-payload.tar.gz"
 printf 'OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1\n' > "${MISSION_OS_DIR}/os.meta.env"
+printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBF4tZb5mB7mN7kI8dAcLhY3CS4n4L35YVjgx1qX7QvZ fixture@host\n' > "${MISSION_SSH_DIR}/authorized-key.pub"
 
 cat > "${MISSION_MANIFEST}" <<EOF
 {
@@ -159,6 +161,13 @@ cat > "${MISSION_MANIFEST}" <<EOF
     ],
     "catalog_relpath": "artifacts/airgap/catalog.json",
     "selection_relpath": "artifacts/airgap/selected-apps.json"
+  },
+  "installed_target_ssh": {
+    "mode": "host-generated-authorized-key",
+    "key_name": "fixture-shared-dev",
+    "authorized_key_relpath": "artifacts/installed-target-ssh/authorized-key.pub",
+    "key_type": "ssh-ed25519",
+    "public_key_fingerprint": "SHA256:fixtureFingerprint0123456789abcdef=="
   }
 }
 EOF
@@ -182,6 +191,18 @@ load_selected_payload_airgap_metadata
 }
 [[ "${OURBOX_SELECTED_APPLICATION_IDS}" == "landing,dufs" ]] || {
   echo "unexpected selected applications: ${OURBOX_SELECTED_APPLICATION_IDS}" >&2
+  exit 1
+}
+[[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]] || {
+  echo "expected embedded mission installed_target_ssh metadata to be loaded" >&2
+  exit 1
+}
+[[ "${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}" == "fixture-shared-dev" ]] || {
+  echo "unexpected installed-target SSH key name: ${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}" >&2
+  exit 1
+}
+[[ -f "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}" ]] || {
+  echo "expected installed-target SSH public key path to resolve inside mission media" >&2
   exit 1
 }
 

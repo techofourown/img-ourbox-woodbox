@@ -127,6 +127,16 @@ jobs:
       - name: Validate offline install contract
         run: bash tools/check-offline-install-contract-smoke.sh
 
+  platform-contract-shape:
+    name: Platform contract shape smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate platform contract capability guard
+        run: bash tools/check-validate-platform-contract-shape-smoke.sh
+
   target-netplan-renderer:
     name: Target netplan renderer smoke
     runs-on: ubuntu-latest
@@ -236,6 +246,16 @@ jobs:
 
       - name: Verify Woodbox offline helper generation
         run: bash tools/check-preinstall-offline-helpers-smoke.sh
+
+  installed-target-ssh-helper:
+    name: Installed-target SSH helper smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Woodbox installed-target SSH helper
+        run: bash tools/check-installed-target-ssh-helper-smoke.sh
 
   mission-media-helper:
     name: Mission media helper smoke

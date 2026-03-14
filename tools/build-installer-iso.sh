@@ -36,6 +36,7 @@ need_cmd sed
 need_cmd awk
 need_cmd bash
 : "${OURBOX_INSTALLER_TARGET_PACKAGES:=avahi-daemon avahi-utils}"
+: "${OURBOX_INSTALLER_TARGET_APT_REPO_EXTRA_PACKAGES:=openssh-server}"
 : "${OURBOX_INSTALLER_TARGET_APT_REPO_SOURCE_DIR:=}"
 
 EMBED_PAYLOAD=""
@@ -264,6 +265,9 @@ if [[ -n "${OURBOX_INSTALLER_TARGET_APT_REPO_SOURCE_DIR}" ]]; then
 fi
 for pkg in ${OURBOX_INSTALLER_TARGET_PACKAGES}; do
   apt_repo_cmd+=(--package "${pkg}")
+done
+for pkg in ${OURBOX_INSTALLER_TARGET_APT_REPO_EXTRA_PACKAGES}; do
+  apt_repo_cmd+=(--repo-package "${pkg}")
 done
 "${apt_repo_cmd[@]}"
 

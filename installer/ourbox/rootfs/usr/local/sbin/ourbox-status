@@ -13,6 +13,7 @@ STATUS_FILE="/run/ourbox/status"
 BOOT_INTERVAL=10
 READY_INTERVAL=60
 HOSTNAME="$(hostname)"
+PLATFORM_STATE_FILE="/var/lib/ourbox/state/platform-contract.env"
 
 mkdir -p /run/ourbox
 
@@ -32,14 +33,44 @@ check_k3s_api() {
   /usr/local/bin/k3s kubectl get nodes --no-headers 2>/dev/null | grep -q .
 }
 
+env_file_value() {
+  local file="$1" key="$2"
+  [[ -f "${file}" ]] || return 1
+  awk -F= -v wanted="${key}" '
+    $1 == wanted {
+      value = substr($0, index($0, "=") + 1)
+      gsub(/^"/, "", value)
+      gsub(/"$/, "", value)
+      gsub(/^'\''/, "", value)
+      gsub(/'\''$/, "", value)
+      print value
+      exit
+    }
+  ' "${file}"
+}
+
+resolved_box_host() {
+  local box_host=""
+  box_host="$(env_file_value "${PLATFORM_STATE_FILE}" "BOX_HOST" || true)"
+  if [[ -n "${box_host}" ]]; then
+    printf '%s\n' "${box_host}"
+  else
+    printf '%s.local\n' "${HOSTNAME}"
+  fi
+}
+
 check_traefik() {
-  python3 - <<'PY' >/dev/null 2>&1
+  local box_host="$1"
+  python3 - "${box_host}" <<'PY' >/dev/null 2>&1
 import sys
 import urllib.error
 import urllib.request
 
+box_host = sys.argv[1]
+
 try:
-    with urllib.request.urlopen("http://127.0.0.1/", timeout=2) as response:
+    request = urllib.request.Request("http://127.0.0.1/", headers={"Host": box_host})
+    with urllib.request.urlopen(request, timeout=2) as response:
         sys.exit(0 if getattr(response, "status", 200) else 0)
 except (OSError, urllib.error.URLError):
     sys.exit(1)
@@ -66,8 +97,8 @@ check_pods_ready() {
 }
 
 format_status() {
-  local ip="$1" data_ok="$2" net_ok="$3" k3s_ok="$4" traefik_ok="$5"
-  local mdns_ok="$6" bootstrap_ok="$7" pods_info="$8" all_ready="$9"
+  local ip="$1" box_host="$2" data_ok="$3" net_ok="$4" k3s_ok="$5" traefik_ok="$6"
+  local mdns_ok="$7" bootstrap_ok="$8" pods_info="$9" all_ready="${10}"
 
   local mark_ok="OK" mark_wait=".." mark_no="  "
   local out=""
@@ -130,10 +161,10 @@ format_status() {
     out+=$'\n'
     out+="  ========================================"$'\n'
     out+="    OurBox Woodbox is READY"$'\n\n'
-    out+="    http://${HOSTNAME}.local"$'\n'
-    out+="    http://files.${HOSTNAME}.local"$'\n'
-    out+="    http://notes.${HOSTNAME}.local"$'\n'
-    out+="    http://todo.${HOSTNAME}.local"$'\n\n'
+    out+="    http://${box_host}"$'\n'
+    out+="    http://files.${box_host}"$'\n'
+    out+="    http://notes.${box_host}"$'\n'
+    out+="    http://todo.${box_host}"$'\n\n'
     out+="    Commands:"$'\n'
     out+="      woodbox status  — show this status"$'\n'
     out+="      woodbox quiet   — silence console output"$'\n'
@@ -149,8 +180,9 @@ was_ready=false
 while true; do
   data_ok=0; check_data_mount && data_ok=1
   net_ok=0; ip=""; ip="$(check_network)"; [[ -n "$ip" ]] && net_ok=1
+  box_host="$(resolved_box_host)"
   k3s_ok=0; check_k3s_api && k3s_ok=1
-  traefik_ok=0; check_traefik && traefik_ok=1
+  traefik_ok=0; check_traefik "${box_host}" && traefik_ok=1
   mdns_ok=0; check_mdns && mdns_ok=1
   bootstrap_ok=0; check_bootstrap_done && bootstrap_ok=1
 
@@ -164,7 +196,7 @@ while true; do
     all_ready=1
   fi
 
-  status="$(format_status "$ip" "$data_ok" "$net_ok" "$k3s_ok" "$traefik_ok" \
+  status="$(format_status "$ip" "$box_host" "$data_ok" "$net_ok" "$k3s_ok" "$traefik_ok" \
     "$mdns_ok" "$bootstrap_ok" "$pods_info" "$all_ready")"
 
   echo "$status" > "${STATUS_FILE}"
