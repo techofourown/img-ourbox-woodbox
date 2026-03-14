@@ -1295,8 +1295,8 @@ SCRIPT
   cat > "${cache_dir}/apply-airgap-platform-override.sh" <<'SCRIPT'
 #!/bin/sh
 set -e
-PROV="/opt/ourbox/installer/cache/install-provenance.env"
-SOURCE_DIR="/opt/ourbox/installer/cache/airgap-platform-override"
+PROV="${OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env}"
+SOURCE_DIR="${OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR:-/opt/ourbox/installer/cache/airgap-platform-override}"
 TARGET="${1:-/target}"
 
 if [ ! -f "${PROV}" ]; then
@@ -1330,8 +1330,8 @@ SCRIPT
 #!/bin/sh
 set -e
 TARGET="${1:-/target}"
-SOURCE_CATALOG="/opt/ourbox/installer/cache/catalog.json"
-SOURCE_SELECTION="/opt/ourbox/installer/cache/selected-apps.json"
+SOURCE_CATALOG="${OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/installer/cache/catalog.json}"
+SOURCE_SELECTION="${OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json}"
 PLATFORM_DIR="${TARGET}/opt/ourbox/airgap/platform"
 
 mkdir -p "${PLATFORM_DIR}"

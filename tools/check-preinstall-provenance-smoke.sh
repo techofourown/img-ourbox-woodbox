@@ -51,7 +51,13 @@ export OURBOX_SELECTED_APPLICATION_IDS="landing,dufs"
 write_install_provenance
 
 TARGET_DIR="${TMP}/target"
+OVERRIDE_DIR="${TMP}/airgap-platform-override"
+APPLICATION_SELECTION_DIR="${TMP}/application-selection"
 mkdir -p "${TARGET_DIR}/etc/ourbox"
+mkdir -p "${TARGET_DIR}/opt/ourbox/airgap/platform" \
+  "${OVERRIDE_DIR}/k3s" \
+  "${OVERRIDE_DIR}/platform/images" \
+  "${APPLICATION_SELECTION_DIR}"
 printf 'EXISTING_KEY="existing-value"\n' > "${TARGET_DIR}/etc/ourbox/release"
 OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
   "${CACHE_DIR}/append-provenance.sh" "${TARGET_DIR}"
@@ -77,6 +83,10 @@ grep -F 'AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${CACHE_DIR}/install-prove
 grep -F 'APPLICATION_CATALOG_ID="demo-apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F 'APPLICATION_CATALOG_NAME="Demo Apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F 'SELECTED_APPLICATION_IDS="landing,dufs"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+grep -F 'OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR:-/opt/ourbox/installer/cache/airgap-platform-override' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+grep -F 'OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/installer/cache/catalog.json' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+grep -F 'OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 grep -F 'OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'OURBOX_APPLICATION_CATALOG_ID="demo-apps"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'OURBOX_APPLICATION_CATALOG_NAME="Demo Apps"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
@@ -98,5 +108,71 @@ if grep -F 'contract.digest' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/
   echo "override helper must not replace platform contract files" >&2
   exit 1
 fi
+
+printf 'fixture-k3s\n' > "${OVERRIDE_DIR}/k3s/README"
+printf 'fixture-image\n' > "${OVERRIDE_DIR}/platform/images/example.txt"
+printf '{"images":[]}\n' > "${OVERRIDE_DIR}/platform/images.lock.json"
+printf 'OURBOX_PROFILE=demo-apps\n' > "${OVERRIDE_DIR}/platform/profile.env"
+printf 'K3S_VERSION=v1.35.0+k3s1\n' > "${OVERRIDE_DIR}/manifest.env"
+printf 'keep-me\n' > "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest"
+
+OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
+OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR="${OVERRIDE_DIR}" \
+  "${CACHE_DIR}/apply-airgap-platform-override.sh" "${TARGET_DIR}"
+
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/k3s/README" ]] || {
+  echo "override helper did not stage k3s payload into target" >&2
+  exit 1
+}
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/images/example.txt" ]] || {
+  echo "override helper did not stage platform images into target" >&2
+  exit 1
+}
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/images.lock.json" ]] || {
+  echo "override helper did not stage images.lock.json into target" >&2
+  exit 1
+}
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/profile.env" ]] || {
+  echo "override helper did not stage profile.env into target" >&2
+  exit 1
+}
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/manifest.env" ]] || {
+  echo "override helper did not stage manifest.env into target" >&2
+  exit 1
+}
+grep -F 'keep-me' "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest" >/dev/null || {
+  echo "override helper unexpectedly replaced platform contract digest" >&2
+  exit 1
+}
+
+printf '{"catalog_id":"demo-apps"}\n' > "${APPLICATION_SELECTION_DIR}/catalog.json"
+printf '{"selected_app_ids":["landing","dufs"]}\n' > "${APPLICATION_SELECTION_DIR}/selected-apps.json"
+
+OURBOX_INSTALLER_APPLICATION_CATALOG_FILE="${APPLICATION_SELECTION_DIR}/catalog.json" \
+OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE="${APPLICATION_SELECTION_DIR}/selected-apps.json" \
+  "${CACHE_DIR}/apply-application-selection.sh" "${TARGET_DIR}"
+
+cmp -s "${APPLICATION_SELECTION_DIR}/catalog.json" "${TARGET_DIR}/opt/ourbox/airgap/platform/catalog.json" || {
+  echo "application selection helper did not copy catalog.json into target" >&2
+  exit 1
+}
+cmp -s "${APPLICATION_SELECTION_DIR}/selected-apps.json" "${TARGET_DIR}/opt/ourbox/airgap/platform/selected-apps.json" || {
+  echo "application selection helper did not copy selected-apps.json into target" >&2
+  exit 1
+}
+
+rm -f "${APPLICATION_SELECTION_DIR}/selected-apps.json"
+OURBOX_INSTALLER_APPLICATION_CATALOG_FILE="${APPLICATION_SELECTION_DIR}/catalog.json" \
+OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE="${APPLICATION_SELECTION_DIR}/selected-apps.json" \
+  "${CACHE_DIR}/apply-application-selection.sh" "${TARGET_DIR}"
+
+[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/catalog.json" ]] || {
+  echo "application selection helper unexpectedly removed catalog.json from target" >&2
+  exit 1
+}
+[[ ! -f "${TARGET_DIR}/opt/ourbox/airgap/platform/selected-apps.json" ]] || {
+  echo "application selection helper did not remove selected-apps.json when no selection file was staged" >&2
+  exit 1
+}
 
 printf '[%s] Woodbox preinstall provenance smoke passed\n' "$(date -Is)"
