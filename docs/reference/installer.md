@@ -96,6 +96,9 @@ also carries:
 
 - `/cdrom/ourbox/mission/artifacts/installed-target-ssh/authorized-key.pub`
 
+The live installer reuses that same staged public key for `ourbox-installer`
+SSH access when the media carries it.
+
 `ourbox-preinstall` requires both:
 
 - an embedded payload
@@ -181,6 +184,8 @@ Behavior:
 - host keys are generated before `sshd -t`
 - SSH is only advertised after validation and service startup succeed
 - official/public media is password-capable by default
+- when mission media carries a staged installed-target SSH public key, the live
+  installer also authorizes that same key for `ourbox-installer`
 - when no password hash is baked, the installer generates a one-time password at
   boot and shows it only on the attached console
 - step 0 on TTY1 can replace that generated password with an operator-chosen

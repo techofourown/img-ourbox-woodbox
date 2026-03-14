@@ -7,6 +7,7 @@ STATUS_FILE="${STATUS_FILE:-/run/ourbox-installer-ssh-status.env}"
 PASSWORD_FILE="${PASSWORD_FILE:-/run/ourbox-installer-ssh-password.txt}"
 CONFIG_FILE="${CONFIG_FILE:-/etc/ssh/sshd_config.d/60-ourbox-installer.conf}"
 HELPER_FILE="${HELPER_FILE:-/cdrom/ourbox/tools/installer-ssh-helper.sh}"
+MISSION_AUTHORIZED_KEY_FILE="${MISSION_AUTHORIZED_KEY_FILE:-/cdrom/ourbox/mission/artifacts/installed-target-ssh/authorized-key.pub}"
 
 OURBOX_INSTALLER_SSH_STATUS="${OURBOX_INSTALLER_SSH_STATUS:-pending}"
 OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
@@ -55,6 +56,37 @@ write_password_file_if_ready() {
   umask 077
   printf '%s\n' "${GENERATED_PASSWORD}" > "${PASSWORD_FILE}"
   chmod 0600 "${PASSWORD_FILE}" >/dev/null 2>&1 || true
+}
+
+load_mission_authorized_key_if_present() {
+  local key_path="${MISSION_AUTHORIZED_KEY_FILE:-}"
+  local -a key_lines=()
+
+  case "${OURBOX_INSTALLER_SSH_MODE:-off}" in
+    key|both) ;;
+    *) return 0 ;;
+  esac
+
+  [[ -n "${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}" ]] && return 0
+  [[ -n "${key_path}" ]] || return 0
+  [[ -f "${key_path}" ]] || return 0
+
+  mapfile -t key_lines < <(awk 'NF {print $0}' "${key_path}")
+  if [[ "${#key_lines[@]}" -ne 1 ]]; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    OURBOX_INSTALLER_SSH_KEY_STATE="error"
+    log "ERROR: staged mission installer SSH authorized key must contain exactly one non-empty public key line: ${key_path}"
+    return 1
+  fi
+  if [[ "${key_lines[0]}" != ssh-ed25519\ * ]]; then
+    OURBOX_INSTALLER_SSH_STATUS="error"
+    OURBOX_INSTALLER_SSH_KEY_STATE="error"
+    log "ERROR: staged mission installer SSH authorized key must be an ssh-ed25519 public key: ${key_path}"
+    return 1
+  fi
+
+  OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${key_lines[0]}"
+  log "installer SSH authorized key loaded from staged mission media"
 }
 
 finalize_status() {
@@ -154,6 +186,7 @@ spawn_ready_watcher() {
       PASSWORD_FILE="${PASSWORD_FILE}" \
       CONFIG_FILE="${CONFIG_FILE}" \
       HELPER_FILE="${HELPER_FILE}" \
+      MISSION_AUTHORIZED_KEY_FILE="${MISSION_AUTHORIZED_KEY_FILE}" \
       OURBOX_INSTALLER_SSH_STATUS="${OURBOX_INSTALLER_SSH_STATUS}" \
       OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER}" \
       OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE}" \
@@ -203,11 +236,17 @@ main() {
   OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
   OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-}"
   OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
+  MISSION_AUTHORIZED_KEY_FILE="${MISSION_AUTHORIZED_KEY_FILE:-/cdrom/ourbox/mission/artifacts/installed-target-ssh/authorized-key.pub}"
   OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
   OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY="${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-1}"
   OURBOX_INSTALLER_SSH_STATUS="pending"
   OURBOX_INSTALLER_SSH_PASSWORD_STATE="disabled"
   OURBOX_INSTALLER_SSH_KEY_STATE="disabled"
+
+  if ! load_mission_authorized_key_if_present; then
+    finalize_status
+    return 1
+  fi
 
   [[ -f "${HELPER_FILE}" ]] || {
     OURBOX_INSTALLER_SSH_STATUS="error"
