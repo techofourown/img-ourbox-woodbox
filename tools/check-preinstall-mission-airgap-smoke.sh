@@ -233,6 +233,31 @@ stage_selected_application_metadata
   exit 1
 }
 
+python3 - <<'PY' "${MISSION_MANIFEST}"
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1])
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+manifest["selected_airgap"]["payload_relpath"] = "../outside-airgap-platform.tar.gz"
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+PY
+
+set +e
+( load_selected_payload_airgap_metadata ) >"${TMP}/mission-relpath.log" 2>&1
+status=$?
+set -e
+
+[[ "${status}" -ne 0 ]] || {
+  echo "expected embedded mission relpath traversal to be rejected" >&2
+  exit 1
+}
+grep -F "must stay within the mission directory" "${TMP}/mission-relpath.log" >/dev/null || {
+  cat "${TMP}/mission-relpath.log" >&2
+  exit 1
+}
+
 rm -f "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz.sha256"
 set +e
 (prepare_selected_airgap_platform_bundle >/dev/null 2>&1)

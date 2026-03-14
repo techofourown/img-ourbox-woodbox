@@ -72,6 +72,64 @@ cat > "${PROFILE_DIR}/images.lock.json" <<'EOF_IMAGES_LOCK'
 }
 EOF_IMAGES_LOCK
 
+cat > "${CONTRACT_DIR}/catalog.json" <<'EOF_CATALOG'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "fixture-catalog",
+  "catalog_name": "Fixture Catalog",
+  "default_app_ids": [
+    "landing",
+    "dufs"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ]
+    },
+    {
+      "id": "dufs",
+      "display_name": "Dufs",
+      "image_names": [
+        "dufs"
+      ]
+    }
+  ]
+}
+EOF_CATALOG
+
+cat > "${CONTRACT_DIR}/selected-apps.json" <<'EOF_SELECTED_APPS'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "fixture-catalog",
+  "selection_mode": "host-selected",
+  "selected_app_ids": [
+    "landing",
+    "dufs"
+  ]
+}
+EOF_SELECTED_APPS
+
+cat > "${CONTRACT_DIR}/images.lock.json" <<'EOF_RENDERED_IMAGES_LOCK'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "name": "dufs",
+      "ref": "ghcr.io/example/dufs@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}
+EOF_RENDERED_IMAGES_LOCK
+
 chmod +x "${TOOLS_DIR}/check-target-prereqs.sh" "${TOOLS_DIR}/contract-identity.sh" "${TOOLS_DIR}/verify-runtime.sh"
 
 cat > "${CONTRACT_DIR}/contract.env" <<'EOF_CONTRACT'
@@ -148,6 +206,7 @@ OURBOX_APPLICATION_CATALOG_ID=
 OURBOX_APPLICATION_SELECTION_MODE=
 OURBOX_SELECTED_APPLICATION_IDS=
 OURBOX_APPLICATION_CATALOG_SHA256=
+OURBOX_APPLICATION_IMAGES_LOCK_SHA256=
 EOF_OUTPUT
 EOF_BAD_IDENTITY
 chmod +x "${TOOLS_DIR}/contract-identity.sh"
@@ -161,7 +220,7 @@ set -e
   echo "validator should reject contract-identity.sh without application image metadata output" >&2
   exit 1
 }
-grep -F "OURBOX_APPLICATION_IMAGES_LOCK_SHA256" "${TMP}/bad-identity.log" >/dev/null || {
+grep -F "OURBOX_APPLICATION_CATALOG_ID" "${TMP}/bad-identity.log" >/dev/null || {
   cat "${TMP}/bad-identity.log" >&2
   exit 1
 }

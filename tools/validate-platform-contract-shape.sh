@@ -97,4 +97,42 @@ if (( ${#missing_identity_keys[@]} > 0 )); then
   exit 1
 fi
 
+identity_value() {
+  local key="$1"
+  awk -F= -v wanted="${key}" '
+    $1 == wanted {
+      print substr($0, index($0, "=") + 1)
+      exit
+    }
+  ' <<<"${identity_output}"
+}
+
+empty_identity_keys=()
+if [[ -f "${CONTRACT_DIR}/selected-apps.json" ]]; then
+  for key in \
+    "OURBOX_APPLICATION_CATALOG_ID" \
+    "OURBOX_APPLICATION_SELECTION_MODE" \
+    "OURBOX_SELECTED_APPLICATION_IDS"; do
+    if [[ -z "$(identity_value "${key}")" ]]; then
+      empty_identity_keys+=("${key}")
+    fi
+  done
+fi
+
+if [[ -f "${CONTRACT_DIR}/catalog.json" ]] && [[ -z "$(identity_value "OURBOX_APPLICATION_CATALOG_SHA256")" ]]; then
+  empty_identity_keys+=("OURBOX_APPLICATION_CATALOG_SHA256")
+fi
+
+if [[ -f "${CONTRACT_DIR}/images.lock.json" ]] && [[ -z "$(identity_value "OURBOX_APPLICATION_IMAGES_LOCK_SHA256")" ]]; then
+  empty_identity_keys+=("OURBOX_APPLICATION_IMAGES_LOCK_SHA256")
+fi
+
+if (( ${#empty_identity_keys[@]} > 0 )); then
+  echo "ERROR: platform-contract identity capability check failed for ${CONTRACT_DIR}" >&2
+  echo "contract-identity.sh leaves required application metadata outputs empty:" >&2
+  printf '  - %s\n' "${empty_identity_keys[@]}" >&2
+  echo "Update PLATFORM_CONTRACT_REF to a platform-contract artifact that supports host-selected application metadata." >&2
+  exit 1
+fi
+
 echo "OK: platform contract shape validated: ${CONTRACT_DIR}"

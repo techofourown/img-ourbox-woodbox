@@ -98,6 +98,33 @@ shell_quote_sh() {
   printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\$"`]/\\&/g')"
 }
 
+resolve_path_within_root() {
+  local root="$1" label="$2" relpath="$3"
+
+  python3 - <<'PY' "${root}" "${label}" "${relpath}"
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+label = sys.argv[2]
+relpath = sys.argv[3].strip()
+if not relpath:
+    raise SystemExit(f"{label} must be set")
+
+candidate = (root / relpath).resolve()
+try:
+    candidate.relative_to(root)
+except ValueError as exc:
+    raise SystemExit(f"{label} must stay within the mission directory") from exc
+
+print(candidate)
+PY
+}
+
+resolve_mission_relpath() {
+  resolve_path_within_root "${MISSION_DIR}" "$1" "$2"
+}
+
 _load_installer_ssh_status() {
   OURBOX_INSTALLER_SSH_STATUS="pending"
   OURBOX_INSTALLER_SSH_USER="ourbox-installer"
@@ -861,8 +888,16 @@ PY
   MISSION_AIRGAP_RELEASE_CHANNEL="$(mission_json_field selected_airgap_release_channel)"
   MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST="$(mission_json_field selected_airgap_platform_contract_digest)"
   MISSION_AIRGAP_ARCH="$(mission_json_field selected_airgap_arch)"
-  MISSION_AIRGAP_PAYLOAD_PATH="${MISSION_DIR}/$(mission_json_field selected_airgap_payload_relpath)"
-  MISSION_AIRGAP_MANIFEST_PATH="${MISSION_DIR}/$(mission_json_field selected_airgap_manifest_relpath)"
+  MISSION_AIRGAP_PAYLOAD_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission selected_airgap.payload_relpath" \
+      "$(mission_json_field selected_airgap_payload_relpath)"
+  )"
+  MISSION_AIRGAP_MANIFEST_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission selected_airgap.manifest_relpath" \
+      "$(mission_json_field selected_airgap_manifest_relpath)"
+  )"
   MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD="$(mission_json_field selected_airgap_present_in_selected_os_payload)"
   MISSION_SELECTED_APPLICATIONS_PRESENT="$(mission_json_field selected_applications_present)"
   MISSION_APPLICATION_CATALOG_ID="$(mission_json_field application_catalog_id)"
@@ -880,9 +915,21 @@ PY
   MISSION_APPLICATION_CATALOG_PATH=""
   MISSION_SELECTED_APPLICATIONS_PATH=""
   MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH=""
-  [[ -n "${app_catalog_relpath}" ]] && MISSION_APPLICATION_CATALOG_PATH="${MISSION_DIR}/${app_catalog_relpath}"
-  [[ -n "${app_selection_relpath}" ]] && MISSION_SELECTED_APPLICATIONS_PATH="${MISSION_DIR}/${app_selection_relpath}"
-  [[ -n "${installed_target_ssh_authorized_key_relpath}" ]] && MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH="${MISSION_DIR}/${installed_target_ssh_authorized_key_relpath}"
+  [[ -n "${app_catalog_relpath}" ]] && MISSION_APPLICATION_CATALOG_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission selected_applications.catalog_relpath" \
+      "${app_catalog_relpath}"
+  )"
+  [[ -n "${app_selection_relpath}" ]] && MISSION_SELECTED_APPLICATIONS_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission selected_applications.selection_relpath" \
+      "${app_selection_relpath}"
+  )"
+  [[ -n "${installed_target_ssh_authorized_key_relpath}" ]] && MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission installed_target_ssh.authorized_key_relpath" \
+      "${installed_target_ssh_authorized_key_relpath}"
+  )"
 
   [[ -n "${MISSION_OS_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_os.artifact_ref"
   [[ "${MISSION_OS_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_os.artifact_digest"
