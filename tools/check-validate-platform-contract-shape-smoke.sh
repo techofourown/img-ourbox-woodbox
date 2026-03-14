@@ -140,8 +140,8 @@ EOF_CONTRACT
 
 for manifest in \
   20-landing-deployment.yaml \
-  31-dufs-deployment.yaml \
-  41-flatnotes-deployment.yaml \
+  dufs-deployment.yaml \
+  flatnotes-deployment.yaml \
   50-demo-apps-ingress.yaml; do
   printf '# fixture manifest: %s\n' "${manifest}" > "${MANIFEST_DIR}/${manifest}"
 done

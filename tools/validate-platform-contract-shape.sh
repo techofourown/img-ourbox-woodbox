@@ -13,7 +13,10 @@ die() {
 command -v python3 >/dev/null 2>&1 || die "python3 is required to validate platform contract capabilities"
 
 # The current runtime seam expects render/verify tools, demo-app profile data,
-# and the workload manifests that were absent from the older two-file contract.
+# and a full rendered workload manifest set. Older upstream artifacts lacked
+# those manifests entirely. Current upstream bundles use unnumbered app
+# deployment filenames while retaining numbered control-plane filenames, so
+# accept either unnumbered or NN-prefixed variants for workload manifests.
 required_paths=(
   "contract.env"
   "tools/check-target-prereqs.sh"
@@ -22,15 +25,30 @@ required_paths=(
   "tools/verify-runtime.sh"
   "profiles/demo-apps/profile.env"
   "profiles/demo-apps/images.lock.json"
-  "manifests/20-landing-deployment.yaml"
-  "manifests/31-dufs-deployment.yaml"
-  "manifests/41-flatnotes-deployment.yaml"
-  "manifests/50-demo-apps-ingress.yaml"
 )
+
+required_manifest_basenames=(
+  "landing-deployment.yaml"
+  "dufs-deployment.yaml"
+  "flatnotes-deployment.yaml"
+  "demo-apps-ingress.yaml"
+)
+
+has_required_manifest() {
+  local basename="$1"
+
+  [[ -e "${CONTRACT_DIR}/manifests/${basename}" ]] && return 0
+  compgen -G "${CONTRACT_DIR}/manifests/[0-9][0-9]-${basename}" >/dev/null && return 0
+  return 1
+}
 
 missing=()
 for rel in "${required_paths[@]}"; do
   [[ -e "${CONTRACT_DIR}/${rel}" ]] || missing+=("${rel}")
+done
+
+for basename in "${required_manifest_basenames[@]}"; do
+  has_required_manifest "${basename}" || missing+=("manifests/{NN-}${basename}")
 done
 
 if (( ${#missing[@]} > 0 )); then
