@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Application Catalog",
+  "catalog_description": "Compatibility snapshot used by Woodbox while approved upstream airgap and platform-contract artifacts catch up to baked application catalog metadata.",
+  "default_app_ids": [
+    "landing",
+    "todo-bloom",
+    "dufs",
+    "flatnotes"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "app_uid": "techofourown/landing",
+      "display_name": "Landing",
+      "description": "Default landing page that links to the rest of the installed applications.",
+      "renderer": "landing",
+      "service_name": "landing",
+      "service_port": 80,
+      "host_template": "{box_host}",
+      "path": "/",
+      "expected_status": 200,
+      "body_marker": "Your apps, served by your machine, to your phone.",
+      "route_description": "landing-root",
+      "default_backend": true,
+      "image_names": [
+        "nginx"
+      ]
+    },
+    {
+      "id": "todo-bloom",
+      "app_uid": "techofourown/todo-bloom",
+      "display_name": "Todo Bloom",
+      "description": "Static to-do demo app served from nginx.",
+      "renderer": "todo-bloom",
+      "service_name": "todo-bloom",
+      "service_port": 80,
+      "host_template": "todo.{box_host}",
+      "path": "/",
+      "expected_status": 200,
+      "body_marker": "Todo Bloom",
+      "route_description": "todo-bloom-root",
+      "default_backend": false,
+      "image_names": [
+        "nginx"
+      ]
+    },
+    {
+      "id": "dufs",
+      "app_uid": "thirdparty/dufs",
+      "display_name": "Dufs",
+      "description": "Simple file browser rooted on the shared data volume.",
+      "renderer": "dufs",
+      "service_name": "dufs",
+      "service_port": 5000,
+      "host_template": "files.{box_host}",
+      "path": "/",
+      "expected_status": 200,
+      "body_marker": "Upload files",
+      "route_description": "dufs-root",
+      "default_backend": false,
+      "image_names": [
+        "dufs"
+      ]
+    },
+    {
+      "id": "flatnotes",
+      "app_uid": "thirdparty/flatnotes",
+      "display_name": "Flatnotes",
+      "description": "Simple note-taking app backed by the shared data volume.",
+      "renderer": "flatnotes",
+      "service_name": "flatnotes",
+      "service_port": 8080,
+      "host_template": "notes.{box_host}",
+      "path": "/",
+      "expected_status": 200,
+      "body_marker": "flatnotes",
+      "route_description": "flatnotes-root",
+      "default_backend": false,
+      "image_names": [
+        "flatnotes"
+      ]
+    }
+  ]
+}

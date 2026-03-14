@@ -167,6 +167,46 @@ jobs:
       - name: Verify Woodbox flash helper
         run: bash tools/check-flash-installer-media-smoke.sh
 
+  installer-ssh-bootstrap-smoke:
+    name: Installer SSH bootstrap smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer SSH bootstrap service control
+        run: bash tools/check-installer-ssh-bootstrap-smoke.sh
+
+  installer-ssh-timeout-smoke:
+    name: Installer SSH timeout smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer SSH timeout contract
+        run: bash tools/check-installer-ssh-timeout-smoke.sh
+
+  installer-ssh-log-leak-smoke:
+    name: Installer SSH log leak smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer SSH leak detector
+        run: bash tools/check-installer-ssh-log-leak-smoke.sh
+
+  installer-cloud-init-gate-smoke:
+    name: Installer cloud-init gate smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer cloud-init readiness gate
+        run: bash tools/check-installer-cloud-init-gate-smoke.sh
+
   preinstall-provenance-smoke:
     name: Preinstall provenance smoke
     runs-on: ubuntu-latest
@@ -197,6 +237,36 @@ jobs:
       - name: Verify Woodbox offline helper generation
         run: bash tools/check-preinstall-offline-helpers-smoke.sh
 
+  mission-media-helper:
+    name: Mission media helper smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify mission-media smoke helper
+        run: bash tools/check-prepare-mission-media-smoke.sh
+
+  baked-airgap-application-metadata:
+    name: Baked airgap application metadata smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify baked airgap metadata synthesis
+        run: bash tools/check-ensure-airgap-application-metadata-smoke.sh
+
+  legacy-upstream-fallback-refs:
+    name: Legacy upstream fallback refs smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify legacy upstream fallback refs
+        run: bash tools/check-legacy-upstream-fallback-refs-smoke.sh
+
   commitlint:
     name: Commit message lint
     runs-on: ubuntu-latest
@@ -211,7 +281,7 @@ jobs:
           node-version: '20'
 
       - name: Install commitlint
-        run: npm install --no-save @commitlint/cli @commitlint/config-conventional
+        run: npm install --no-save @commitlint/cli @commitlint/config-conventional tinyexec@1.0.2
 
       - name: Lint PR commits
         run: |

@@ -85,6 +85,10 @@ strict_metadata_values() {
   python3 "${STRICT_METADATA_PARSER}" "${metadata_file}" "$@"
 }
 
+shell_quote_sh() {
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\$"`]/\\&/g')"
+}
+
 _load_installer_ssh_status() {
   OURBOX_INSTALLER_SSH_STATUS="pending"
   OURBOX_INSTALLER_SSH_USER="ourbox-installer"
@@ -387,6 +391,10 @@ OURBOX_AIRGAP_PLATFORM_REF=""
 OURBOX_AIRGAP_PLATFORM_DIGEST=""
 OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=""
 OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
+OURBOX_APPLICATION_CATALOG_ID=""
+OURBOX_APPLICATION_CATALOG_NAME=""
+OURBOX_APPLICATION_SELECTION_MODE=""
+OURBOX_SELECTED_APPLICATION_IDS=""
 PAYLOAD_VERSION="unknown"
 PAYLOAD_VARIANT="unknown"
 MISSION_PRESENT=0
@@ -404,6 +412,13 @@ MISSION_AIRGAP_ARCH=""
 MISSION_AIRGAP_PAYLOAD_PATH=""
 MISSION_AIRGAP_MANIFEST_PATH=""
 MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD=""
+MISSION_SELECTED_APPLICATIONS_PRESENT=0
+MISSION_APPLICATION_CATALOG_PATH=""
+MISSION_SELECTED_APPLICATIONS_PATH=""
+MISSION_APPLICATION_CATALOG_ID=""
+MISSION_APPLICATION_CATALOG_NAME=""
+MISSION_APPLICATION_SELECTION_MODE=""
+MISSION_SELECTED_APPLICATION_IDS=""
 
 validate_extracted_airgap_platform_bundle() {
   local bundle_dir="$1"
@@ -610,14 +625,23 @@ load_selected_payload_airgap_metadata() {
   [[ -n "${PAYLOAD_VARIANT}" ]] || PAYLOAD_VARIANT="unknown"
 
   load_embedded_mission_metadata
+  load_mission_selected_application_metadata
 }
 
 load_embedded_mission_metadata() {
   MISSION_PRESENT=0
+  MISSION_SELECTED_APPLICATIONS_PRESENT=0
+  MISSION_APPLICATION_CATALOG_PATH=""
+  MISSION_SELECTED_APPLICATIONS_PATH=""
+  MISSION_APPLICATION_CATALOG_ID=""
+  MISSION_APPLICATION_CATALOG_NAME=""
+  MISSION_APPLICATION_SELECTION_MODE=""
+  MISSION_SELECTED_APPLICATION_IDS=""
   [[ -f "${MISSION_MANIFEST}" ]] || return 0
 
   local mission_dump=""
-  local -a mission_fields=()
+  local app_catalog_relpath=""
+  local app_selection_relpath=""
 
   mission_dump="$(
     python3 - <<'PY' "${MISSION_MANIFEST}"
@@ -642,44 +666,116 @@ if operator_mode.get("mode") != "install":
 
 selected_os = manifest.get("selected_os", {})
 selected_airgap = manifest.get("selected_airgap", {})
+selected_applications = manifest.get("selected_applications")
 
-values = [
-    str(selected_os.get("artifact_ref", "")),
-    str(selected_os.get("artifact_digest", "")),
-    str(selected_os.get("selection_source", "")),
-    str(selected_os.get("release_channel", "")),
-    str(selected_os.get("platform_contract_digest", "")),
-    str(selected_airgap.get("artifact_ref", "")),
-    str(selected_airgap.get("artifact_digest", "")),
-    str(selected_airgap.get("selection_source", "")),
-    str(selected_airgap.get("release_channel", "")),
-    str(selected_airgap.get("platform_contract_digest", "")),
-    str(selected_airgap.get("arch", "")),
-    str(selected_airgap.get("payload_relpath", "")),
-    str(selected_airgap.get("manifest_relpath", "")),
-    "1" if selected_airgap.get("present_in_selected_os_payload", False) else "0",
-]
-print("\n".join(values))
+app_present = False
+app_catalog_id = ""
+app_catalog_name = ""
+app_selection_mode = ""
+app_selected_ids = ""
+app_catalog_relpath = ""
+app_selection_relpath = ""
+
+if selected_applications is not None:
+    if not isinstance(selected_applications, dict) or not selected_applications:
+        raise SystemExit("embedded mission selected_applications must be an object when present")
+    app_catalog_id = str(selected_applications.get("catalog_id", ""))
+    app_catalog_name = str(selected_applications.get("catalog_name", ""))
+    app_selection_mode = str(selected_applications.get("selection_mode", ""))
+    app_catalog_relpath = str(selected_applications.get("catalog_relpath", ""))
+    app_selection_relpath = str(selected_applications.get("selection_relpath", ""))
+    selected_app_ids = selected_applications.get("selected_app_ids")
+    if not app_catalog_id:
+        raise SystemExit("embedded mission selected_applications.catalog_id must be set")
+    if not app_catalog_name:
+        raise SystemExit("embedded mission selected_applications.catalog_name must be set")
+    if not app_selection_mode:
+        raise SystemExit("embedded mission selected_applications.selection_mode must be set")
+    if not app_catalog_relpath:
+        raise SystemExit("embedded mission selected_applications.catalog_relpath must be set")
+    if not app_selection_relpath:
+        raise SystemExit("embedded mission selected_applications.selection_relpath must be set")
+    if not isinstance(selected_app_ids, list) or not selected_app_ids:
+        raise SystemExit("embedded mission selected_applications.selected_app_ids must be a non-empty list")
+    normalized_ids = []
+    seen_ids = set()
+    for raw_app_id in selected_app_ids:
+        app_id = str(raw_app_id).strip()
+        if not app_id:
+            raise SystemExit("embedded mission selected_applications.selected_app_ids contains an empty app id")
+        if app_id in seen_ids:
+            raise SystemExit(f"embedded mission selected_applications.selected_app_ids duplicates app id {app_id}")
+        seen_ids.add(app_id)
+        normalized_ids.append(app_id)
+    app_selected_ids = ",".join(normalized_ids)
+    app_present = True
+
+print(
+    json.dumps(
+        {
+            "selected_os_artifact_ref": str(selected_os.get("artifact_ref", "")),
+            "selected_os_artifact_digest": str(selected_os.get("artifact_digest", "")),
+            "selected_os_selection_source": str(selected_os.get("selection_source", "")),
+            "selected_os_release_channel": str(selected_os.get("release_channel", "")),
+            "selected_os_platform_contract_digest": str(selected_os.get("platform_contract_digest", "")),
+            "selected_airgap_artifact_ref": str(selected_airgap.get("artifact_ref", "")),
+            "selected_airgap_artifact_digest": str(selected_airgap.get("artifact_digest", "")),
+            "selected_airgap_selection_source": str(selected_airgap.get("selection_source", "")),
+            "selected_airgap_release_channel": str(selected_airgap.get("release_channel", "")),
+            "selected_airgap_platform_contract_digest": str(selected_airgap.get("platform_contract_digest", "")),
+            "selected_airgap_arch": str(selected_airgap.get("arch", "")),
+            "selected_airgap_payload_relpath": str(selected_airgap.get("payload_relpath", "")),
+            "selected_airgap_manifest_relpath": str(selected_airgap.get("manifest_relpath", "")),
+            "selected_airgap_present_in_selected_os_payload": "1"
+            if selected_airgap.get("present_in_selected_os_payload", False)
+            else "0",
+            "selected_applications_present": "1" if app_present else "0",
+            "application_catalog_id": app_catalog_id,
+            "application_catalog_name": app_catalog_name,
+            "application_selection_mode": app_selection_mode,
+            "selected_application_ids": app_selected_ids,
+            "application_catalog_relpath": app_catalog_relpath,
+            "selected_applications_relpath": app_selection_relpath,
+        },
+        separators=(",", ":"),
+    )
+)
 PY
   )" || die "failed to parse embedded mission manifest: ${MISSION_MANIFEST}"
 
-  mapfile -t mission_fields <<<"${mission_dump}"
-  [[ "${#mission_fields[@]}" -eq 14 ]] || die "embedded mission manifest parse produced an unexpected field set: ${MISSION_MANIFEST}"
+  mission_json_field() {
+    python3 - <<'PY' "${mission_dump}" "$1"
+import json
+import sys
+print(json.loads(sys.argv[1]).get(sys.argv[2], ""))
+PY
+  }
 
-  MISSION_OS_ARTIFACT_REF="${mission_fields[0]}"
-  MISSION_OS_ARTIFACT_DIGEST="${mission_fields[1]}"
-  MISSION_OS_SELECTION_SOURCE="${mission_fields[2]}"
-  MISSION_OS_RELEASE_CHANNEL="${mission_fields[3]}"
-  MISSION_OS_PLATFORM_CONTRACT_DIGEST="${mission_fields[4]}"
-  MISSION_AIRGAP_ARTIFACT_REF="${mission_fields[5]}"
-  MISSION_AIRGAP_ARTIFACT_DIGEST="${mission_fields[6]}"
-  MISSION_AIRGAP_SELECTION_SOURCE="${mission_fields[7]}"
-  MISSION_AIRGAP_RELEASE_CHANNEL="${mission_fields[8]}"
-  MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST="${mission_fields[9]}"
-  MISSION_AIRGAP_ARCH="${mission_fields[10]}"
-  MISSION_AIRGAP_PAYLOAD_PATH="${MISSION_DIR}/${mission_fields[11]}"
-  MISSION_AIRGAP_MANIFEST_PATH="${MISSION_DIR}/${mission_fields[12]}"
-  MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD="${mission_fields[13]}"
+  MISSION_OS_ARTIFACT_REF="$(mission_json_field selected_os_artifact_ref)"
+  MISSION_OS_ARTIFACT_DIGEST="$(mission_json_field selected_os_artifact_digest)"
+  MISSION_OS_SELECTION_SOURCE="$(mission_json_field selected_os_selection_source)"
+  MISSION_OS_RELEASE_CHANNEL="$(mission_json_field selected_os_release_channel)"
+  MISSION_OS_PLATFORM_CONTRACT_DIGEST="$(mission_json_field selected_os_platform_contract_digest)"
+  MISSION_AIRGAP_ARTIFACT_REF="$(mission_json_field selected_airgap_artifact_ref)"
+  MISSION_AIRGAP_ARTIFACT_DIGEST="$(mission_json_field selected_airgap_artifact_digest)"
+  MISSION_AIRGAP_SELECTION_SOURCE="$(mission_json_field selected_airgap_selection_source)"
+  MISSION_AIRGAP_RELEASE_CHANNEL="$(mission_json_field selected_airgap_release_channel)"
+  MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST="$(mission_json_field selected_airgap_platform_contract_digest)"
+  MISSION_AIRGAP_ARCH="$(mission_json_field selected_airgap_arch)"
+  MISSION_AIRGAP_PAYLOAD_PATH="${MISSION_DIR}/$(mission_json_field selected_airgap_payload_relpath)"
+  MISSION_AIRGAP_MANIFEST_PATH="${MISSION_DIR}/$(mission_json_field selected_airgap_manifest_relpath)"
+  MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD="$(mission_json_field selected_airgap_present_in_selected_os_payload)"
+  MISSION_SELECTED_APPLICATIONS_PRESENT="$(mission_json_field selected_applications_present)"
+  MISSION_APPLICATION_CATALOG_ID="$(mission_json_field application_catalog_id)"
+  MISSION_APPLICATION_CATALOG_NAME="$(mission_json_field application_catalog_name)"
+  MISSION_APPLICATION_SELECTION_MODE="$(mission_json_field application_selection_mode)"
+  MISSION_SELECTED_APPLICATION_IDS="$(mission_json_field selected_application_ids)"
+  app_catalog_relpath="$(mission_json_field application_catalog_relpath)"
+  app_selection_relpath="$(mission_json_field selected_applications_relpath)"
+  MISSION_APPLICATION_CATALOG_PATH=""
+  MISSION_SELECTED_APPLICATIONS_PATH=""
+  [[ -n "${app_catalog_relpath}" ]] && MISSION_APPLICATION_CATALOG_PATH="${MISSION_DIR}/${app_catalog_relpath}"
+  [[ -n "${app_selection_relpath}" ]] && MISSION_SELECTED_APPLICATIONS_PATH="${MISSION_DIR}/${app_selection_relpath}"
 
   [[ -n "${MISSION_OS_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_os.artifact_ref"
   [[ "${MISSION_OS_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_os.artifact_digest"
@@ -700,6 +796,96 @@ PY
   INSTALL_SELECTION_SOURCE="${MISSION_OS_SELECTION_SOURCE:-embedded}"
   RELEASE_CHANNEL="${MISSION_OS_RELEASE_CHANNEL:-}"
   MISSION_PRESENT=1
+}
+
+load_mission_selected_application_metadata() {
+  if [[ "${MISSION_SELECTED_APPLICATIONS_PRESENT}" != "1" ]]; then
+    OURBOX_APPLICATION_CATALOG_ID=""
+    OURBOX_APPLICATION_CATALOG_NAME=""
+    OURBOX_APPLICATION_SELECTION_MODE=""
+    OURBOX_SELECTED_APPLICATION_IDS=""
+    return 0
+  fi
+
+  [[ -f "${MISSION_APPLICATION_CATALOG_PATH}" ]] || die "embedded mission application catalog missing: ${MISSION_APPLICATION_CATALOG_PATH}"
+  [[ -f "${MISSION_SELECTED_APPLICATIONS_PATH}" ]] || die "embedded mission selected applications file missing: ${MISSION_SELECTED_APPLICATIONS_PATH}"
+
+  python3 - <<'PY' \
+    "${MISSION_APPLICATION_CATALOG_PATH}" \
+    "${MISSION_SELECTED_APPLICATIONS_PATH}" \
+    "${MISSION_APPLICATION_CATALOG_ID}" \
+    "${MISSION_APPLICATION_CATALOG_NAME}" \
+    "${MISSION_APPLICATION_SELECTION_MODE}" \
+    "${MISSION_SELECTED_APPLICATION_IDS}"
+import json
+import pathlib
+import sys
+
+catalog_path = pathlib.Path(sys.argv[1])
+selected_path = pathlib.Path(sys.argv[2])
+expected_catalog_id = sys.argv[3]
+expected_catalog_name = sys.argv[4]
+expected_selection_mode = sys.argv[5]
+expected_selected_ids = [item for item in sys.argv[6].split(",") if item]
+
+with catalog_path.open("r", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+with selected_path.open("r", encoding="utf-8") as handle:
+    selected = json.load(handle)
+
+if catalog.get("schema") != 1:
+    raise SystemExit("embedded mission application catalog must declare schema=1")
+if catalog.get("kind") != "ourbox-application-catalog":
+    raise SystemExit("embedded mission application catalog kind must be 'ourbox-application-catalog'")
+if str(catalog.get("catalog_id", "")) != expected_catalog_id:
+    raise SystemExit("embedded mission application catalog id does not match mission manifest")
+if str(catalog.get("catalog_name", "")) != expected_catalog_name:
+    raise SystemExit("embedded mission application catalog name does not match mission manifest")
+catalog_apps = catalog.get("apps")
+if not isinstance(catalog_apps, list) or not catalog_apps:
+    raise SystemExit("embedded mission application catalog must declare a non-empty apps list")
+catalog_app_ids = set()
+for app in catalog_apps:
+    app_id = str(app.get("id", "")).strip()
+    if not app_id:
+        raise SystemExit("embedded mission application catalog contains an app without an id")
+    catalog_app_ids.add(app_id)
+unknown_ids = [app_id for app_id in expected_selected_ids if app_id not in catalog_app_ids]
+if unknown_ids:
+    raise SystemExit("embedded mission selected applications must be a subset of the application catalog")
+
+if selected.get("schema") != 1:
+    raise SystemExit("embedded mission selected applications must declare schema=1")
+if selected.get("kind") != "ourbox-selected-applications":
+    raise SystemExit("embedded mission selected applications kind must be 'ourbox-selected-applications'")
+if str(selected.get("catalog_id", "")) != expected_catalog_id:
+    raise SystemExit("embedded mission selected applications catalog_id does not match mission manifest")
+if str(selected.get("selection_mode", "")) != expected_selection_mode:
+    raise SystemExit("embedded mission selected applications selection_mode does not match mission manifest")
+
+selected_ids = selected.get("selected_app_ids")
+if not isinstance(selected_ids, list) or not selected_ids:
+    raise SystemExit("embedded mission selected applications must declare a non-empty selected_app_ids list")
+
+normalized_ids = []
+seen_ids = set()
+for raw_app_id in selected_ids:
+    app_id = str(raw_app_id).strip()
+    if not app_id:
+        raise SystemExit("embedded mission selected applications contains an empty app id")
+    if app_id in seen_ids:
+        raise SystemExit(f"embedded mission selected applications duplicates app id {app_id}")
+    seen_ids.add(app_id)
+    normalized_ids.append(app_id)
+
+if normalized_ids != expected_selected_ids:
+    raise SystemExit("embedded mission selected applications file does not match mission manifest selected_app_ids")
+PY
+
+  OURBOX_APPLICATION_CATALOG_ID="${MISSION_APPLICATION_CATALOG_ID}"
+  OURBOX_APPLICATION_CATALOG_NAME="${MISSION_APPLICATION_CATALOG_NAME}"
+  OURBOX_APPLICATION_SELECTION_MODE="${MISSION_APPLICATION_SELECTION_MODE}"
+  OURBOX_SELECTED_APPLICATION_IDS="${MISSION_SELECTED_APPLICATION_IDS}"
 }
 
 verify_mission_selected_airgap_tarball() {
@@ -748,6 +934,23 @@ prepare_selected_airgap_platform_bundle() {
   stage_embedded_mission_airgap_bundle
 }
 
+stage_selected_application_metadata() {
+  local cache_dir="${INSTALLER_CACHE_DIR:-/opt/ourbox/installer/cache}"
+  mkdir -p "${cache_dir}"
+
+  if [[ "${MISSION_SELECTED_APPLICATIONS_PRESENT}" != "1" ]]; then
+    rm -f "${cache_dir}/catalog.json" "${cache_dir}/selected-apps.json"
+    OURBOX_APPLICATION_CATALOG_ID=""
+    OURBOX_APPLICATION_CATALOG_NAME=""
+    OURBOX_APPLICATION_SELECTION_MODE=""
+    OURBOX_SELECTED_APPLICATION_IDS=""
+    return 0
+  fi
+
+  cp -f "${MISSION_APPLICATION_CATALOG_PATH}" "${cache_dir}/catalog.json"
+  cp -f "${MISSION_SELECTED_APPLICATIONS_PATH}" "${cache_dir}/selected-apps.json"
+}
+
 show_airgap_platform_panel() {
   echo
   echo "  =================================================================="
@@ -765,6 +968,23 @@ show_airgap_platform_panel() {
   if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
     echo "  Channel  : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
   fi
+  echo "  =================================================================="
+  echo
+}
+
+show_selected_applications_panel() {
+  if [[ "${MISSION_SELECTED_APPLICATIONS_PRESENT}" != "1" ]]; then
+    return 0
+  fi
+
+  echo
+  echo "  =================================================================="
+  echo "  Applications"
+  echo "  =================================================================="
+  echo "  Catalog   : ${OURBOX_APPLICATION_CATALOG_NAME:-unknown}"
+  echo "  Catalog ID: ${OURBOX_APPLICATION_CATALOG_ID:-unknown}"
+  echo "  Select    : ${OURBOX_APPLICATION_SELECTION_MODE:-unknown}"
+  echo "  Apps      : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"
   echo "  =================================================================="
   echo
 }
@@ -822,30 +1042,34 @@ write_install_provenance() {
   # Write env file consumed by the late-commands append-provenance.sh script.
   # INSTALLER_VERSION and INSTALLER_GIT_HASH come from defaults.env (baked at
   # ISO build time); they uniquely identify the installer artifact that ran.
-  cat > "${cache_dir}/install-provenance.env" <<EOF
-INSTALLER_ID=${INSTALLER_ID:-woodbox}
-INSTALLER_VERSION=${INSTALLER_VERSION:-unknown}
-INSTALLER_GIT_HASH=${INSTALLER_GIT_HASH:-unknown}
-OS_ARTIFACT_SOURCE=${OS_ARTIFACT_SOURCE:-unknown}
-OS_ARTIFACT_REF=${OS_ARTIFACT_REF:-unknown}
-OS_ARTIFACT_DIGEST=${OS_ARTIFACT_DIGEST:-unknown}
-OS_IMAGE_SHA256=${OS_IMAGE_SHA256:-unknown}
-RELEASE_CHANNEL=${RELEASE_CHANNEL:-}
-INSTALL_SELECTION_SOURCE=${INSTALL_SELECTION_SOURCE:-unknown}
-AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}
-AIRGAP_PLATFORM_REVISION=${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}
-AIRGAP_PLATFORM_VERSION=${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}
-AIRGAP_PLATFORM_CREATED=${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}
-AIRGAP_PLATFORM_ARCH=${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}
-AIRGAP_PLATFORM_PROFILE=${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}
-AIRGAP_PLATFORM_K3S_VERSION=${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}
-AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}
-AIRGAP_PLATFORM_ARTIFACT_SOURCE=${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}
-AIRGAP_PLATFORM_REF=${OURBOX_AIRGAP_PLATFORM_REF:-unknown}
-AIRGAP_PLATFORM_DIGEST=${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}
-AIRGAP_PLATFORM_SELECTION_SOURCE=${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}
-AIRGAP_PLATFORM_RELEASE_CHANNEL=${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL:-}
-EOF
+  {
+    printf 'INSTALLER_ID=%s\n' "$(shell_quote_sh "${INSTALLER_ID:-woodbox}")"
+    printf 'INSTALLER_VERSION=%s\n' "$(shell_quote_sh "${INSTALLER_VERSION:-unknown}")"
+    printf 'INSTALLER_GIT_HASH=%s\n' "$(shell_quote_sh "${INSTALLER_GIT_HASH:-unknown}")"
+    printf 'OS_ARTIFACT_SOURCE=%s\n' "$(shell_quote_sh "${OS_ARTIFACT_SOURCE:-unknown}")"
+    printf 'OS_ARTIFACT_REF=%s\n' "$(shell_quote_sh "${OS_ARTIFACT_REF:-unknown}")"
+    printf 'OS_ARTIFACT_DIGEST=%s\n' "$(shell_quote_sh "${OS_ARTIFACT_DIGEST:-unknown}")"
+    printf 'OS_IMAGE_SHA256=%s\n' "$(shell_quote_sh "${OS_IMAGE_SHA256:-unknown}")"
+    printf 'RELEASE_CHANNEL=%s\n' "$(shell_quote_sh "${RELEASE_CHANNEL:-}")"
+    printf 'INSTALL_SELECTION_SOURCE=%s\n' "$(shell_quote_sh "${INSTALL_SELECTION_SOURCE:-unknown}")"
+    printf 'AIRGAP_PLATFORM_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}")"
+    printf 'AIRGAP_PLATFORM_REVISION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}")"
+    printf 'AIRGAP_PLATFORM_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}")"
+    printf 'AIRGAP_PLATFORM_CREATED=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}")"
+    printf 'AIRGAP_PLATFORM_ARCH=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}")"
+    printf 'AIRGAP_PLATFORM_PROFILE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}")"
+    printf 'AIRGAP_PLATFORM_K3S_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}")"
+    printf 'AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}")"
+    printf 'AIRGAP_PLATFORM_ARTIFACT_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}")"
+    printf 'AIRGAP_PLATFORM_REF=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_REF:-unknown}")"
+    printf 'AIRGAP_PLATFORM_DIGEST=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}")"
+    printf 'AIRGAP_PLATFORM_SELECTION_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}")"
+    printf 'AIRGAP_PLATFORM_RELEASE_CHANNEL=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL:-}")"
+    printf 'APPLICATION_CATALOG_ID=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_CATALOG_ID:-}")"
+    printf 'APPLICATION_CATALOG_NAME=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_CATALOG_NAME:-}")"
+    printf 'APPLICATION_SELECTION_MODE=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_SELECTION_MODE:-}")"
+    printf 'SELECTED_APPLICATION_IDS=%s\n' "$(shell_quote_sh "${OURBOX_SELECTED_APPLICATION_IDS:-}")"
+  } > "${cache_dir}/install-provenance.env"
 
   # Write the provenance-append script called by autoinstall.tpl late-commands.
   # Single-quoted heredoc: variable references are literal in the script body
@@ -884,6 +1108,10 @@ OURBOX_AIRGAP_PLATFORM_REF=${AIRGAP_PLATFORM_REF:-unknown}
 OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_PLATFORM_DIGEST:-unknown}
 OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=${AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}
 OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=${AIRGAP_PLATFORM_RELEASE_CHANNEL:-}
+OURBOX_APPLICATION_CATALOG_ID=${APPLICATION_CATALOG_ID:-}
+OURBOX_APPLICATION_CATALOG_NAME=${APPLICATION_CATALOG_NAME:-}
+OURBOX_APPLICATION_SELECTION_MODE=${APPLICATION_SELECTION_MODE:-}
+OURBOX_SELECTED_APPLICATION_IDS=${SELECTED_APPLICATION_IDS:-}
 EOT
 SCRIPT
   chmod +x "${cache_dir}/append-provenance.sh"
@@ -921,6 +1149,26 @@ cp -f "${SOURCE_DIR}/platform/profile.env" "${TARGET}/opt/ourbox/airgap/platform
 cp -f "${SOURCE_DIR}/manifest.env" "${TARGET}/opt/ourbox/airgap/manifest.env"
 SCRIPT
   chmod +x "${cache_dir}/apply-airgap-platform-override.sh"
+
+  cat > "${cache_dir}/apply-application-selection.sh" <<'SCRIPT'
+#!/bin/sh
+set -e
+TARGET="${1:-/target}"
+SOURCE_CATALOG="/opt/ourbox/installer/cache/catalog.json"
+SOURCE_SELECTION="/opt/ourbox/installer/cache/selected-apps.json"
+PLATFORM_DIR="${TARGET}/opt/ourbox/airgap/platform"
+
+mkdir -p "${PLATFORM_DIR}"
+if [ -f "${SOURCE_CATALOG}" ]; then
+  cp -f "${SOURCE_CATALOG}" "${PLATFORM_DIR}/catalog.json"
+fi
+if [ -f "${SOURCE_SELECTION}" ]; then
+  cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"
+else
+  rm -f "${PLATFORM_DIR}/selected-apps.json"
+fi
+SCRIPT
+  chmod +x "${cache_dir}/apply-application-selection.sh"
 }
 
 write_offline_install_helpers() {
@@ -1145,7 +1393,9 @@ main() {
   echo "  No target-side registry browsing or pulling will be used."
   echo
   prepare_selected_airgap_platform_bundle
+  stage_selected_application_metadata
   show_airgap_platform_panel
+  show_selected_applications_panel
   write_install_provenance
   write_offline_install_helpers
 
@@ -1184,6 +1434,11 @@ main() {
     echo "  Apps lane    : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
   fi
   echo "  Apps digest  : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  if [[ -n "${OURBOX_APPLICATION_CATALOG_ID}" ]]; then
+    echo "  App catalog  : ${OURBOX_APPLICATION_CATALOG_NAME:-unknown} (${OURBOX_APPLICATION_CATALOG_ID})"
+    echo "  App mode     : ${OURBOX_APPLICATION_SELECTION_MODE:-unknown}"
+    echo "  Applications : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"
+  fi
   echo "  Contract     : ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
@@ -1246,6 +1501,10 @@ main() {
   echo "  OS SHA256     : ${OS_IMAGE_SHA256}"
   echo "  Apps bundle   : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
   echo "  Apps digest   : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  if [[ -n "${OURBOX_APPLICATION_CATALOG_ID}" ]]; then
+    echo "  App catalog   : ${OURBOX_APPLICATION_CATALOG_NAME:-unknown} (${OURBOX_APPLICATION_CATALOG_ID})"
+    echo "  Applications  : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"
+  fi
   echo "  Hostname      : ${OURBOX_HOSTNAME}"
   echo "  Username      : ${OURBOX_USERNAME}"
   echo "  Autoinstall   : ${AUTOINSTALL_OUT}"

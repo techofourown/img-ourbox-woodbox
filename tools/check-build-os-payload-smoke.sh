@@ -87,9 +87,13 @@ grep -F "OURBOX_AIRGAP_PLATFORM_ARCH=amd64" "${META_ENV}" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_PROFILE=demo-apps" "${META_ENV}" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_K3S_VERSION=v1.35.0+k3s1" "${META_ENV}" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${LOCK_SHA}" "${META_ENV}" >/dev/null
+grep -F "OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1" "${META_ENV}" >/dev/null
+grep -F "GIT_SHA=" "${META_ENV}" >/dev/null
+grep -F "OURBOX_PLATFORM_CONTRACT_CREATED=2026-03-11T00:00:00Z" "${META_ENV}" >/dev/null
 
 tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_DIGEST}" >/dev/null
 tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${LOCK_SHA}" >/dev/null
+tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1" >/dev/null
 if tar -xOzf "${TARBALL}" ./rootfs/etc/ourbox/release | grep -q '^OURBOX_AIRGAP_PLATFORM_'; then
   echo "payload rootfs release file must not preseed OURBOX_AIRGAP_PLATFORM_* keys" >&2
   exit 1

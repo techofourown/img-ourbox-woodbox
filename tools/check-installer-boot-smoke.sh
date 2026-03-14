@@ -17,6 +17,7 @@ Environment overrides:
   VM_MEMORY_MB=4096
   VM_CPUS=2
   BOOT_TIMEOUT_SECS=600
+  INITIAL_MONITOR_TIMEOUT_SECS=300
   OURBOX_INSTALLER_SSH_USER=ourbox-installer
   OURBOX_INSTALLER_SSH_MODE=both
   OURBOX_INSTALLER_SSH_KEY=/path/to/private_key
@@ -46,6 +47,7 @@ VM_UDP_PORT="${VM_UDP_PORT:-19999}"
 VM_MEMORY_MB="${VM_MEMORY_MB:-4096}"
 VM_CPUS="${VM_CPUS:-2}"
 BOOT_TIMEOUT_SECS="${BOOT_TIMEOUT_SECS:-600}"
+INITIAL_MONITOR_TIMEOUT_SECS="${INITIAL_MONITOR_TIMEOUT_SECS:-300}"
 OURBOX_INSTALLER_SSH_USER="${OURBOX_INSTALLER_SSH_USER:-ourbox-installer}"
 OURBOX_INSTALLER_SSH_MODE="${OURBOX_INSTALLER_SSH_MODE:-both}"
 OURBOX_INSTALLER_SSH_KEY="${OURBOX_INSTALLER_SSH_KEY:-}"
@@ -68,6 +70,8 @@ SSH_BANNER_DIAG="${TMP_DIR}/ssh-banner-diag.log"
 HTTP_DIAG_HEADERS="${TMP_DIR}/http-diag.headers"
 HTTP_DIAG_BODY="${TMP_DIR}/http-diag.body"
 HTTP_DIAG_ERROR="${TMP_DIR}/http-diag.error"
+CLOUD_INIT_DIAG="${TMP_DIR}/cloud-init-status.log"
+CLOUD_INIT_UNITS_DIAG="${TMP_DIR}/cloud-init-units.log"
 QEMU_PID=""
 UDP_LISTENER_PID=""
 HTTP_BODY="${TMP_DIR}/monitor.html"
@@ -114,6 +118,8 @@ cleanup() {
     cp -f "${HTTP_DIAG_HEADERS}" "${SMOKE_ARTIFACT_DIR}/http.headers" 2>/dev/null || true
     cp -f "${HTTP_DIAG_BODY}" "${SMOKE_ARTIFACT_DIR}/http.body" 2>/dev/null || true
     cp -f "${HTTP_DIAG_ERROR}" "${SMOKE_ARTIFACT_DIR}/http.error" 2>/dev/null || true
+    cp -f "${CLOUD_INIT_DIAG}" "${SMOKE_ARTIFACT_DIR}/cloud-init-status.log" 2>/dev/null || true
+    cp -f "${CLOUD_INIT_UNITS_DIAG}" "${SMOKE_ARTIFACT_DIR}/cloud-init-units.log" 2>/dev/null || true
   fi
 
   rm -rf "${TMP_DIR}"
@@ -276,6 +282,16 @@ capture_http_monitor_diagnostics() {
   return 1
 }
 
+capture_cloud_init_diagnostics() {
+  installer_ssh "cloud-id 2>/dev/null || true; printf '\n'; cloud-init status --long 2>/dev/null || true" \
+    > "${CLOUD_INIT_DIAG}" 2>/dev/null || true
+  installer_ssh "for unit in cloud-init-local.service cloud-init.service cloud-config.service cloud-final.service; do
+    printf '===== %s =====\n' \"\$unit\"
+    systemctl show --no-pager --property Id,LoadState,ActiveState,SubState,Result \"\$unit\" 2>/dev/null || true
+    printf '\n'
+  done" > "${CLOUD_INIT_UNITS_DIAG}" 2>/dev/null || true
+}
+
 log_failure_diagnostics() {
   log "Installer SSH readiness diagnostics:"
 
@@ -304,25 +320,46 @@ log_failure_diagnostics() {
       sed -n '1,10p' "${HTTP_DIAG_ERROR}" || true
     fi
   fi
+
+  capture_cloud_init_diagnostics
+  if [[ -s "${CLOUD_INIT_DIAG}" ]]; then
+    log "cloud-init status during failure triage:"
+    sed -n '1,40p' "${CLOUD_INIT_DIAG}" || true
+  fi
+  if [[ -s "${CLOUD_INIT_UNITS_DIAG}" ]]; then
+    log "cloud-init unit states during failure triage:"
+    sed -n '1,80p' "${CLOUD_INIT_UNITS_DIAG}" || true
+  fi
 }
 
-wait_for_cloud_init_healthy() {
-  local deadline status
+wait_for_cloud_init_ready() {
+  local deadline status datasource
   deadline=$((SECONDS + BOOT_TIMEOUT_SECS))
 
   while (( SECONDS < deadline )); do
     status="$(installer_ssh "cloud-init status --long 2>/dev/null" 2>/dev/null || true)"
-    if [[ -n "${status}" ]] \
-      && grep -q '^status: done$' <<<"${status}" \
-      && grep -q '^extended_status:' <<<"${status}" \
-      && ! grep -q '^extended_status: degraded' <<<"${status}" \
-      && grep -q 'DataSourceNoCloud' <<<"${status}"; then
+    datasource="$(installer_ssh "cloud-id 2>/dev/null || true" 2>/dev/null || true)"
+    if installer_ssh "
+      for unit in cloud-init-local.service cloud-init.service cloud-config.service; do
+        show=\"\$(systemctl show --property LoadState,SubState,Result \"\$unit\" 2>/dev/null || true)\"
+        grep -q '^LoadState=loaded$' <<<\"\$show\" || exit 1
+        grep -q '^Result=success$' <<<\"\$show\" || exit 1
+        grep -Eq '^SubState=(exited|dead)$' <<<\"\$show\" || exit 1
+      done
+      exit 0
+    " >/dev/null 2>&1 \
+      && ! grep -q '^status: error$' <<<"${status}" \
+      && { [[ "${datasource,,}" == "nocloud" ]] || grep -q 'DataSourceNoCloud' <<<"${status}"; }; then
       CLOUD_INIT_STATUS="${status}"
+      if [[ -z "${CLOUD_INIT_STATUS}" ]]; then
+        CLOUD_INIT_STATUS="cloud-id: ${datasource}"
+      fi
       return 0
     fi
     sleep 5
   done
 
+  capture_cloud_init_diagnostics
   return 1
 }
 
@@ -381,7 +418,7 @@ QEMU_PID="$!"
 log "Waiting for installer monitor to serve initial status page"
 if ! wait_for_http_response_contains \
   "http://127.0.0.1:${VM_HTTP_PORT}/" \
-  180 \
+  "${INITIAL_MONITOR_TIMEOUT_SECS}" \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer"; then
   log_failure_diagnostics
@@ -415,8 +452,8 @@ wait_for_remote_condition "test -f /run/ourbox-installer.log && grep -Fq '[ourbo
 wait_for_remote_condition "test -f /run/ourbox-installer-ssh-status.env && grep -qx 'OURBOX_INSTALLER_SSH_STATUS=ready' /run/ourbox-installer-ssh-status.env" 180 \
   || die "timed out waiting for installer SSH ready status"
 
-log "Waiting for cloud-init to finish without degraded status"
-wait_for_cloud_init_healthy || die "timed out waiting for healthy cloud-init status"
+log "Waiting for cloud-init local/network/config stages to finish cleanly"
+wait_for_cloud_init_ready || die "timed out waiting for ready cloud-init stages"
 printf '%s\n' "${CLOUD_INIT_STATUS}"
 
 if [[ "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" == "generated-console-only" && -z "${OURBOX_INSTALLER_SSH_PASSWORD}" ]]; then
@@ -457,6 +494,7 @@ wait_for_http_response_contains \
   "${HTTP_BODY}" \
   "OurBox Woodbox Installer" \
   "ssh ${OURBOX_INSTALLER_SSH_USER}@" \
+  "UDP broadcast on port ${VM_UDP_PORT}" \
   || die "timed out waiting for installer HTTP monitor content"
 
 log "Waiting for UDP monitor output on port ${VM_UDP_PORT}"

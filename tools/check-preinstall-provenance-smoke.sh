@@ -43,6 +43,10 @@ export OURBOX_AIRGAP_PLATFORM_REF="ghcr.io/techofourown/sw-ourbox-os/airgap-plat
 export OURBOX_AIRGAP_PLATFORM_DIGEST="sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 export OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="catalog"
 export OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="stable"
+export OURBOX_APPLICATION_CATALOG_ID="demo-apps"
+export OURBOX_APPLICATION_CATALOG_NAME="Demo Apps"
+export OURBOX_APPLICATION_SELECTION_MODE="defaults"
+export OURBOX_SELECTED_APPLICATION_IDS="landing,dufs"
 
 write_install_provenance
 
@@ -58,11 +62,22 @@ write_install_provenance
   echo "apply-airgap-platform-override.sh was not generated" >&2
   exit 1
 }
+[[ -f "${CACHE_DIR}/apply-application-selection.sh" ]] || {
+  echo "apply-application-selection.sh was not generated" >&2
+  exit 1
+}
 
-grep -F "AIRGAP_PLATFORM_ARTIFACT_SOURCE=registry" "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'APPLICATION_CATALOG_ID="demo-apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'APPLICATION_CATALOG_NAME="Demo Apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'SELECTED_APPLICATION_IDS="landing,dufs"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F "OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=\${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
+grep -F "OURBOX_APPLICATION_CATALOG_ID=\${APPLICATION_CATALOG_ID:-}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
+grep -F "OURBOX_SELECTED_APPLICATION_IDS=\${SELECTED_APPLICATION_IDS:-}" "${CACHE_DIR}/append-provenance.sh" >/dev/null
 # shellcheck disable=SC2016
 grep -F 'if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+# shellcheck disable=SC2016
+grep -F 'cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
   echo "legacy install-defaults provenance fields must not be written" >&2
   exit 1

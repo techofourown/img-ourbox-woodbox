@@ -16,6 +16,8 @@ OS_PAYLOAD="${OS_DIR}/os-payload.tar.gz"
 OS_META_ENV="${OS_DIR}/os.meta.env"
 AIRGAP_PAYLOAD="${AIRGAP_DIR}/airgap-platform.tar.gz"
 AIRGAP_MANIFEST="${AIRGAP_DIR}/manifest.env"
+APP_CATALOG="${AIRGAP_DIR}/catalog.json"
+SELECTED_APPS="${AIRGAP_DIR}/selected-apps.json"
 MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
 
 printf 'payload bytes\n' > "${OS_PAYLOAD}"
@@ -33,6 +35,7 @@ BUILD_TS=2026-03-12T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=abc123def456
 OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.1
+OURBOX_PLATFORM_CONTRACT_CREATED=2026-03-12T00:00:00Z
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
@@ -92,6 +95,40 @@ EOF
 
   printf '%s  %s\n' "$(sha256sum "${AIRGAP_PAYLOAD}" | awk '{print $1}')" "airgap-platform.tar.gz" > "${AIRGAP_PAYLOAD}.sha256"
   cp -f "${AIRGAP_SOURCE_DIR}/manifest.env" "${AIRGAP_MANIFEST}"
+  cat > "${APP_CATALOG}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing",
+    "dufs"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing"
+    },
+    {
+      "id": "dufs",
+      "display_name": "Dufs"
+    }
+  ]
+}
+EOF
+  cat > "${SELECTED_APPS}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "defaults",
+  "selected_app_ids": [
+    "landing",
+    "dufs"
+  ]
+}
+EOF
 }
 
 write_manifest() {
@@ -135,6 +172,17 @@ EOF
     "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
     "manifest_relpath": "artifacts/airgap/manifest.env",
     "present_in_selected_os_payload": false
+  },
+  "selected_applications": {
+    "catalog_id": "demo-apps",
+    "catalog_name": "Demo Apps",
+    "selection_mode": "defaults",
+    "selected_app_ids": [
+      "landing",
+      "dufs"
+    ],
+    "catalog_relpath": "artifacts/airgap/catalog.json",
+    "selection_relpath": "artifacts/airgap/selected-apps.json"
   }
 EOF
   fi
@@ -185,6 +233,26 @@ build_airgap_bundle valid
 write_manifest 1
 mutate_manifest 'del manifest["selected_airgap"]["artifact_digest"]'
 expect_validation_failure "mission manifests missing selected_airgap.artifact_digest"
+
+build_airgap_bundle valid
+write_manifest 1
+mutate_manifest 'del manifest["selected_applications"]["selection_relpath"]'
+expect_validation_failure "mission manifests missing selected_applications.selection_relpath"
+
+build_airgap_bundle valid
+write_manifest 1
+cat > "${SELECTED_APPS}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "defaults",
+  "selected_app_ids": [
+    "landing"
+  ]
+}
+EOF
+expect_validation_failure "mission selected applications files that do not match manifest selected_applications.selected_app_ids"
 
 build_airgap_bundle valid
 write_manifest 1
