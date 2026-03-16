@@ -39,6 +39,8 @@ ${OURBOX_STORAGE_MATCH}
     username: ${OURBOX_USERNAME}
     password: ${OURBOX_PASSWORD_HASH}
 
+${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}
+
   late-commands:
     # -----------------------------------------------------------------------
     # [1/12] Extract staged OS payload (rootfs overlay + airgap artifacts).

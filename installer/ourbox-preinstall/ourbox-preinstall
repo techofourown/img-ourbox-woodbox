@@ -98,6 +98,10 @@ shell_quote_sh() {
   printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\$"`]/\\&/g')"
 }
 
+yaml_double_quote() {
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
 resolve_path_within_root() {
   local root="$1" label="$2" relpath="$3"
 
@@ -503,6 +507,30 @@ installed_target_ssh_summary_mode() {
     printf '%s\n' "password-only"
   else
     printf '%s\n' "disabled"
+  fi
+}
+
+render_installed_target_ssh_autoinstall_block() {
+  local allow_pw="false"
+  local authorized_key=""
+
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" != "1" && "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED}" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED}" == "1" ]]; then
+    allow_pw="true"
+  fi
+
+  printf '  ssh:\n'
+  printf '    allow-pw: %s\n' "${allow_pw}"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
+    authorized_key="$(awk 'NF {print $0; exit}' "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}")"
+    printf '    authorized-keys:\n'
+    printf '      - %s\n' "$(yaml_double_quote "${authorized_key}")"
+  else
+    printf '    authorized-keys: []\n'
   fi
 }
 
@@ -958,6 +986,12 @@ PY
     validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
   fi
 
+  log "Embedded mission installed-target SSH present: ${MISSION_INSTALLED_TARGET_SSH_PRESENT}"
+  if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
+    log "Embedded mission installed-target SSH key: ${MISSION_INSTALLED_TARGET_SSH_KEY_NAME} (${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT})"
+    log "Embedded mission installed-target SSH authorized key path: ${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
+  fi
+
   OS_ARTIFACT_SOURCE="mission"
   OS_ARTIFACT_REF="${MISSION_OS_ARTIFACT_REF}"
   OS_ARTIFACT_DIGEST="${MISSION_OS_ARTIFACT_DIGEST}"
@@ -1392,8 +1426,10 @@ SCRIPT
   if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
     validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
     cp -f "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}" "${staged_installed_target_authorized_key}"
+    log "Installed-target SSH mission key staged into installer cache: ${staged_installed_target_authorized_key}"
   else
     rm -f "${staged_installed_target_authorized_key}"
+    log "Installed-target SSH mission key staging skipped: no embedded mission key present"
   fi
 
   cat > "${cache_dir}/configure-installed-target-ssh.sh" <<SCRIPT
@@ -1409,6 +1445,11 @@ AUTHORIZED_KEY_SRC=$(shell_quote_sh "${staged_installed_target_authorized_key}")
 SSH_PACKAGE_MANIFEST=$(shell_quote_sh "${installed_target_ssh_packages_manifest}")
 SSH_PACKAGE_INSTALLER=$(shell_quote_sh "${OFFLINE_TARGET_PACKAGE_INSTALLER}")
 SSH_REPO_DIR=$(shell_quote_sh "${OFFLINE_TARGET_APT_REPO_DIR}")
+
+echo "Installed-target SSH inputs: key=\${SSH_KEY_PRESENT} password=\${SSH_PASSWORD_ENABLED}"
+if [ "\${SSH_KEY_PRESENT}" = "1" ]; then
+  echo "Installed-target SSH staged key: \${AUTHORIZED_KEY_SRC} (\${SSH_KEY_NAME}: \${SSH_KEY_FINGERPRINT})"
+fi
 
 if [ "\${SSH_PASSWORD_ENABLED}" != "1" ] && [ "\${SSH_KEY_PRESENT}" != "1" ]; then
   echo "Installed-target SSH is disabled; skipping SSH package install and configuration"
@@ -1735,11 +1776,13 @@ main() {
   # requires no serial normalization.
   OURBOX_STORAGE_MATCH="        path: ${TARGET_DISK_REAL}"
   export OURBOX_STORAGE_MATCH
+  OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK="$(render_installed_target_ssh_autoinstall_block)"
+  export OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK
 
   [[ -f "${AUTOINSTALL_TPL}" ]] || die "missing runtime template: ${AUTOINSTALL_TPL}"
 
   # shellcheck disable=SC2016  # single-quoted intentionally — envsubst needs literal $VAR strings
-  RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH} ${OURBOX_DATA_DISK} ${OURBOX_TARGET_DISK}'
+  RUNTIME_VARS='${OURBOX_HOSTNAME} ${OURBOX_USERNAME} ${OURBOX_PASSWORD_HASH} ${OURBOX_STORAGE_MATCH} ${OURBOX_DATA_DISK} ${OURBOX_TARGET_DISK} ${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}'
   envsubst "${RUNTIME_VARS}" < "${AUTOINSTALL_TPL}" > "${AUTOINSTALL_OUT}"
 
   echo
