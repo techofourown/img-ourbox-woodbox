@@ -277,6 +277,16 @@ jobs:
       - name: Verify fetched airgap-platform bundle shape
         run: bash tools/check-fetch-airgap-platform-smoke.sh
 
+  bootstrap-platform-profile:
+    name: Bootstrap platform profile smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify bootstrap profile contract
+        run: bash tools/check-bootstrap-platform-profile-smoke.sh
+
   legacy-upstream-fallback-refs:
     name: Legacy upstream fallback refs smoke
     runs-on: ubuntu-latest

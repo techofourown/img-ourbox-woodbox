@@ -78,16 +78,12 @@ load_platform_profile_input() {
           print substr($0, index($0, "=") + 1)
           exit
         }
-        $1 == "PROFILE" {
-          print substr($0, index($0, "=") + 1)
-          exit
-        }
       ' "${profile_env}"
     )"
   fi
 
   [[ -n "${PLATFORM_PROFILE_INPUT}" ]] || \
-    die "supported mission installs require an explicit platform profile; set OURBOX_PLATFORM_PROFILE or stage ${profile_env}"
+    die "supported mission installs require OURBOX_PLATFORM_PROFILE or ${profile_env} with OURBOX_PLATFORM_PROFILE"
 }
 
 require_application_intent_files() {

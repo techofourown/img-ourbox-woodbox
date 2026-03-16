@@ -112,7 +112,7 @@ fi
 printf 'fixture-k3s\n' > "${OVERRIDE_DIR}/k3s/README"
 printf 'fixture-image\n' > "${OVERRIDE_DIR}/platform/images/example.txt"
 printf '{"images":[]}\n' > "${OVERRIDE_DIR}/platform/images.lock.json"
-printf 'OURBOX_PROFILE=demo-apps\n' > "${OVERRIDE_DIR}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${OVERRIDE_DIR}/platform/profile.env"
 printf 'K3S_VERSION=v1.35.0+k3s1\n' > "${OVERRIDE_DIR}/manifest.env"
 printf 'keep-me\n' > "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest"
 
