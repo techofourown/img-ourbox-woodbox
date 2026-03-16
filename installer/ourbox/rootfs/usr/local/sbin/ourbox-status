@@ -9,13 +9,16 @@ set -euo pipefail
 # Silenced by `woodbox quiet` (creates /var/lib/ourbox/state/quiet).
 
 QUIET_MARKER="/var/lib/ourbox/state/quiet"
-STATUS_FILE="/run/ourbox/status"
+STATUS_DIR="${OURBOX_STATUS_RUN_DIR:-/run/ourbox}"
+STATUS_FILE="${STATUS_DIR}/status"
 BOOT_INTERVAL=10
 READY_INTERVAL=60
 HOSTNAME="$(hostname)"
 PLATFORM_STATE_FILE="/var/lib/ourbox/state/platform-contract.env"
+APP_SURFACE_FILE="/var/lib/ourbox/state/selected-app-surface.json"
+STATUS_BASE_URL="${OURBOX_STATUS_BASE_URL:-http://127.0.0.1}"
 
-mkdir -p /run/ourbox
+mkdir -p "${STATUS_DIR}"
 
 # Always start loud on boot.
 rm -f "$QUIET_MARKER"
@@ -59,6 +62,71 @@ resolved_box_host() {
   fi
 }
 
+surface_exists() {
+  [[ -f "${APP_SURFACE_FILE}" ]] || return 1
+  python3 - "${APP_SURFACE_FILE}" <<'PY' >/dev/null 2>&1
+import json
+import sys
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+apps = surface.get("apps")
+if surface.get("kind") != "ourbox-selected-app-surface":
+    raise SystemExit(1)
+if surface.get("schema") != 1:
+    raise SystemExit(1)
+if not isinstance(apps, list):
+    raise SystemExit(1)
+PY
+}
+
+surface_app_urls() {
+  [[ -f "${APP_SURFACE_FILE}" ]] || return 1
+  python3 - "${APP_SURFACE_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+for app in surface.get("apps", []):
+    url = str(app.get("url", "")).strip()
+    if url:
+        print(url)
+PY
+}
+
+surface_mdns_hosts() {
+  [[ -f "${APP_SURFACE_FILE}" ]] || return 1
+  python3 - "${APP_SURFACE_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+seen = set()
+for app in surface.get("apps", []):
+    if not bool(app.get("publish_mdns_alias", False)):
+        continue
+    host = str(app.get("host", "")).strip()
+    if not host or host in seen:
+        continue
+    seen.add(host)
+    print(host)
+PY
+}
+
+surface_landing_selected() {
+  [[ -f "${APP_SURFACE_FILE}" ]] || return 1
+  python3 - "${APP_SURFACE_FILE}" <<'PY' >/dev/null 2>&1
+import json
+import sys
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+raise SystemExit(0 if bool(surface.get("landing_selected", False)) else 1)
+PY
+}
+
 check_traefik() {
   local box_host="$1"
   python3 - "${box_host}" <<'PY' >/dev/null 2>&1
@@ -78,6 +146,11 @@ PY
 }
 
 check_mdns() {
+  local mdns_hosts=""
+  mdns_hosts="$(surface_mdns_hosts || true)"
+  if surface_exists && [[ -z "${mdns_hosts}" ]]; then
+    return 0
+  fi
   systemctl is-active --quiet ourbox-mdns-aliases 2>/dev/null
 }
 
@@ -96,9 +169,79 @@ check_pods_ready() {
   return 1
 }
 
+check_app_status_endpoint() {
+  local box_host="$1"
+  [[ -f "${APP_SURFACE_FILE}" ]] || {
+    echo "waiting for rendered app surface"
+    return 1
+  }
+  python3 - "${APP_SURFACE_FILE}" "${box_host}" "${STATUS_BASE_URL}" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+box_host = sys.argv[2]
+status_base_url = sys.argv[3]
+status_route = surface.get("status_route")
+if not bool(surface.get("landing_selected", False)) or not isinstance(status_route, dict):
+    print("status route not required")
+    raise SystemExit(2)
+
+expected_ids = [
+    str(app.get("id", "")).strip()
+    for app in surface.get("apps", [])
+    if bool(app.get("include_in_status", False)) and str(app.get("id", "")).strip()
+]
+path = str(status_route.get("path", "")).strip() or "/_ourbox/app-status.json"
+
+try:
+    request = urllib.request.Request(f"{status_base_url}{path}", headers={"Host": box_host})
+    with urllib.request.urlopen(request, timeout=3) as response:
+        status_code = getattr(response, "status", 200)
+        payload = json.load(response)
+except (OSError, ValueError, urllib.error.URLError):
+    print("waiting for app-status endpoint")
+    raise SystemExit(1)
+
+if status_code != 200:
+    print(f"app-status HTTP {status_code}")
+    raise SystemExit(1)
+
+cluster_status = str(payload.get("cluster_status", "")).strip()
+if cluster_status and cluster_status != "ok":
+    print(f"cluster status {cluster_status}")
+    raise SystemExit(1)
+
+apps = payload.get("apps", [])
+if not isinstance(apps, list):
+    print("malformed app-status payload")
+    raise SystemExit(1)
+
+actual_ids = [str(app.get("id", "")).strip() for app in apps if str(app.get("id", "")).strip()]
+if sorted(actual_ids) != sorted(expected_ids):
+    print(f"app-status ids mismatch ({len(actual_ids)} actual / {len(expected_ids)} expected)")
+    raise SystemExit(1)
+
+healthy_ids = [
+    str(app.get("id", "")).strip()
+    for app in apps
+    if str(app.get("status", "")).strip() == "healthy" and str(app.get("id", "")).strip()
+]
+if sorted(healthy_ids) != sorted(expected_ids):
+    print(f"{len(healthy_ids)}/{len(expected_ids)} apps healthy")
+    raise SystemExit(1)
+
+print(f"{len(expected_ids)}/{len(expected_ids)} apps healthy")
+PY
+}
+
 format_status() {
   local ip="$1" box_host="$2" data_ok="$3" net_ok="$4" k3s_ok="$5" traefik_ok="$6"
-  local mdns_ok="$7" bootstrap_ok="$8" pods_info="$9" all_ready="${10}"
+  local surface_ok="$7" mdns_ok="$8" bootstrap_ok="$9" pods_info="${10}" all_ready="${11}"
+  local app_urls="${12}" landing_selected="${13}" app_status_ok="${14}" app_status_summary="${15}"
 
   local mark_ok="OK" mark_wait=".." mark_no="  "
   local out=""
@@ -133,12 +276,32 @@ format_status() {
     out+="  [${mark_no}] Traefik: waiting for k3s"$'\n'
   fi
 
-  if [[ "$k3s_ok" == "1" ]]; then
+  if [[ "$surface_ok" == "1" ]]; then
+    out+="  [${mark_ok}] App surface: loaded"$'\n'
+  elif [[ "$bootstrap_ok" == "1" ]]; then
+    out+="  [${mark_wait}] App surface: missing rendered state"$'\n'
+  else
+    out+="  [${mark_wait}] App surface: waiting for bootstrap render"$'\n'
+  fi
+
+  if [[ "$landing_selected" == "1" ]]; then
+    if [[ "$app_status_ok" == "1" ]]; then
+      out+="  [${mark_ok}] Apps: ${app_status_summary}"$'\n'
+    elif [[ "$surface_ok" == "1" && "$traefik_ok" == "1" ]]; then
+      out+="  [${mark_wait}] Apps: ${app_status_summary}"$'\n'
+    elif [[ "$surface_ok" == "1" ]]; then
+      out+="  [${mark_wait}] Apps: waiting for app-status route"$'\n'
+    else
+      out+="  [${mark_no}] Apps: waiting for rendered app surface"$'\n'
+    fi
+  elif [[ "$k3s_ok" == "1" && "$surface_ok" == "1" ]]; then
     if [[ "$pods_info" == "ready" ]]; then
       out+="  [${mark_ok}] Apps: all running"$'\n'
     else
       out+="  [${mark_wait}] Apps: ${pods_info} pods running"$'\n'
     fi
+  elif [[ "$k3s_ok" == "1" ]]; then
+    out+="  [${mark_wait}] Apps: waiting for rendered app surface"$'\n'
   else
     out+="  [${mark_no}] Apps: waiting for k3s"$'\n'
   fi
@@ -161,10 +324,11 @@ format_status() {
     out+=$'\n'
     out+="  ========================================"$'\n'
     out+="    OurBox Woodbox is READY"$'\n\n'
-    out+="    http://${box_host}"$'\n'
-    out+="    http://files.${box_host}"$'\n'
-    out+="    http://notes.${box_host}"$'\n'
-    out+="    http://todo.${box_host}"$'\n\n'
+    while IFS= read -r app_url; do
+      [[ -n "${app_url}" ]] || continue
+      out+="    ${app_url}"$'\n'
+    done <<<"${app_urls}"
+    out+=$'\n'
     out+="    Commands:"$'\n'
     out+="      woodbox status  — show this status"$'\n'
     out+="      woodbox quiet   — silence console output"$'\n'
@@ -183,6 +347,7 @@ while true; do
   box_host="$(resolved_box_host)"
   k3s_ok=0; check_k3s_api && k3s_ok=1
   traefik_ok=0; check_traefik "${box_host}" && traefik_ok=1
+  surface_ok=0; surface_exists && surface_ok=1
   mdns_ok=0; check_mdns && mdns_ok=1
   bootstrap_ok=0; check_bootstrap_done && bootstrap_ok=1
 
@@ -191,13 +356,40 @@ while true; do
     pods_info="$(check_pods_ready)" && pods_info="ready"
   fi
 
-  all_ready=0
-  if [[ "$data_ok$net_ok$k3s_ok$traefik_ok$mdns_ok" == "11111" && "$pods_info" == "ready" ]]; then
-    all_ready=1
+  landing_selected=0
+  if [[ "$surface_ok" == "1" ]]; then
+    surface_landing_selected && landing_selected=1 || true
   fi
 
+  app_status_ok=0
+  app_status_summary="waiting for rendered app surface"
+  if [[ "$surface_ok" == "1" ]]; then
+    if [[ "$landing_selected" == "1" ]]; then
+      if app_status_summary="$(check_app_status_endpoint "${box_host}")"; then
+        app_status_ok=1
+      fi
+      if [[ -z "${app_status_summary}" ]]; then
+        app_status_summary="waiting for app-status endpoint"
+      fi
+    else
+      app_status_summary="status route not required"
+    fi
+  fi
+
+  all_ready=0
+  if [[ "$data_ok$net_ok$k3s_ok$traefik_ok$surface_ok$mdns_ok$bootstrap_ok" == "1111111" ]]; then
+    if [[ "$landing_selected" == "1" ]]; then
+      [[ "$app_status_ok" == "1" ]] && all_ready=1
+    elif [[ "$pods_info" == "ready" ]]; then
+      all_ready=1
+    fi
+  fi
+
+  app_urls="$(surface_app_urls || true)"
+
   status="$(format_status "$ip" "$box_host" "$data_ok" "$net_ok" "$k3s_ok" "$traefik_ok" \
-    "$mdns_ok" "$bootstrap_ok" "$pods_info" "$all_ready")"
+    "$surface_ok" "$mdns_ok" "$bootstrap_ok" "$pods_info" "$all_ready" "$app_urls" \
+    "$landing_selected" "$app_status_ok" "$app_status_summary")"
 
   echo "$status" > "${STATUS_FILE}"
 
