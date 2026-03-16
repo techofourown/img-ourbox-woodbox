@@ -1,3 +1,18 @@
+# [0.13.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.4...v0.13.0) (2026-03-16)
+
+
+### Bug Fixes
+
+* export runtime smoke status dir before sourcing ([a676d95](https://github.com/techofourown/img-ourbox-woodbox/commit/a676d956c463a04f443de93c4b2e4805c77573aa))
+* make runtime surface smoke use writable status dir ([1054b87](https://github.com/techofourown/img-ourbox-woodbox/commit/1054b87f8bf4357219df28d9b7e4b40d80cfade8))
+* require runtime surface on bootstrap fast path ([6310485](https://github.com/techofourown/img-ourbox-woodbox/commit/6310485b2254dff68a37e17c1f53d5e4d19e8a21))
+* satisfy runtime surface smoke shellcheck ([5559594](https://github.com/techofourown/img-ourbox-woodbox/commit/5559594a312e25ec92fff3604bf68ca7ba14c2d4))
+
+
+### Features
+
+* consume rendered runtime app surface ([534898e](https://github.com/techofourown/img-ourbox-woodbox/commit/534898eba9fdb848ddf478df8ad634e00c3ca2df))
+
 ## [0.12.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.3...v0.12.4) (2026-03-16)
 
 
