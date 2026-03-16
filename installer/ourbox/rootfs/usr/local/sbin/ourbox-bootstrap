@@ -246,6 +246,7 @@ resolve_desired_contract_state() {
 current_contract_matches() {
   [[ -f "${MARKER}" ]] || return 1
   [[ -f "${APPLIED_CONTRACT_STATE}" ]] || return 1
+  [[ -f "${SELECTED_APP_SURFACE_STATE}" ]] || return 1
   cmp -s "${APPLIED_CONTRACT_STATE}" "${DESIRED_CONTRACT_STATE}"
 }
 
@@ -274,7 +275,11 @@ if current_contract_matches; then
 fi
 
 if [[ -f "${MARKER}" ]]; then
-  log "Bootstrap marker exists but shipped contract state changed (or was never recorded); reapplying"
+  if [[ ! -f "${SELECTED_APP_SURFACE_STATE}" ]]; then
+    log "Bootstrap marker exists but selected app surface is missing; reapplying"
+  else
+    log "Bootstrap marker exists but shipped contract state changed (or was never recorded); reapplying"
+  fi
 fi
 
 "${PLATFORM_CONTRACT_DIR}/tools/check-target-prereqs.sh"
