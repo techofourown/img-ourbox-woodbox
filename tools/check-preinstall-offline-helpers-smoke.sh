@@ -25,7 +25,7 @@ printf 'avahi-daemon\navahi-utils\n' > "${APT_DIR}/target-packages.txt"
 printf '1\n' > "${SYSFS_DIR}/enp2s0/type"
 printf 'aa:bb:cc:dd:ee:01\n' > "${SYSFS_DIR}/enp2s0/address"
 ln -s "/devices/pci0000:00/0000:00:1f.6" "${SYSFS_DIR}/enp2s0/device"
-printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtq4zUjV1X3cM4wUx2u1g0qzW3N0Pqf7sXc7gXvQxQn fixture@host\n' > "${MISSION_SSH_KEY}"
+printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtq4zUjV1X3cM4wUx2u1g0qzW3N0Pqf7sXc7gXvQxQn fixture: host\n' > "${MISSION_SSH_KEY}"
 
 # shellcheck disable=SC1091
 OURBOX_PREINSTALL_LIBRARY_ONLY=1 \
@@ -93,8 +93,8 @@ grep -q 'Installed-target SSH inputs: key=' "${CACHE_DIR}/configure-installed-ta
   echo "configure-installed-target-ssh helper must log its input posture" >&2
   exit 1
 }
-[[ "${ssh_block}" == *'install-server: true'* ]] || {
-  echo "autoinstall SSH block must install the SSH server when SSH is enabled" >&2
+[[ "${ssh_block}" != *'install-server: true'* ]] || {
+  echo "autoinstall SSH block must not enable install-server through Subiquity" >&2
   exit 1
 }
 [[ "${ssh_block}" == *'allow-pw: true'* ]] || {
@@ -105,8 +105,8 @@ grep -q 'Installed-target SSH inputs: key=' "${CACHE_DIR}/configure-installed-ta
   echo "autoinstall SSH block must include authorized-keys when a mission SSH key is present" >&2
   exit 1
 }
-[[ "${ssh_block}" == *'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtq4zUjV1X3cM4wUx2u1g0qzW3N0Pqf7sXc7gXvQxQn fixture@host'* ]] || {
-  echo "autoinstall SSH block must embed the selected mission SSH public key" >&2
+[[ "${ssh_block}" == *'      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtq4zUjV1X3cM4wUx2u1g0qzW3N0Pqf7sXc7gXvQxQn fixture: host"'* ]] || {
+  echo "autoinstall SSH block must quote the selected mission SSH public key" >&2
   exit 1
 }
 

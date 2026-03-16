@@ -98,6 +98,10 @@ shell_quote_sh() {
   printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\$"`]/\\&/g')"
 }
 
+yaml_double_quote() {
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
 resolve_path_within_root() {
   local root="$1" label="$2" relpath="$3"
 
@@ -519,13 +523,12 @@ render_installed_target_ssh_autoinstall_block() {
   fi
 
   printf '  ssh:\n'
-  printf '    install-server: true\n'
   printf '    allow-pw: %s\n' "${allow_pw}"
   if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
     validate_installed_target_ssh_authorized_key "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}"
     authorized_key="$(awk 'NF {print $0; exit}' "${MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH}")"
     printf '    authorized-keys:\n'
-    printf '      - %s\n' "${authorized_key}"
+    printf '      - %s\n' "$(yaml_double_quote "${authorized_key}")"
   else
     printf '    authorized-keys: []\n'
   fi
