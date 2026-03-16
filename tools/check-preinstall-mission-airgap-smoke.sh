@@ -98,7 +98,7 @@ cat > "${MISSION_AIRGAP_DIR}/selected-apps.json" <<'EOF'
   "schema": 1,
   "kind": "ourbox-selected-applications",
   "catalog_id": "demo-apps",
-  "selection_mode": "defaults",
+  "selection_mode": "catalog-defaults",
   "selected_app_ids": [
     "landing",
     "dufs"
@@ -154,7 +154,7 @@ cat > "${MISSION_MANIFEST}" <<EOF
   "selected_applications": {
     "catalog_id": "demo-apps",
     "catalog_name": "Demo Apps",
-    "selection_mode": "defaults",
+    "selection_mode": "catalog-defaults",
     "selected_app_ids": [
       "landing",
       "dufs"

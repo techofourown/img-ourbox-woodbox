@@ -112,6 +112,95 @@ OURBOX_PLATFORM_CONTRACT_DIGEST=${manifest_fields[5]}
 EOF
 }
 
+validate_complete_application_metadata() {
+  local bundle_dir="$1"
+  local catalog_path="${bundle_dir}/platform/catalog.json"
+  local selected_apps_path="${bundle_dir}/platform/selected-apps.json"
+  local images_lock_path="${bundle_dir}/platform/images.lock.json"
+
+  [[ -f "${catalog_path}" ]] || die "airgap bundle missing platform/catalog.json"
+  [[ -f "${selected_apps_path}" ]] || die "airgap bundle missing platform/selected-apps.json"
+  [[ -f "${images_lock_path}" ]] || die "airgap bundle missing platform/images.lock.json"
+
+  python3 - <<'PY' "${catalog_path}" "${selected_apps_path}" "${images_lock_path}"
+import json
+import pathlib
+import sys
+
+catalog_path = pathlib.Path(sys.argv[1])
+selected_apps_path = pathlib.Path(sys.argv[2])
+images_lock_path = pathlib.Path(sys.argv[3])
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
+
+with catalog_path.open("r", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+with selected_apps_path.open("r", encoding="utf-8") as handle:
+    selected = json.load(handle)
+with images_lock_path.open("r", encoding="utf-8") as handle:
+    images_lock = json.load(handle)
+
+if catalog.get("schema") != 1:
+    raise SystemExit("airgap bundle platform/catalog.json must declare schema=1")
+if catalog.get("kind") != "ourbox-application-catalog":
+    raise SystemExit("airgap bundle platform/catalog.json must declare kind=ourbox-application-catalog")
+catalog_id = str(catalog.get("catalog_id", "")).strip()
+if not catalog_id:
+    raise SystemExit("airgap bundle platform/catalog.json must declare catalog_id")
+catalog_apps = catalog.get("apps")
+if not isinstance(catalog_apps, list) or not catalog_apps:
+    raise SystemExit("airgap bundle platform/catalog.json must declare a non-empty apps list")
+catalog_app_ids = []
+seen_catalog_ids = set()
+for app in catalog_apps:
+    app_id = str(app.get("id", "")).strip()
+    if not app_id:
+        raise SystemExit("airgap bundle platform/catalog.json contains an app without an id")
+    if app_id in seen_catalog_ids:
+        raise SystemExit(f"airgap bundle platform/catalog.json duplicates app id {app_id}")
+    seen_catalog_ids.add(app_id)
+    catalog_app_ids.append(app_id)
+
+if selected.get("schema") != 1:
+    raise SystemExit("airgap bundle platform/selected-apps.json must declare schema=1")
+if selected.get("kind") != "ourbox-selected-applications":
+    raise SystemExit("airgap bundle platform/selected-apps.json must declare kind=ourbox-selected-applications")
+if str(selected.get("catalog_id", "")).strip() != catalog_id:
+    raise SystemExit("airgap bundle platform/selected-apps.json catalog_id must match platform/catalog.json")
+selection_mode = str(selected.get("selection_mode", "")).strip()
+if selection_mode not in supported_selection_modes:
+    raise SystemExit(
+        "airgap bundle platform/selected-apps.json selection_mode must be one of "
+        "catalog-defaults, all-apps, custom"
+    )
+selected_ids = selected.get("selected_app_ids")
+if not isinstance(selected_ids, list) or not selected_ids:
+    raise SystemExit("airgap bundle platform/selected-apps.json must declare a non-empty selected_app_ids list")
+normalized_selected_ids = []
+seen_selected_ids = set()
+for raw_app_id in selected_ids:
+    app_id = str(raw_app_id).strip()
+    if not app_id:
+        raise SystemExit("airgap bundle platform/selected-apps.json contains an empty app id")
+    if app_id in seen_selected_ids:
+        raise SystemExit(f"airgap bundle platform/selected-apps.json duplicates app id {app_id}")
+    if app_id not in seen_catalog_ids:
+        raise SystemExit(f"airgap bundle platform/selected-apps.json references unknown app id {app_id}")
+    seen_selected_ids.add(app_id)
+    normalized_selected_ids.append(app_id)
+
+images = images_lock.get("images")
+if not isinstance(images, list) or not images:
+    raise SystemExit("airgap bundle platform/images.lock.json must declare a non-empty images list")
+for image in images:
+    name = str(image.get("name", "")).strip()
+    ref = str(image.get("ref", "")).strip()
+    if not name:
+        raise SystemExit("airgap bundle platform/images.lock.json contains an image without a name")
+    if not ref:
+        raise SystemExit("airgap bundle platform/images.lock.json contains an image without a ref")
+PY
+}
+
 # Resolve airgap platform ref.
 # Priority: OURBOX_AIRGAP_PLATFORM_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
 if [[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]]; then
@@ -203,6 +292,7 @@ shopt -u nullglob
 
 (( ${#k3s_tars[@]} > 0 )) || die "No k3s airgap image tar found in ${OUT}/k3s"
 (( ${#platform_tars[@]} > 0 )) || die "No platform image tars found in ${OUT}/platform/images"
+validate_complete_application_metadata "${OUT}"
 
 log "Artifacts created:"
 ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/manifest.env"
@@ -232,8 +322,4 @@ log "Selected baked airgap bundle recorded at ${OUT}/selected-bundle.env"
 
 log "Syncing pinned platform contract into installer tree"
 "${ROOT}/tools/sync-platform-contract-into-installer.sh"
-
-log "Ensuring baked application catalog metadata exists in fetched airgap bundle"
-bash "${ROOT}/tools/ensure-airgap-application-metadata.sh" \
-  --bundle-dir "${OUT}" \
-  --contract-root "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform"
+log "Validated complete baked application metadata in fetched airgap bundle"

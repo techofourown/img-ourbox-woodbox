@@ -34,7 +34,7 @@ TLS_MODE=lan-http
 INGRESS_CLASS=traefik
 STORAGE_CLASS=local-path
 OURBOX_APPLICATION_CATALOG_ID=fixture-catalog
-OURBOX_APPLICATION_SELECTION_MODE=host-selected
+OURBOX_APPLICATION_SELECTION_MODE=custom
 OURBOX_SELECTED_APPLICATION_IDS=landing,dufs
 OURBOX_APPLICATION_CATALOG_SHA256=sha256:1111111111111111111111111111111111111111111111111111111111111111
 OURBOX_APPLICATION_IMAGES_LOCK_SHA256=sha256:2222222222222222222222222222222222222222222222222222222222222222
@@ -106,7 +106,7 @@ cat > "${CONTRACT_DIR}/selected-apps.json" <<'EOF_SELECTED_APPS'
   "schema": 1,
   "kind": "ourbox-selected-applications",
   "catalog_id": "fixture-catalog",
-  "selection_mode": "host-selected",
+  "selection_mode": "custom",
   "selected_app_ids": [
     "landing",
     "dufs"

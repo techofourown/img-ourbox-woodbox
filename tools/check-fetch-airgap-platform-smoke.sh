@@ -8,16 +8,13 @@ trap 'rm -rf "${TMP}"' EXIT
 
 FIXTURE_ROOT="${TMP}/repo"
 TOOLS_DIR="${FIXTURE_ROOT}/tools"
-FALLBACK_DIR="${FIXTURE_ROOT}/catalog-fallbacks"
 BIN_DIR="${TMP}/bin"
 BUNDLE_DIR="${TMP}/bundle"
-mkdir -p "${TOOLS_DIR}" "${FALLBACK_DIR}" "${BIN_DIR}" "${BUNDLE_DIR}"
+mkdir -p "${TOOLS_DIR}" "${BIN_DIR}" "${BUNDLE_DIR}"
 
 cp "${ROOT}/tools/fetch-airgap-platform.sh" "${TOOLS_DIR}/fetch-airgap-platform.sh"
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
 cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
-cp "${ROOT}/tools/ensure-airgap-application-metadata.sh" "${TOOLS_DIR}/ensure-airgap-application-metadata.sh"
-cp "${ROOT}/catalog-fallbacks/demo-apps.catalog.json" "${FALLBACK_DIR}/demo-apps.catalog.json"
 
 AIRGAP_DIGEST="sha256:1111111111111111111111111111111111111111111111111111111111111111"
 PLATFORM_CONTRACT_DIGEST="sha256:2222222222222222222222222222222222222222222222222222222222222222"
@@ -86,14 +83,54 @@ chmod +x "${BIN_DIR}/oras"
 
 write_bundle() {
   local contract_digest="$1"
+  local variant="${2:-valid}"
   rm -rf "${BUNDLE_DIR}"
   mkdir -p "${BUNDLE_DIR}/k3s" "${BUNDLE_DIR}/platform/images"
   printf '#!/bin/sh\nexit 0\n' > "${BUNDLE_DIR}/k3s/k3s"
   chmod +x "${BUNDLE_DIR}/k3s/k3s"
   : > "${BUNDLE_DIR}/k3s/k3s-airgap-images-amd64.tar"
   : > "${BUNDLE_DIR}/platform/images/app.tar"
-  printf '{}\n' > "${BUNDLE_DIR}/platform/images.lock.json"
+  printf '{"images":[{"name":"landing","ref":"ghcr.io/example/landing@sha256:4444444444444444444444444444444444444444444444444444444444444444"}]}\n' > "${BUNDLE_DIR}/platform/images.lock.json"
   printf 'PROFILE=demo-apps\n' > "${BUNDLE_DIR}/platform/profile.env"
+  cat > "${BUNDLE_DIR}/platform/catalog.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing"
+    }
+  ]
+}
+EOF
+  if [[ "${variant}" != "missing-selected-apps" ]]; then
+    cat > "${BUNDLE_DIR}/platform/selected-apps.json" <<EOF
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "${variant:-catalog-defaults}"
+}
+EOF
+    python3 - <<'PY' "${BUNDLE_DIR}/platform/selected-apps.json" "${variant}"
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+variant = sys.argv[2]
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["selection_mode"] = "catalog-defaults" if variant == "valid" else "defaults"
+payload["selected_app_ids"] = ["landing"]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+  fi
   cat > "${BUNDLE_DIR}/manifest.env" <<EOF
 OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_AIRGAP_PLATFORM_REVISION=fixture-airgap-revision
@@ -132,7 +169,7 @@ grep -F "OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_DIGEST}" "${SELECTED_ENV}" >/dev
 grep -F "OURBOX_AIRGAP_PLATFORM_ARCH=amd64" "${SELECTED_ENV}" >/dev/null
 grep -F "OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_CONTRACT_DIGEST}" "${SELECTED_ENV}" >/dev/null
 
-write_bundle "${MISMATCH_CONTRACT_DIGEST}"
+write_bundle "${MISMATCH_CONTRACT_DIGEST}" valid
 set +e
 run_fetch >"${TMP}/mismatch.log" 2>&1
 status=$?
@@ -146,5 +183,33 @@ grep -F "airgap-platform contract digest mismatch" "${TMP}/mismatch.log" >/dev/n
     cat "${TMP}/mismatch.log" >&2
     exit 1
   }
+
+write_bundle "${PLATFORM_CONTRACT_DIGEST}" missing-selected-apps
+set +e
+run_fetch >"${TMP}/missing-selected-apps.log" 2>&1
+status=$?
+set -e
+[[ "${status}" -ne 0 ]] || {
+  echo "fetch-airgap-platform.sh should reject bundles missing selected-apps.json" >&2
+  exit 1
+}
+grep -F "airgap bundle missing platform/selected-apps.json" "${TMP}/missing-selected-apps.log" >/dev/null || {
+  cat "${TMP}/missing-selected-apps.log" >&2
+  exit 1
+}
+
+write_bundle "${PLATFORM_CONTRACT_DIGEST}" invalid-selection-mode
+set +e
+run_fetch >"${TMP}/invalid-selection-mode.log" 2>&1
+status=$?
+set -e
+[[ "${status}" -ne 0 ]] || {
+  echo "fetch-airgap-platform.sh should reject bundles with invalid selected-apps selection_mode" >&2
+  exit 1
+}
+grep -F "selection_mode must be one of catalog-defaults, all-apps, custom" "${TMP}/invalid-selection-mode.log" >/dev/null || {
+  cat "${TMP}/invalid-selection-mode.log" >&2
+  exit 1
+}
 
 printf '[%s] Woodbox fetch-airgap-platform smoke passed\n' "$(date -Is)"

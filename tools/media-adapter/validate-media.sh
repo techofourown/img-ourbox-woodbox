@@ -88,6 +88,7 @@ pinned_ref_re = re.compile(r"^[^\s]+@sha256:[0-9a-f]{64}$")
 plain_sha256_re = re.compile(r"^[0-9a-f]{64}$")
 key_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 ssh_fingerprint_re = re.compile(r"^SHA256:[A-Za-z0-9+/=]+$")
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
 
 
 def ensure_relpath_within_mission(label: str, relpath: str) -> pathlib.Path:
@@ -399,9 +400,9 @@ if installed_target_ssh is not None:
     validate_authorized_key_file("mission installed_target_ssh.authorized_key_relpath", authorized_key_path)
 
 selected_applications = manifest.get("selected_applications")
-if selected_applications is not None:
-    if not isinstance(selected_applications, dict) or not selected_applications:
-        raise SystemExit("mission selected_applications must be an object when present")
+if not isinstance(selected_applications, dict) or not selected_applications:
+    raise SystemExit("mission selected_applications must be present")
+else:
     catalog_id = str(selected_applications.get("catalog_id", ""))
     catalog_name = str(selected_applications.get("catalog_name", ""))
     selection_mode = str(selected_applications.get("selection_mode", ""))
@@ -412,8 +413,10 @@ if selected_applications is not None:
         raise SystemExit("mission selected_applications.catalog_id must be set")
     if not catalog_name:
         raise SystemExit("mission selected_applications.catalog_name must be set")
-    if not selection_mode:
-        raise SystemExit("mission selected_applications.selection_mode must be set")
+    if selection_mode not in supported_selection_modes:
+        raise SystemExit(
+            "mission selected_applications.selection_mode must be one of catalog-defaults, all-apps, custom"
+        )
     if not catalog_relpath:
         raise SystemExit("mission selected_applications.catalog_relpath must be set")
     if not selection_relpath:

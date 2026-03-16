@@ -53,6 +53,12 @@ OUT_SHA="${OUT_TAR}.sha256"
   die "missing artifacts/airgap/k3s/k3s — run: ./tools/fetch-airgap-platform.sh"
 [[ -f "${ROOT}/artifacts/airgap/manifest.env" ]] || \
   die "missing artifacts/airgap/manifest.env — run: ./tools/fetch-airgap-platform.sh"
+[[ -f "${ROOT}/artifacts/airgap/platform/images.lock.json" ]] || \
+  die "missing artifacts/airgap/platform/images.lock.json — run: ./tools/fetch-airgap-platform.sh"
+[[ -f "${ROOT}/artifacts/airgap/platform/catalog.json" ]] || \
+  die "missing artifacts/airgap/platform/catalog.json — run: ./tools/fetch-airgap-platform.sh"
+[[ -f "${ROOT}/artifacts/airgap/platform/selected-apps.json" ]] || \
+  die "missing artifacts/airgap/platform/selected-apps.json — run: ./tools/fetch-airgap-platform.sh"
 
 # Require platform contract sync
 [[ -f "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env" ]] || \

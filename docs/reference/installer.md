@@ -141,7 +141,7 @@ Step 4:
 - reads the selected `airgap-platform` identity from the embedded mission
   manifest
 - reads the selected application catalog ids and selected app ids from the
-  embedded mission manifest when present
+  embedded mission manifest
 - if the mission-selected airgap bundle matches the baked bundle already inside
   the OS payload, uses the baked bundle
 - otherwise extracts the staged mission airgap bundle into the override cache
@@ -149,8 +149,11 @@ Step 4:
   - required `OURBOX_PLATFORM_CONTRACT_DIGEST`
   - expected `amd64` arch
   - required bundle shape and manifest fields
-- stages `catalog.json` and `selected-apps.json` into the installer cache when
-  the mission carries application-catalog metadata
+- requires baked/selected application metadata to already exist in-band as:
+  - `platform/catalog.json`
+  - `platform/selected-apps.json`
+  - `platform/images.lock.json`
+- stages `catalog.json` and `selected-apps.json` into the installer cache
 
 There is no target-side fallback selection path.
 
@@ -256,7 +259,7 @@ Late-commands in `autoinstall.tpl`:
 1. Extract `os-payload.tar.gz` and copy the payload rootfs + baked airgap bytes into `/target/`
 2. Install the remaining target packages from the substrate-local APT repo only
 3. If the mission-selected airgap bundle differs from the baked bundle, overlay the validated mutable airgap subset from the override cache
-4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory when present
+4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory
 5. Install the `k3s` binary from `airgap/k3s/k3s`
 6. Append install-time provenance to `/target/etc/ourbox/release`
 7. Configure installed-target SSH when a staged host key or target-side password SSH was requested
