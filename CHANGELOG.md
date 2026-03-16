@@ -1,3 +1,12 @@
+## [0.12.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.3...v0.12.4) (2026-03-16)
+
+
+### Bug Fixes
+
+* carry installed-target ssh into autoinstall ([6dea2e9](https://github.com/techofourown/img-ourbox-woodbox/commit/6dea2e92c9d8a75bbfbf330af2c6c1e3fb7028b1))
+* keep autoinstall ssh block offline-safe ([750572e](https://github.com/techofourown/img-ourbox-woodbox/commit/750572e5b664b04292e5f0ee129044e1497c542b))
+* suppress literal autoinstall placeholder warning ([98e850e](https://github.com/techofourown/img-ourbox-woodbox/commit/98e850ec20502c27b0dc9f26f3dce331c93a7872))
+
 ## [0.12.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.2...v0.12.3) (2026-03-16)
 
 
