@@ -197,10 +197,9 @@ mdns_fragment="$(
   ' "${MDNS_SCRIPT}"
 )"
 
-bash -c "${status_fragment}
+OURBOX_STATUS_RUN_DIR='${TMP}/run' bash -c "${status_fragment}
 APP_SURFACE_FILE='${SURFACE_FILE}'
 PLATFORM_STATE_FILE='${PLATFORM_STATE_FILE}'
-OURBOX_STATUS_RUN_DIR='${TMP}/run'
 STATUS_BASE_URL='http://127.0.0.1:${PORT}'
 surface_exists
 [[ \"\$(surface_landing_selected >/dev/null 2>&1; echo \$?)\" == \"0\" ]]
