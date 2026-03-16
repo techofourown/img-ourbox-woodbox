@@ -1,3 +1,12 @@
+## [0.12.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.2...v0.12.3) (2026-03-16)
+
+
+### Bug Fixes
+
+* **bootstrap:** reject legacy profile keys ([c17d1e4](https://github.com/techofourown/img-ourbox-woodbox/commit/c17d1e4f05c1ea538ef8341136442691902109f7))
+* **ci:** satisfy bootstrap smoke shellcheck ([3c0f206](https://github.com/techofourown/img-ourbox-woodbox/commit/3c0f2066031e6df71320ababc91cbf00fde3b8db))
+* fail closed on missing airgap application intent ([1a8d94d](https://github.com/techofourown/img-ourbox-woodbox/commit/1a8d94d71c774f1c77fc84b4a6ccd9bf4515b271))
+
 ## [0.12.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.1...v0.12.2) (2026-03-14)
 
 
