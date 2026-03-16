@@ -116,6 +116,7 @@ ssh_key_only_block="$(render_installed_target_ssh_autoinstall_block)"
   echo "key-only autoinstall SSH block must disable password login" >&2
   exit 1
 }
+# shellcheck disable=SC2016
 grep -q '\${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}' "${ROOT}/installer/autoinstall/autoinstall.tpl" || {
   echo "runtime autoinstall template must include the installed-target SSH block placeholder" >&2
   exit 1
