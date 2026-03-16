@@ -231,7 +231,7 @@ grep -Fq 'selected-app-surface.json' "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap does not persist selected-app-surface.json" >&2
   exit 1
 }
-grep -Fq '[[ -f "${SELECTED_APP_SURFACE_STATE}" ]] || return 1' "${BOOTSTRAP_SCRIPT}" || {
+grep -Fq "[[ -f \"\${SELECTED_APP_SURFACE_STATE}\" ]] || return 1" "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap fast-path does not require selected-app-surface.json" >&2
   exit 1
 }
