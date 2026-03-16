@@ -8,6 +8,7 @@ kubectl_cmd(){ /usr/local/bin/k3s kubectl --kubeconfig "${KUBECONFIG_PATH}" "$@"
 STATE_DIR="/var/lib/ourbox/state"
 MARKER="${STATE_DIR}/bootstrap.done"
 APPLIED_CONTRACT_STATE="${STATE_DIR}/platform-contract.env"
+SELECTED_APP_SURFACE_STATE="${STATE_DIR}/selected-app-surface.json"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 HOSTNAME="$(hostname)"
 PLATFORM_CONTRACT_DIR="/opt/ourbox/airgap/platform"
@@ -395,6 +396,8 @@ render_cmd=(
 )
 log "Applying mission-selected application metadata from ${APPLICATION_CATALOG_FILE}, ${SELECTED_APPS_FILE}, and ${IMAGES_LOCK_FILE}"
 "${render_cmd[@]}"
+[[ -f "${RENDER_DIR}/selected-app-surface.json" ]] || \
+  die "rendered platform contract is missing selected-app-surface.json"
 
 log "Applying rendered platform manifests"
 kubectl_cmd apply -f "${RENDER_DIR}/manifests"
@@ -406,5 +409,7 @@ log "Running upstream runtime verification"
   --render-dir "${RENDER_DIR}"
 
 install -D -m 0644 "${DESIRED_CONTRACT_STATE}" "${APPLIED_CONTRACT_STATE}"
+install -D -m 0644 "${RENDER_DIR}/selected-app-surface.json" "${SELECTED_APP_SURFACE_STATE}"
 date -Is > "$MARKER"
+systemctl restart ourbox-mdns-aliases.service ourbox-status.service || true
 echo "OurBox bootstrap complete. device_id=${DEVICE_ID}"

@@ -1,12 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOSTNAME="$(hostname)"
-ALIASES=(
-  "files.${HOSTNAME}.local"
-  "notes.${HOSTNAME}.local"
-  "todo.${HOSTNAME}.local"
-)
+APP_SURFACE_FILE="/var/lib/ourbox/state/selected-app-surface.json"
+
+surface_aliases() {
+  [[ -f "${APP_SURFACE_FILE}" ]] || return 1
+  python3 - "${APP_SURFACE_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+surface = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+seen = set()
+for app in surface.get("apps", []):
+    if not bool(app.get("publish_mdns_alias", False)):
+        continue
+    host = str(app.get("host", "")).strip()
+    if not host or host in seen:
+        continue
+    seen.add(host)
+    print(host)
+PY
+}
+
+ALIASES=""
+for _i in $(seq 1 600); do
+  ALIASES="$(surface_aliases || true)"
+  if [[ -f "${APP_SURFACE_FILE}" ]]; then
+    break
+  fi
+  sleep 1
+done
+
+if [[ ! -f "${APP_SURFACE_FILE}" ]]; then
+  echo "ERROR: selected app surface not found after 600s: ${APP_SURFACE_FILE}" >&2
+  exit 1
+fi
 
 # Wait for a global IPv4 (up to 60s — first boot DHCP can be slow)
 IP=""
@@ -22,12 +51,18 @@ if [[ -z "${IP}" ]]; then
   exit 1
 fi
 
+if [[ -z "${ALIASES}" ]]; then
+  echo "No mDNS aliases requested by selected app surface"
+  exit 0
+fi
+
 echo "Publishing mDNS aliases for ${IP}:"
 PIDS=()
-for alias in "${ALIASES[@]}"; do
+while IFS= read -r alias; do
+  [[ -n "${alias}" ]] || continue
   echo "  ${alias}"
   avahi-publish-address -R "${alias}" "${IP}" &
   PIDS+=($!)
-done
+done <<<"${ALIASES}"
 
 wait "${PIDS[@]}"
