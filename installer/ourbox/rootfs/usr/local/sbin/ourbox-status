@@ -9,7 +9,8 @@ set -euo pipefail
 # Silenced by `woodbox quiet` (creates /var/lib/ourbox/state/quiet).
 
 QUIET_MARKER="/var/lib/ourbox/state/quiet"
-STATUS_FILE="/run/ourbox/status"
+STATUS_DIR="${OURBOX_STATUS_RUN_DIR:-/run/ourbox}"
+STATUS_FILE="${STATUS_DIR}/status"
 BOOT_INTERVAL=10
 READY_INTERVAL=60
 HOSTNAME="$(hostname)"
@@ -17,7 +18,7 @@ PLATFORM_STATE_FILE="/var/lib/ourbox/state/platform-contract.env"
 APP_SURFACE_FILE="/var/lib/ourbox/state/selected-app-surface.json"
 STATUS_BASE_URL="${OURBOX_STATUS_BASE_URL:-http://127.0.0.1}"
 
-mkdir -p /run/ourbox
+mkdir -p "${STATUS_DIR}"
 
 # Always start loud on boot.
 rm -f "$QUIET_MARKER"
