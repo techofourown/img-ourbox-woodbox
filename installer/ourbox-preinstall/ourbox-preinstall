@@ -761,6 +761,7 @@ selected_os = manifest.get("selected_os", {})
 selected_airgap = manifest.get("selected_airgap", {})
 selected_applications = manifest.get("selected_applications")
 installed_target_ssh = manifest.get("installed_target_ssh")
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
 
 app_present = False
 app_catalog_id = ""
@@ -776,9 +777,9 @@ installed_target_ssh_authorized_key_relpath = ""
 installed_target_ssh_key_type = ""
 installed_target_ssh_public_key_fingerprint = ""
 
-if selected_applications is not None:
-    if not isinstance(selected_applications, dict) or not selected_applications:
-        raise SystemExit("embedded mission selected_applications must be an object when present")
+if not isinstance(selected_applications, dict) or not selected_applications:
+    raise SystemExit("embedded mission selected_applications must be present")
+else:
     app_catalog_id = str(selected_applications.get("catalog_id", ""))
     app_catalog_name = str(selected_applications.get("catalog_name", ""))
     app_selection_mode = str(selected_applications.get("selection_mode", ""))
@@ -789,8 +790,11 @@ if selected_applications is not None:
         raise SystemExit("embedded mission selected_applications.catalog_id must be set")
     if not app_catalog_name:
         raise SystemExit("embedded mission selected_applications.catalog_name must be set")
-    if not app_selection_mode:
-        raise SystemExit("embedded mission selected_applications.selection_mode must be set")
+    if app_selection_mode not in supported_selection_modes:
+        raise SystemExit(
+            "embedded mission selected_applications.selection_mode must be one of "
+            "catalog-defaults, all-apps, custom"
+        )
     if not app_catalog_relpath:
         raise SystemExit("embedded mission selected_applications.catalog_relpath must be set")
     if not app_selection_relpath:
@@ -1024,7 +1028,10 @@ if selected.get("kind") != "ourbox-selected-applications":
     raise SystemExit("embedded mission selected applications kind must be 'ourbox-selected-applications'")
 if str(selected.get("catalog_id", "")) != expected_catalog_id:
     raise SystemExit("embedded mission selected applications catalog_id does not match mission manifest")
-if str(selected.get("selection_mode", "")) != expected_selection_mode:
+selection_mode = str(selected.get("selection_mode", ""))
+if selection_mode not in {"catalog-defaults", "all-apps", "custom"}:
+    raise SystemExit("embedded mission selected applications selection_mode is out of contract")
+if selection_mode != expected_selection_mode:
     raise SystemExit("embedded mission selected applications selection_mode does not match mission manifest")
 
 selected_ids = selected.get("selected_app_ids")
@@ -1102,14 +1109,8 @@ stage_selected_application_metadata() {
   local cache_dir="${INSTALLER_CACHE_DIR:-/opt/ourbox/installer/cache}"
   mkdir -p "${cache_dir}"
 
-  if [[ "${MISSION_SELECTED_APPLICATIONS_PRESENT}" != "1" ]]; then
-    rm -f "${cache_dir}/catalog.json" "${cache_dir}/selected-apps.json"
-    OURBOX_APPLICATION_CATALOG_ID=""
-    OURBOX_APPLICATION_CATALOG_NAME=""
-    OURBOX_APPLICATION_SELECTION_MODE=""
-    OURBOX_SELECTED_APPLICATION_IDS=""
-    return 0
-  fi
+  [[ "${MISSION_SELECTED_APPLICATIONS_PRESENT}" == "1" ]] || \
+    die "Woodbox install requires mission selected application metadata"
 
   cp -f "${MISSION_APPLICATION_CATALOG_PATH}" "${cache_dir}/catalog.json"
   cp -f "${MISSION_SELECTED_APPLICATIONS_PATH}" "${cache_dir}/selected-apps.json"

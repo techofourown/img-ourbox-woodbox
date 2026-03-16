@@ -35,6 +35,17 @@ cat > "${PAYLOAD_AIRGAP}/platform/catalog.json" <<'EOF'
   ]
 }
 EOF
+cat > "${PAYLOAD_AIRGAP}/platform/selected-apps.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "catalog-defaults",
+  "selected_app_ids": [
+    "landing"
+  ]
+}
+EOF
 cat > "${PAYLOAD_AIRGAP}/manifest.env" <<'EOF'
 OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_AIRGAP_PLATFORM_REVISION=fixture-revision
@@ -110,7 +121,7 @@ with open(sys.argv[1], "r", encoding="utf-8") as handle:
 selected_apps = manifest.get("selected_applications", {})
 if selected_apps.get("catalog_id") != "demo-apps":
     raise SystemExit("unexpected selected_applications.catalog_id")
-if selected_apps.get("selection_mode") != "defaults":
+if selected_apps.get("selection_mode") != "catalog-defaults":
     raise SystemExit("unexpected selected_applications.selection_mode")
 if selected_apps.get("selected_app_ids") != ["landing"]:
     raise SystemExit("unexpected selected_applications.selected_app_ids")

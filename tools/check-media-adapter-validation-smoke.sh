@@ -122,7 +122,7 @@ EOF
   "schema": 1,
   "kind": "ourbox-selected-applications",
   "catalog_id": "demo-apps",
-  "selection_mode": "defaults",
+  "selection_mode": "catalog-defaults",
   "selected_app_ids": [
     "landing",
     "dufs"
@@ -176,7 +176,7 @@ EOF
   "selected_applications": {
     "catalog_id": "demo-apps",
     "catalog_name": "Demo Apps",
-    "selection_mode": "defaults",
+    "selection_mode": "catalog-defaults",
     "selected_app_ids": [
       "landing",
       "dufs"
@@ -227,12 +227,17 @@ bash "${ROOT}/tools/media-adapter/validate-media.sh" \
   --os-meta-env "${OS_META_ENV}"
 
 write_manifest 0
-expect_validation_failure "mission manifests missing selected_airgap"
+expect_validation_failure "mission manifests missing selected_airgap and selected_applications"
 
 build_airgap_bundle valid
 write_manifest 1
 mutate_manifest 'del manifest["selected_airgap"]["artifact_digest"]'
 expect_validation_failure "mission manifests missing selected_airgap.artifact_digest"
+
+build_airgap_bundle valid
+write_manifest 1
+mutate_manifest 'del manifest["selected_applications"]'
+expect_validation_failure "mission manifests missing selected_applications"
 
 build_airgap_bundle valid
 write_manifest 1
@@ -246,13 +251,29 @@ cat > "${SELECTED_APPS}" <<'EOF'
   "schema": 1,
   "kind": "ourbox-selected-applications",
   "catalog_id": "demo-apps",
-  "selection_mode": "defaults",
+  "selection_mode": "catalog-defaults",
   "selected_app_ids": [
     "landing"
   ]
 }
 EOF
 expect_validation_failure "mission selected applications files that do not match manifest selected_applications.selected_app_ids"
+
+build_airgap_bundle valid
+write_manifest 1
+cat > "${SELECTED_APPS}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "defaults",
+  "selected_app_ids": [
+    "landing",
+    "dufs"
+  ]
+}
+EOF
+expect_validation_failure "mission selected applications files with an unsupported selection_mode"
 
 build_airgap_bundle valid
 write_manifest 1

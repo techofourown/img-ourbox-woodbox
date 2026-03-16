@@ -27,6 +27,12 @@ required_paths=(
   "profiles/demo-apps/images.lock.json"
 )
 
+root_application_metadata_paths=(
+  "catalog.json"
+  "selected-apps.json"
+  "images.lock.json"
+)
+
 required_manifest_basenames=(
   "landing-deployment.yaml"
   "dufs-deployment.yaml"
@@ -57,6 +63,93 @@ if (( ${#missing[@]} > 0 )); then
   printf '  - %s\n' "${missing[@]}" >&2
   echo "Update PLATFORM_CONTRACT_REF to a full-shape upstream contract artifact." >&2
   exit 1
+fi
+
+present_root_application_metadata=()
+for rel in "${root_application_metadata_paths[@]}"; do
+  [[ -e "${CONTRACT_DIR}/${rel}" ]] && present_root_application_metadata+=("${rel}")
+done
+
+if (( ${#present_root_application_metadata[@]} > 0 && ${#present_root_application_metadata[@]} != ${#root_application_metadata_paths[@]} )); then
+  echo "ERROR: platform-contract application metadata check failed for ${CONTRACT_DIR}" >&2
+  echo "When any root-level application metadata is present, all of these files are required:" >&2
+  printf '  - %s\n' "${root_application_metadata_paths[@]}" >&2
+  exit 1
+fi
+
+if (( ${#present_root_application_metadata[@]} == ${#root_application_metadata_paths[@]} )); then
+  python3 - <<'PY' "${CONTRACT_DIR}/catalog.json" "${CONTRACT_DIR}/selected-apps.json" "${CONTRACT_DIR}/images.lock.json"
+import json
+import pathlib
+import sys
+
+catalog_path = pathlib.Path(sys.argv[1])
+selected_apps_path = pathlib.Path(sys.argv[2])
+images_lock_path = pathlib.Path(sys.argv[3])
+supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
+
+with catalog_path.open("r", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+with selected_apps_path.open("r", encoding="utf-8") as handle:
+    selected = json.load(handle)
+with images_lock_path.open("r", encoding="utf-8") as handle:
+    images_lock = json.load(handle)
+
+if catalog.get("schema") != 1:
+    raise SystemExit(f"{catalog_path} must declare schema=1")
+if catalog.get("kind") != "ourbox-application-catalog":
+    raise SystemExit(f"{catalog_path} must declare kind=ourbox-application-catalog")
+catalog_id = str(catalog.get("catalog_id", "")).strip()
+if not catalog_id:
+    raise SystemExit(f"{catalog_path} must declare catalog_id")
+apps = catalog.get("apps")
+if not isinstance(apps, list) or not apps:
+    raise SystemExit(f"{catalog_path} must declare a non-empty apps list")
+app_ids = set()
+for app in apps:
+    app_id = str(app.get("id", "")).strip()
+    if not app_id:
+        raise SystemExit(f"{catalog_path} contains an app without an id")
+    if app_id in app_ids:
+        raise SystemExit(f"{catalog_path} duplicates app id {app_id}")
+    app_ids.add(app_id)
+
+if selected.get("schema") != 1:
+    raise SystemExit(f"{selected_apps_path} must declare schema=1")
+if selected.get("kind") != "ourbox-selected-applications":
+    raise SystemExit(f"{selected_apps_path} must declare kind=ourbox-selected-applications")
+if str(selected.get("catalog_id", "")).strip() != catalog_id:
+    raise SystemExit(f"{selected_apps_path} catalog_id must match {catalog_path}")
+selection_mode = str(selected.get("selection_mode", "")).strip()
+if selection_mode not in supported_selection_modes:
+    raise SystemExit(
+        f"{selected_apps_path} selection_mode must be one of catalog-defaults, all-apps, custom"
+    )
+selected_ids = selected.get("selected_app_ids")
+if not isinstance(selected_ids, list) or not selected_ids:
+    raise SystemExit(f"{selected_apps_path} must declare a non-empty selected_app_ids list")
+seen_ids = set()
+for raw_app_id in selected_ids:
+    app_id = str(raw_app_id).strip()
+    if not app_id:
+        raise SystemExit(f"{selected_apps_path} contains an empty app id")
+    if app_id in seen_ids:
+        raise SystemExit(f"{selected_apps_path} duplicates app id {app_id}")
+    if app_id not in app_ids:
+        raise SystemExit(f"{selected_apps_path} references unknown app id {app_id}")
+    seen_ids.add(app_id)
+
+images = images_lock.get("images")
+if not isinstance(images, list) or not images:
+    raise SystemExit(f"{images_lock_path} must declare a non-empty images list")
+for image in images:
+    name = str(image.get("name", "")).strip()
+    ref = str(image.get("ref", "")).strip()
+    if not name:
+        raise SystemExit(f"{images_lock_path} contains an image without a name")
+    if not ref:
+        raise SystemExit(f"{images_lock_path} contains an image without a ref")
+PY
 fi
 
 render_help="$(

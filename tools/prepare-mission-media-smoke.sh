@@ -82,8 +82,6 @@ need_cmd git
 
 STRICT_METADATA_PARSER="${ROOT}/tools/strict-kv-metadata.py"
 [[ -f "${STRICT_METADATA_PARSER}" ]] || die "strict metadata parser not found: ${STRICT_METADATA_PARSER}"
-ENSURE_AIRGAP_APPLICATION_METADATA="${ROOT}/tools/ensure-airgap-application-metadata.sh"
-[[ -f "${ENSURE_AIRGAP_APPLICATION_METADATA}" ]] || die "airgap application metadata helper not found: ${ENSURE_AIRGAP_APPLICATION_METADATA}"
 
 WORK_ROOT="${ROOT}/artifacts/work"
 mkdir -p "${WORK_ROOT}"
@@ -101,12 +99,9 @@ mkdir -p "${PAYLOAD_ROOT}" "${MISSION_OS_DIR}" "${MISSION_AIRGAP_DIR}" "${BUNDLE
 tar -xzf "${OS_PAYLOAD}" -C "${PAYLOAD_ROOT}"
 [[ -f "${PAYLOAD_ROOT}/airgap/manifest.env" ]] || die "OS payload missing airgap/manifest.env"
 [[ -x "${PAYLOAD_ROOT}/airgap/k3s/k3s" ]] || die "OS payload missing airgap/k3s/k3s"
-if [[ -d "${PAYLOAD_ROOT}/rootfs/opt/ourbox/airgap/platform" ]]; then
-  bash "${ENSURE_AIRGAP_APPLICATION_METADATA}" \
-    --bundle-dir "${PAYLOAD_ROOT}/airgap" \
-    --contract-root "${PAYLOAD_ROOT}/rootfs/opt/ourbox/airgap/platform"
-fi
 [[ -f "${PAYLOAD_ROOT}/airgap/platform/catalog.json" ]] || die "OS payload missing airgap/platform/catalog.json"
+[[ -f "${PAYLOAD_ROOT}/airgap/platform/selected-apps.json" ]] || die "OS payload missing airgap/platform/selected-apps.json"
+[[ -f "${PAYLOAD_ROOT}/airgap/platform/images.lock.json" ]] || die "OS payload missing airgap/platform/images.lock.json"
 
 meta_dump="$(
   python3 "${STRICT_METADATA_PARSER}" "${OS_META_ENV}" \
@@ -210,35 +205,8 @@ OS_ARTIFACT_REF="ghcr.io/techofourown/ourbox-woodbox-os-smoke@sha256:${OS_PAYLOA
 
 cp -a "${PAYLOAD_ROOT}/airgap/." "${BUNDLE_ROOT}/"
 
-if [[ -f "${BUNDLE_ROOT}/platform/selected-apps.json" ]]; then
-  cp -f "${BUNDLE_ROOT}/platform/selected-apps.json" "${MISSION_AIRGAP_DIR}/selected-apps.json"
-else
-  python3 - <<'PY' "${BUNDLE_ROOT}/platform/catalog.json" "${MISSION_AIRGAP_DIR}/selected-apps.json"
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    catalog = json.load(handle)
-
-default_ids = catalog.get("default_app_ids")
-if not isinstance(default_ids, list) or not default_ids:
-    raise SystemExit("catalog.json must define a non-empty default_app_ids list for mission-media smoke")
-
-payload = {
-    "schema": 1,
-    "kind": "ourbox-selected-applications",
-    "catalog_id": catalog.get("catalog_id"),
-    "selection_mode": "defaults",
-    "selected_app_ids": default_ids,
-}
-with open(sys.argv[2], "w", encoding="utf-8") as handle:
-    json.dump(payload, handle, indent=2, sort_keys=True)
-    handle.write("\n")
-PY
-  cp -f "${MISSION_AIRGAP_DIR}/selected-apps.json" "${BUNDLE_ROOT}/platform/selected-apps.json"
-fi
-
 cp -f "${BUNDLE_ROOT}/platform/catalog.json" "${MISSION_AIRGAP_DIR}/catalog.json"
+cp -f "${BUNDLE_ROOT}/platform/selected-apps.json" "${MISSION_AIRGAP_DIR}/selected-apps.json"
 cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
 tar -C "${BUNDLE_ROOT}" -czf "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" k3s platform manifest.env
 printf '%s  %s\n' "$(sha256sum "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" | awk '{print $1}')" "airgap-platform.tar.gz" \

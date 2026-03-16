@@ -22,6 +22,37 @@ chmod +x "${ARTIFACTS_AIRGAP}/k3s/k3s"
 : > "${ARTIFACTS_AIRGAP}/platform/images/app.tar"
 printf '{}\n' > "${ARTIFACTS_AIRGAP}/platform/images.lock.json"
 printf 'PROFILE=demo-apps\n' > "${ARTIFACTS_AIRGAP}/platform/profile.env"
+cat > "${ARTIFACTS_AIRGAP}/platform/catalog.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ]
+    }
+  ]
+}
+EOF
+cat > "${ARTIFACTS_AIRGAP}/platform/selected-apps.json" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "catalog-defaults",
+  "selected_app_ids": [
+    "landing"
+  ]
+}
+EOF
 
 AIRGAP_DIGEST="sha256:5555555555555555555555555555555555555555555555555555555555555555"
 CONTRACT_DIGEST="sha256:6666666666666666666666666666666666666666666666666666666666666666"
@@ -94,6 +125,8 @@ grep -F "OURBOX_PLATFORM_CONTRACT_CREATED=2026-03-11T00:00:00Z" "${META_ENV}" >/
 tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_DIGEST}" >/dev/null
 tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${LOCK_SHA}" >/dev/null
 tar -xOzf "${TARBALL}" ./payload.meta.env | grep -F "OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1" >/dev/null
+tar -xOzf "${TARBALL}" ./airgap/platform/catalog.json | grep -F '"catalog_id": "demo-apps"' >/dev/null
+tar -xOzf "${TARBALL}" ./airgap/platform/selected-apps.json | grep -F '"selection_mode": "catalog-defaults"' >/dev/null
 if tar -xOzf "${TARBALL}" ./rootfs/etc/ourbox/release | grep -q '^OURBOX_AIRGAP_PLATFORM_'; then
   echo "payload rootfs release file must not preseed OURBOX_AIRGAP_PLATFORM_* keys" >&2
   exit 1
