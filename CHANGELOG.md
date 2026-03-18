@@ -1,3 +1,10 @@
+## [0.13.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.1...v0.13.2) (2026-03-18)
+
+
+### Bug Fixes
+
+* recreate installed-target user after OS payload rootfs overlay ([03b9f21](https://github.com/techofourown/img-ourbox-woodbox/commit/03b9f21c09ef124af6545f989c66f652a2f91c7a)), closes [#66](https://github.com/techofourown/img-ourbox-woodbox/issues/66)
+
 ## [0.13.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.0...v0.13.1) (2026-03-18)
 
 
