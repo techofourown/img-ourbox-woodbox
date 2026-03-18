@@ -1439,6 +1439,7 @@ TARGET="\${1:-/target}"
 SSH_PASSWORD_ENABLED=$(shell_quote_sh "${OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED:-0}")
 SSH_KEY_PRESENT=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_PRESENT:-0}")
 SSH_USERNAME=$(shell_quote_sh "${OURBOX_USERNAME:-ourbox}")
+USER_PASSWORD_HASH=$(shell_quote_sh "${OURBOX_PASSWORD_HASH:-}")
 SSH_KEY_NAME=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_KEY_NAME}")
 SSH_KEY_FINGERPRINT=$(shell_quote_sh "${MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT}")
 AUTHORIZED_KEY_SRC=$(shell_quote_sh "${staged_installed_target_authorized_key}")
@@ -1460,6 +1461,16 @@ fi
   --target "\${TARGET}" \
   --repo-dir "\${SSH_REPO_DIR}" \
   --package-manifest "\${SSH_PACKAGE_MANIFEST}"
+
+# The OS payload overlay (late command [1/12]) replaces /target/etc/passwd and
+# /target/etc/shadow with the pre-built payload rootfs versions, removing the
+# autoinstall-created user. Recreate the user so login and SSH both work.
+if ! awk -F: -v u="\${SSH_USERNAME}" '\$1 == u {found=1} END{exit !found}' "\${TARGET}/etc/passwd"; then
+  echo "Installed target user \${SSH_USERNAME} absent after OS payload overlay; recreating"
+  curtin in-target --target="\${TARGET}" -- useradd -m -s /bin/bash -G sudo "\${SSH_USERNAME}"
+  printf '%s:%s\n' "\${SSH_USERNAME}" "\${USER_PASSWORD_HASH}" | curtin in-target --target="\${TARGET}" -- chpasswd -e
+  echo "Installed target user \${SSH_USERNAME} recreated"
+fi
 
 password_authentication="no"
 if [ "\${SSH_PASSWORD_ENABLED}" = "1" ]; then
