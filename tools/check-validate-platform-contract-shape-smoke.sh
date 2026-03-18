@@ -9,8 +9,10 @@ CONTRACT_DIR="${TMP}/platform-contract"
 TOOLS_DIR="${CONTRACT_DIR}/tools"
 PROFILE_DIR="${CONTRACT_DIR}/profiles/demo-apps"
 MANIFEST_DIR="${CONTRACT_DIR}/manifests"
+RENDERED_DIR="${CONTRACT_DIR}/rendered/defaults/demo-apps"
 
-mkdir -p "${TOOLS_DIR}" "${PROFILE_DIR}" "${MANIFEST_DIR}"
+mkdir -p "${TOOLS_DIR}" "${PROFILE_DIR}" "${MANIFEST_DIR}" "${RENDERED_DIR}"
+touch "${RENDERED_DIR}/selected-app-surface.json"
 
 cat > "${TOOLS_DIR}/check-target-prereqs.sh" <<'EOF_CHECK_TARGET_PREREQS'
 #!/usr/bin/env bash
