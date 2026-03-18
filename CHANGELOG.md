@@ -1,3 +1,10 @@
+## [0.13.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.0...v0.13.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* advance to platform-contract v0.21.1, guard runtime surface shape ([d714f9e](https://github.com/techofourown/img-ourbox-woodbox/commit/d714f9ef07b643703e20529b7ab69844d3f1e532))
+
 # [0.13.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.12.4...v0.13.0) (2026-03-16)
 
 
