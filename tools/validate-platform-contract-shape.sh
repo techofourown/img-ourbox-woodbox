@@ -25,6 +25,7 @@ required_paths=(
   "tools/verify-runtime.sh"
   "profiles/demo-apps/profile.env"
   "profiles/demo-apps/images.lock.json"
+  "rendered/defaults/demo-apps/selected-app-surface.json"
 )
 
 root_application_metadata_paths=(
