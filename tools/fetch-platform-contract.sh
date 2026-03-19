@@ -4,22 +4,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Resolve platform contract ref.
-# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
+# Supported sources: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env
 if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]]; then
   REF="${OURBOX_PLATFORM_CONTRACT_REF}"
 else
   INPUTS_ENV="${ROOT}/release/official-inputs.env"
-  if [[ -f "${INPUTS_ENV}" ]]; then
-    # shellcheck disable=SC1090
-    source "${INPUTS_ENV}"
-    [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || { echo "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}" >&2; exit 1; }
-    REF="${PLATFORM_CONTRACT_REF}"
-  else
-    # Legacy fallback: contracts/platform-contract.ref (deprecated — use release/official-inputs.env)
-    REF_FILE="${ROOT}/contracts/platform-contract.ref"
-    [[ -f "${REF_FILE}" ]] || { echo "Missing ${INPUTS_ENV} and no legacy ${REF_FILE} found" >&2; exit 1; }
-    REF="$(cat "${REF_FILE}")"
-  fi
+  [[ -f "${INPUTS_ENV}" ]] || {
+    echo "Missing ${INPUTS_ENV} and OURBOX_PLATFORM_CONTRACT_REF is not set." >&2
+    echo "Legacy contracts/platform-contract.ref fallback has been removed." >&2
+    exit 1
+  }
+  # shellcheck disable=SC1090
+  source "${INPUTS_ENV}"
+  [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || {
+    echo "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}" >&2
+    exit 1
+  }
+  REF="${PLATFORM_CONTRACT_REF}"
 fi
 
 command -v oras >/dev/null 2>&1 || {

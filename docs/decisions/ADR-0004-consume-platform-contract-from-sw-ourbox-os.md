@@ -93,9 +93,10 @@ the upstream OCI artifact, not authored in this repo. This makes the dependency 
 - Adds additional release metadata fields to maintain.
 
 ### Mitigation
-- `contracts/platform-contract.ref` and `contracts/airgap-platform.ref` provide the canonical
-  channel ref as a fallback for development builds.
 - `release/official-inputs.env` carries the digest-pinned refs for official builds.
+- Local/development builds can provide explicit `OURBOX_PLATFORM_CONTRACT_REF` and
+  `OURBOX_AIRGAP_PLATFORM_REF` overrides.
+- No implicit legacy fallback refs are allowed.
 - See `docs/reference/platform-contract.md` for the consumption workflow.
 
 ## References

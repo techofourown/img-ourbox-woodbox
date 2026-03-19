@@ -297,15 +297,15 @@ jobs:
       - name: Verify runtime app surface consumers
         run: bash tools/check-runtime-app-surface-smoke.sh
 
-  legacy-upstream-fallback-refs:
-    name: Legacy upstream fallback refs smoke
+  no-upstream-fallbacks:
+    name: Upstream input fail-closed smoke
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify legacy upstream fallback refs
-        run: bash tools/check-legacy-upstream-fallback-refs-smoke.sh
+      - name: Verify upstream input fetchers fail without explicit inputs
+        run: bash tools/check-no-upstream-fallbacks-smoke.sh
 
   commitlint:
     name: Commit message lint

@@ -8,7 +8,7 @@ It includes:
 - a pre-rendered default bundle under `rendered/defaults/`
 
 They are NOT hand-authored in this repo. The authoritative source is
-`sw-ourbox-os` (consumed via `contracts/platform-contract.ref` or
+`sw-ourbox-os` (consumed via explicit upstream refs or
 `release/official-inputs.env`).
 
 Running `tools/fetch-airgap-platform.sh` will automatically fetch the

@@ -52,8 +52,6 @@ does not reappear.
 | `tools/preflight-build-host.sh` | Verify build host tools before CI build |
 | `tools/check-workflow-safety.sh` | Enforce workflow trust boundary rules |
 | `tools/check-public-sanitization.sh` | Enforce public repo safety (no internal infra details) |
-| `contracts/platform-contract.ref` | Default (channel) ref for platform-contract |
-| `contracts/airgap-platform.ref` | Default (channel) ref for airgap-platform (amd64) |
 | `release/official-artifacts.env` | Official GHCR namespaces and channel tags |
 | `release/official-inputs.env` | Digest-pinned upstream refs for official builds |
 | `release/REVALIDATION_TRIGGER` | Touch file for triggering official republish |
@@ -162,7 +160,8 @@ The ORAS binary from the build host is bundled into the installer ISO at
 6. **Data contract still works**: `LABEL=OURBOX_DATA` at `/var/lib/ourbox` with `nofail` fstab.
 7. **Installed-system provenance complete**: all required fields in `/etc/ourbox/release`.
 8. **Upstream platform consumption real**: `fetch-airgap-platform.sh` uses ORAS with
-   digest-pinned refs from `release/official-inputs.env`; platform manifests are gitkeep placeholders.
+   explicit upstream refs or digest-pinned refs from `release/official-inputs.env`; platform
+   manifests are gitkeep placeholders.
 9. **CI/release discipline real**: workflow safety checks, sanitization checks, official
    publication only from push-to-main/tag-push, no `workflow_dispatch` in official workflows.
 10. **No dead duplicate trees**: `installer/rootfs/` and `installer/scripts/` removed.

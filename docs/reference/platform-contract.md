@@ -11,10 +11,9 @@ this repo.
 - `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact)
 - `sw-ourbox-os` artifact docs: https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
 - Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
-- Pinned refs in this repo:
-  - `contracts/platform-contract.ref` (arch-agnostic contract, fallback for dev builds)
-  - `contracts/airgap-platform.ref` (amd64-specific bundle with k3s + images, fallback for dev)
+- Supported input sources in this repo:
   - `release/official-inputs.env` (generated digest-pinned lockfile for official builds)
+  - explicit `OURBOX_PLATFORM_CONTRACT_REF` / `OURBOX_AIRGAP_PLATFORM_REF` overrides for local work
 
 ---
 
@@ -61,6 +60,9 @@ These are read from the synced `contract.env` and `contract.digest` files in the
 2. Let the upstream sync workflow open the Woodbox lockfile PR updating `release/official-inputs.env`.
 3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
 4. Rebuild OS payload; update release notes/changelog with new digests.
+
+If `release/official-inputs.env` is absent, the fetch scripts fail closed unless you provide
+explicit `OURBOX_PLATFORM_CONTRACT_REF` / `OURBOX_AIRGAP_PLATFORM_REF` values.
 
 ---
 
