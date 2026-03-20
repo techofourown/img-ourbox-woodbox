@@ -40,8 +40,12 @@ Canonical upstream docs:
 
 ### 2) OCI by digest
 
-This repo consumes the platform contract via ORAS pull, using digest-pinned refs defined in
-`release/official-inputs.env`. The following upstream artifacts are consumed:
+This repo consumes the platform contract via ORAS pull, using exact immutable
+refs resolved from the approved upstream snapshot in
+`sw-ourbox-os/release/approved-upstream-inputs.json`. The current candidate
+workflow may still materialize those resolved refs in transitional
+`release/official-inputs.env`, but that file is not the normative approval
+surface. The following upstream artifacts are consumed:
 
 1. **platform-contract** (arch-agnostic): manifests, landing, todo-bloom assets, contract metadata
 2. **airgap-platform** (amd64-specific): `k3s` binary, `k3s-airgap-images-amd64.tar`, platform
@@ -93,9 +97,12 @@ the upstream OCI artifact, not authored in this repo. This makes the dependency 
 - Adds additional release metadata fields to maintain.
 
 ### Mitigation
-- `contracts/platform-contract.ref` and `contracts/airgap-platform.ref` provide the canonical
-  channel ref as a fallback for development builds.
-- `release/official-inputs.env` carries the digest-pinned refs for official builds.
+- `sw-ourbox-os/release/approved-upstream-inputs.json` carries the authoritative
+  upstream approval intent.
+- `contracts/platform-contract.ref` and `contracts/airgap-platform.ref` may
+  still provide local fallback refs for development builds.
+- `release/official-inputs.env` is transitional generated compatibility output
+  for the current workflow, not the normative control plane.
 - See `docs/reference/platform-contract.md` for the consumption workflow.
 
 ## References

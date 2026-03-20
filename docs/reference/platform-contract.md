@@ -11,10 +11,15 @@ this repo.
 - `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact)
 - `sw-ourbox-os` artifact docs: https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
 - Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
-- Pinned refs in this repo:
+  (authoritative source-controlled intent surface)
+- Supported input sources in this repo:
   - `contracts/platform-contract.ref` (arch-agnostic contract, fallback for dev builds)
   - `contracts/airgap-platform.ref` (amd64-specific bundle with k3s + images, fallback for dev)
-  - `release/official-inputs.env` (generated digest-pinned lockfile for official builds)
+  - `release/official-inputs.env` (transitional generated compatibility surface
+    for the current official build path)
+
+This repo does not independently approve or redefine TOOO-produced upstream
+digests in source control.
 
 ---
 
@@ -55,12 +60,18 @@ These are read from the synced `contract.env` and `contract.digest` files in the
 
 ---
 
-## Updating pins
+## Updating approved inputs
 
 1. Approve the new upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`.
-2. Let the upstream sync workflow open the Woodbox lockfile PR updating `release/official-inputs.env`.
+2. If the current workflow still uses it, let the upstream sync workflow refresh
+   transitional `release/official-inputs.env`.
 3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
 4. Rebuild OS payload; update release notes/changelog with new digests.
+
+If `release/official-inputs.env` is absent today, the fetch scripts fail closed
+unless you provide explicit `OURBOX_PLATFORM_CONTRACT_REF` /
+`OURBOX_AIRGAP_PLATFORM_REF` values. That is current implementation behavior,
+not the intended long-term approval model.
 
 ---
 

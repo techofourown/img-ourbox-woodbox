@@ -22,7 +22,7 @@ Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
 | Channel tag(s) | Artifact | Trigger |
 |---|---|---|
-| `x86-beta` / `x86-installer-beta` | OS payload / Installer | Push to `main` using pinned `release/official-inputs.env` (heavy build) |
+| `x86-beta` / `x86-installer-beta` | OS payload / Installer | Push to `main` using approved upstream input intent resolved at workflow start (currently materialized by transitional `release/official-inputs.env`) (heavy build) |
 | `x86-stable` / `x86-installer-stable` | OS payload / Installer | Promotion after both candidate completion and matching GitHub Release `published` authorization are true; whichever arrives second wakes the retag (no rebuild) |
 | `x86-nightly` / `x86-installer-nightly` | OS payload / Installer | Scheduled integration build using floating upstream `edge` refs (heavy build) |
 | `x86-exp-labs` / `x86-installer-exp-labs` | OS payload / Installer | Promotion after both candidate completion and matching GitHub Release `prereleased` authorization are true; whichever arrives second wakes the retag (no rebuild) |
@@ -180,24 +180,28 @@ Every installed Woodbox system records provenance in `/etc/ourbox/release`. Full
 
 ---
 
-## Upstream input pinning
+## Upstream input resolution
 
-The official candidate build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
-`release/official-inputs.env`):
+The official candidate build still consumes exact OCI artifact identities from
+`sw-ourbox-os`, but the authoritative approval surface is the upstream approved
+snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`, not a
+repo-local checked-in copy of those digests.
+
+Current transitional materialization:
 
 ```
 PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
 AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
 ```
 
-These MUST be digest-pinned refs (never floating tags) in official candidate builds.
+`release/official-inputs.env` currently materializes that approved snapshot for
+compatibility with the existing candidate workflow. It is a transitional
+generated surface, MUST NOT be hand-edited as policy, and MUST NOT be treated
+as the normative official model for TOOO-to-TOOO upstream approval.
 
-The scheduled nightly integration build intentionally overrides those pins at workflow time by
-resolving the latest upstream `edge` digests before building.
-
-`release/official-inputs.env` is now a generated downstream lockfile. The approval point lives in
-`sw-ourbox-os/release/approved-upstream-inputs.json`, and the Woodbox lockfile is refreshed from
-that approved snapshot rather than hand-edited here.
+The scheduled nightly integration build intentionally overrides the approved
+snapshot at workflow time by resolving the latest upstream `edge` digests
+before building.
 
 ---
 
@@ -205,9 +209,11 @@ that approved snapshot rather than hand-edited here.
 
 **No cryptographic signatures or attestations are currently used.**
 
-Provenance is established via OCI annotations, digest-pinned upstream refs, and the
-`os.meta.env`/`installer.meta.env` files accompanying each artifact. Consumers should use
-artifacts by digest to ensure they receive exactly what was published.
+Provenance is established via OCI annotations, generated candidate / publish
+records, the exact upstream refs used by the workflow, and the
+`os.meta.env`/`installer.meta.env` files accompanying each artifact. Consumers
+should use artifacts by digest to ensure they receive exactly what was
+published.
 
 ---
 
@@ -227,4 +233,4 @@ TOOO-controlled publication are not official TOOO artifacts.
 - [ADR-0004: Consume Platform Contract from sw-ourbox-os](./decisions/ADR-0004-consume-platform-contract-from-sw-ourbox-os.md)
 - [OPS.md — Operator Runbook](./OPS.md)
 - `release/official-artifacts.env` — official publication targets
-- `release/official-inputs.env` — generated digest-pinned upstream lockfile
+- `release/official-inputs.env` — transitional generated materialization of the approved upstream snapshot
