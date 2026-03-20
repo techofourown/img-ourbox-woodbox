@@ -116,9 +116,11 @@ Terminology note:
   and runtime surfaces
 - the user-facing meaning is now “application catalogs” plus a selected app set
 
-Candidate builds consume the pinned refs in `release/official-inputs.env`.
-Scheduled nightly integration builds resolve the latest `sw-ourbox-os`
-nightly/platform inputs at workflow time.
+Candidate builds resolve exact upstream refs from the approved
+`sw-ourbox-os/release/approved-upstream-inputs.json` snapshot pinned in
+`tools/approved-upstream-inputs.upstream.env`.
+Scheduled nightly integration builds intentionally bypass that approved snapshot
+and resolve the latest upstream nightly/platform inputs at workflow time.
 
 The offline-install contract now lives in the Woodbox substrate itself:
 

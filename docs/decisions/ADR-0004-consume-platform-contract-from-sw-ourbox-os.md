@@ -40,8 +40,10 @@ Canonical upstream docs:
 
 ### 2) OCI by digest
 
-This repo consumes the platform contract via ORAS pull, using digest-pinned refs defined in
-`release/official-inputs.env`. The following upstream artifacts are consumed:
+This repo consumes the platform contract via ORAS pull. Official candidate builds resolve exact
+digest-pinned refs at workflow start from the approved upstream snapshot in
+`sw-ourbox-os/release/approved-upstream-inputs.json`, pinned here by
+`tools/approved-upstream-inputs.upstream.env`. The following upstream artifacts are consumed:
 
 1. **platform-contract** (arch-agnostic): manifests, landing, todo-bloom assets, contract metadata
 2. **airgap-platform** (amd64-specific): `k3s` binary, `k3s-airgap-images-amd64.tar`, platform
@@ -93,9 +95,10 @@ the upstream OCI artifact, not authored in this repo. This makes the dependency 
 - Adds additional release metadata fields to maintain.
 
 ### Mitigation
-- `contracts/platform-contract.ref` and `contracts/airgap-platform.ref` provide the canonical
-  channel ref as a fallback for development builds.
-- `release/official-inputs.env` carries the digest-pinned refs for official builds.
+- Local/manual development builds may pass explicit `OURBOX_PLATFORM_CONTRACT_REF` and
+  `OURBOX_AIRGAP_PLATFORM_REF` overrides when they need a non-default upstream input.
+- Official builds resolve approved upstream intent into digest-pinned refs at workflow start rather
+  than approving mirrored TOOO digests in this repo's source control.
 - See `docs/reference/platform-contract.md` for the consumption workflow.
 
 ## References

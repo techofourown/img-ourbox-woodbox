@@ -84,6 +84,16 @@ jobs:
       - name: Run release-control smoke test
         run: bash tools/check-release-control-smoke.sh
 
+  upstream-input-env:
+    name: Upstream input env contract smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify fetch scripts require explicit upstream refs
+        run: bash tools/check-upstream-input-env-smoke.sh
+
   os-publish-smoke:
     name: OS publish smoke
     runs-on: ubuntu-latest
@@ -296,16 +306,6 @@ jobs:
 
       - name: Verify runtime app surface consumers
         run: bash tools/check-runtime-app-surface-smoke.sh
-
-  legacy-upstream-fallback-refs:
-    name: Legacy upstream fallback refs smoke
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify legacy upstream fallback refs
-        run: bash tools/check-legacy-upstream-fallback-refs-smoke.sh
 
   commitlint:
     name: Commit message lint

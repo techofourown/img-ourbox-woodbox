@@ -184,7 +184,7 @@ if [[ "${ACTUAL_SHA256}" != "${EXPECTED_SHA256}" ]]; then
   Expected: ${EXPECTED_SHA256}
   Actual:   ${ACTUAL_SHA256}
   ISO:      ${BASE_ISO}
-  Update UBUNTU_ISO_SHA256 in tools/versions.env or release/official-inputs.env if intentional."
+  Update UBUNTU_ISO_SHA256 in tools/versions.env if intentional."
 fi
 log "SHA256 verified: ${ACTUAL_SHA256}"
 
