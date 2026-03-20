@@ -1,3 +1,15 @@
+# [0.14.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.2...v0.14.0) (2026-03-20)
+
+
+### Bug Fixes
+
+* address snapshot workflow lint regressions ([6d527b7](https://github.com/techofourown/img-ourbox-woodbox/commit/6d527b716f618c909fe5f77b4a5d20f87ba8d920))
+
+
+### Features
+
+* consume approved upstream input snapshots ([608e52a](https://github.com/techofourown/img-ourbox-woodbox/commit/608e52ac75acb2c6fb0f2ea116e5c9e67e26221b))
+
 ## [0.13.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.1...v0.13.2) (2026-03-18)
 
 
