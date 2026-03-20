@@ -6,7 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/tools/lib.sh"
 
 need_cmd tar
-need_cmd oras
 need_cmd find
 need_cmd grep
 need_cmd python3
@@ -209,6 +208,8 @@ PY
 Resolve the upstream airgap-platform channel at workflow/build start and pass
 the resulting digest-pinned ref in the environment."
 REF="${OURBOX_AIRGAP_PLATFORM_REF}"
+
+need_cmd oras
 
 OUT="${ROOT}/artifacts/airgap"
 PULL_DIR="${ROOT}/artifacts/.airgap-platform-pull"
