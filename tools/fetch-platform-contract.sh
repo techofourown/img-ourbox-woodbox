@@ -4,23 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Resolve platform contract ref.
-# Priority: OURBOX_PLATFORM_CONTRACT_REF env var > release/official-inputs.env > contracts/ (legacy fallback)
-if [[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]]; then
-  REF="${OURBOX_PLATFORM_CONTRACT_REF}"
-else
-  INPUTS_ENV="${ROOT}/release/official-inputs.env"
-  if [[ -f "${INPUTS_ENV}" ]]; then
-    # shellcheck disable=SC1090
-    source "${INPUTS_ENV}"
-    [[ -n "${PLATFORM_CONTRACT_REF:-}" ]] || { echo "PLATFORM_CONTRACT_REF not set in ${INPUTS_ENV}" >&2; exit 1; }
-    REF="${PLATFORM_CONTRACT_REF}"
-  else
-    # Legacy fallback: contracts/platform-contract.ref (deprecated — use release/official-inputs.env)
-    REF_FILE="${ROOT}/contracts/platform-contract.ref"
-    [[ -f "${REF_FILE}" ]] || { echo "Missing ${INPUTS_ENV} and no legacy ${REF_FILE} found" >&2; exit 1; }
-    REF="$(cat "${REF_FILE}")"
-  fi
-fi
+# Callers must resolve channel intent at workflow/build start and pass the
+# selected immutable ref explicitly.
+[[ -n "${OURBOX_PLATFORM_CONTRACT_REF:-}" ]] || {
+  echo "OURBOX_PLATFORM_CONTRACT_REF is required." >&2
+  echo "Resolve the upstream platform-contract channel at workflow/build start and pass" >&2
+  echo "the resulting digest-pinned ref in the environment." >&2
+  exit 1
+}
+REF="${OURBOX_PLATFORM_CONTRACT_REF}"
 
 command -v oras >/dev/null 2>&1 || {
   echo "oras is required. Run ./tools/bootstrap-host.sh or install ORAS v${ORAS_VERSION:-1.3.0}." >&2
@@ -42,11 +34,12 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
   if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
     echo "PLATFORM_CONTRACT_REF '${REF}' is not digest-pinned." >&2
     echo "Official candidate/release builds require @sha256: refs to ensure reproducibility." >&2
-    echo "Update the approved upstream snapshot in sw-ourbox-os instead of editing release/official-inputs.env by hand." >&2
+    echo "Resolve the upstream channel before calling fetch-platform-contract.sh and pass" >&2
+    echo "the pinned ref via OURBOX_PLATFORM_CONTRACT_REF." >&2
     exit 1
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
     echo "WARNING: PLATFORM_CONTRACT_REF is not digest-pinned — nightly build will not be reproducible" >&2
-    echo "  Update the approved upstream snapshot in sw-ourbox-os once the next release is approved" >&2
+    echo "  Resolve the upstream channel before calling fetch-platform-contract.sh" >&2
   fi
 fi
 

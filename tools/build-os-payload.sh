@@ -19,9 +19,6 @@ source "${ROOT}/tools/lib.sh"
 [ -f "${ROOT}/tools/config.env" ] && source "${ROOT}/tools/config.env"
 # shellcheck disable=SC1091
 [ -f "${ROOT}/tools/versions.env" ] && source "${ROOT}/tools/versions.env"
-# shellcheck disable=SC1091
-# Official pinned inputs take precedence over versions.env defaults.
-[ -f "${ROOT}/release/official-inputs.env" ] && source "${ROOT}/release/official-inputs.env"
 
 need_cmd tar
 need_cmd rsync
