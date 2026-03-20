@@ -1,3 +1,10 @@
+## [0.14.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.0...v0.14.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* fail closed in mirrored pin lint ([169bfd4](https://github.com/techofourown/img-ourbox-woodbox/commit/169bfd4dc157d35b1f5a8548524bc1654e474359))
+
 # [0.14.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.13.2...v0.14.0) (2026-03-20)
 
 
