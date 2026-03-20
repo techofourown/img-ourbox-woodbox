@@ -22,7 +22,7 @@ Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
 
 | Channel tag(s) | Artifact | Trigger |
 |---|---|---|
-| `x86-beta` / `x86-installer-beta` | OS payload / Installer | Push to `main` using pinned `release/official-inputs.env` (heavy build) |
+| `x86-beta` / `x86-installer-beta` | OS payload / Installer | Push to `main` using the approved upstream snapshot pinned in `tools/approved-upstream-inputs.upstream.env`; workflow resolves exact upstream refs at start (heavy build) |
 | `x86-stable` / `x86-installer-stable` | OS payload / Installer | Promotion after both candidate completion and matching GitHub Release `published` authorization are true; whichever arrives second wakes the retag (no rebuild) |
 | `x86-nightly` / `x86-installer-nightly` | OS payload / Installer | Scheduled integration build using floating upstream `edge` refs (heavy build) |
 | `x86-exp-labs` / `x86-installer-exp-labs` | OS payload / Installer | Promotion after both candidate completion and matching GitHub Release `prereleased` authorization are true; whichever arrives second wakes the retag (no rebuild) |
@@ -180,24 +180,26 @@ Every installed Woodbox system records provenance in `/etc/ourbox/release`. Full
 
 ---
 
-## Upstream input pinning
+## Upstream input resolution
 
-The official candidate build consumes pinned OCI artifacts from `sw-ourbox-os` (defined in
-`release/official-inputs.env`):
+Official candidate builds consume approved upstream input intent from:
+
+- `sw-ourbox-os/release/approved-upstream-inputs.json`
+- the repo-local pointer to that snapshot in `tools/approved-upstream-inputs.upstream.env`
+
+At workflow start, the heavy candidate lane resolves that approved input intent into exact
+digest-pinned refs for:
 
 ```
-PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
-AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
+OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
+OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
 ```
 
-These MUST be digest-pinned refs (never floating tags) in official candidate builds.
+Those resolved refs MUST be digest-pinned (never floating tags) in official candidate builds.
+This repository does not independently approve mirrored TOOO digests in source control.
 
-The scheduled nightly integration build intentionally overrides those pins at workflow time by
-resolving the latest upstream `edge` digests before building.
-
-`release/official-inputs.env` is now a generated downstream lockfile. The approval point lives in
-`sw-ourbox-os/release/approved-upstream-inputs.json`, and the Woodbox lockfile is refreshed from
-that approved snapshot rather than hand-edited here.
+The scheduled nightly integration build intentionally bypasses the approved snapshot and resolves
+the latest upstream nightly/platform inputs at workflow time before building.
 
 ---
 
@@ -227,4 +229,4 @@ TOOO-controlled publication are not official TOOO artifacts.
 - [ADR-0004: Consume Platform Contract from sw-ourbox-os](./decisions/ADR-0004-consume-platform-contract-from-sw-ourbox-os.md)
 - [OPS.md — Operator Runbook](./OPS.md)
 - `release/official-artifacts.env` — official publication targets
-- `release/official-inputs.env` — generated digest-pinned upstream lockfile
+- `tools/approved-upstream-inputs.upstream.env` — repo-local pointer to the approved upstream snapshot

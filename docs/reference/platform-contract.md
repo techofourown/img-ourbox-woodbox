@@ -11,10 +11,11 @@ this repo.
 - `sw-ourbox-os` ADR-0009 (platform contract as OCI artifact)
 - `sw-ourbox-os` artifact docs: https://github.com/techofourown/sw-ourbox-os/blob/main/docs/architecture/artifact-distribution-and-integration.md
 - Approved upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`
-- Pinned refs in this repo:
-  - `contracts/platform-contract.ref` (arch-agnostic contract, fallback for dev builds)
-  - `contracts/airgap-platform.ref` (amd64-specific bundle with k3s + images, fallback for dev)
-  - `release/official-inputs.env` (generated digest-pinned lockfile for official builds)
+- Repo-local pointer to that snapshot in `tools/approved-upstream-inputs.upstream.env`
+- Official candidate/revalidation workflows resolve exact upstream refs from that approved snapshot
+  at workflow start
+- Local/manual builds must pass explicit `OURBOX_PLATFORM_CONTRACT_REF` and
+  `OURBOX_AIRGAP_PLATFORM_REF` overrides when they need non-default upstream inputs
 
 ---
 
@@ -55,12 +56,16 @@ These are read from the synced `contract.env` and `contract.digest` files in the
 
 ---
 
-## Updating pins
+## Updating approved inputs
 
 1. Approve the new upstream snapshot in `sw-ourbox-os/release/approved-upstream-inputs.json`.
-2. Let the upstream sync workflow open the Woodbox lockfile PR updating `release/official-inputs.env`.
-3. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
-4. Rebuild OS payload; update release notes/changelog with new digests.
+2. Update `tools/approved-upstream-inputs.upstream.env` to the upstream revision/path carrying that
+   approved snapshot.
+3. Official workflows resolve exact upstream refs from that snapshot at workflow start.
+4. For local/manual runs, export explicit `OURBOX_PLATFORM_CONTRACT_REF` and
+   `OURBOX_AIRGAP_PLATFORM_REF` overrides before fetch/build if you want the same curated inputs.
+5. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
+6. Rebuild OS payload; update release notes/changelog with new digests.
 
 ---
 

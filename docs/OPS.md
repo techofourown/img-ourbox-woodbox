@@ -231,4 +231,4 @@ To run a non-publishing revalidation build:
 - `docs/reference/installer.md` — installer defaults, artifact contract, UX flow
 - `docs/reference/platform-contract.md` — upstream platform contract consumption
 - `release/official-artifacts.env` — official GHCR namespaces and channel tags
-- `release/official-inputs.env` — generated digest-pinned upstream lockfile for official builds
+- `tools/approved-upstream-inputs.upstream.env` — repo-local pointer to the approved upstream snapshot

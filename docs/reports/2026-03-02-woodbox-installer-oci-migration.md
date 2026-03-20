@@ -1,5 +1,10 @@
 # Woodbox Installer OCI Migration — 2026-03-02
 
+Historical note: this report captures the pre-approved-snapshot model as of
+March 2, 2026. Current official upstream input intent now lives in
+`sw-ourbox-os/release/approved-upstream-inputs.json`, with Woodbox resolving
+exact refs at workflow/build start.
+
 ## Summary
 
 This report documents the implementation of the Matchbox hardening / artifact / provenance /
