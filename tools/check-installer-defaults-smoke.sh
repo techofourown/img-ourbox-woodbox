@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/tools/lib.sh"
+
+report_err() {
+  local rc=$?
+  log "ERROR: command failed at line ${1}: ${2} (exit ${rc})"
+  exit "${rc}"
+}
+trap 'report_err "${LINENO}" "${BASH_COMMAND}"' ERR
 
 need_cmd xorriso
 
@@ -32,7 +39,8 @@ xorriso -osirrox on -indev "${ISO_FILE}" \
   || die "failed to extract /ourbox/installer/defaults.env from ${ISO_FILE}"
 
 # shellcheck disable=SC1090
-source "${EXTRACTED_DEFAULTS}"
+source "${EXTRACTED_DEFAULTS}" \
+  || die "failed to source extracted installer defaults from ${EXTRACTED_DEFAULTS}"
 
 [[ "${INSTALLER_ID:-}" == "woodbox" ]] || die \
   "installer defaults INSTALLER_ID mismatch: expected 'woodbox', found '${INSTALLER_ID:-}'"
@@ -72,7 +80,8 @@ for legacy_key in \
   fi
 done
 
-cp "${EXTRACTED_DEFAULTS}" "${DEPLOY_DIR}/installer-defaults.extracted.env"
+cp "${EXTRACTED_DEFAULTS}" "${DEPLOY_DIR}/installer-defaults.extracted.env" \
+  || die "failed to persist extracted installer defaults into deploy/"
 cat > "${DEPLOY_DIR}/installer-defaults-smoke.txt" <<EOF
 ARTIFACT=$(basename "${ISO_FILE}")
 EXTRACTED_DEFAULTS=${DEPLOY_DIR}/installer-defaults.extracted.env
