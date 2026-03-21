@@ -1,3 +1,11 @@
+## [0.14.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.1...v0.14.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* bump woodbox approved snapshot pointer ([fac4377](https://github.com/techofourown/img-ourbox-woodbox/commit/fac4377a34c65ebc1dcadb960b1536ae96785b15))
+* harden woodbox snapshot smoke diagnostics ([71610be](https://github.com/techofourown/img-ourbox-woodbox/commit/71610be217e981e959126850d6f1a1118e5b14dc))
+
 ## [0.14.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.0...v0.14.1) (2026-03-20)
 
 
