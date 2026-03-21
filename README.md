@@ -80,7 +80,9 @@ Published artifacts from this repo:
 | OS payload (`.tar.gz`) | `application/vnd.techofourown.ourbox.woodbox.os-payload.v1` | `ghcr.io/techofourown/ourbox-woodbox-os` |
 | Installer substrate ISO (`.iso`) | `application/vnd.techofourown.ourbox.woodbox.installer.v1` | `ghcr.io/techofourown/ourbox-woodbox-installer` |
 
-Official channel tags: `x86-stable`, `x86-nightly`, `x86-installer-stable`, `x86-installer-nightly`
+Official channel tags: `x86-beta`, `x86-stable`, `x86-nightly`, `x86-exp-labs`,
+`x86-installer-beta`, `x86-installer-stable`, `x86-installer-nightly`,
+`x86-installer-exp-labs`
 
 Important distinction:
 
