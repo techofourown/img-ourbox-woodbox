@@ -1,3 +1,10 @@
+## [0.14.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.5...v0.14.6) (2026-03-23)
+
+
+### Bug Fixes
+
+* drop catalog coupling from woodbox substrate ([56d8c9b](https://github.com/techofourown/img-ourbox-woodbox/commit/56d8c9b40889bd95f8b00e76251ff9c2cc53ca03))
+
 ## [0.14.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.4...v0.14.5) (2026-03-23)
 
 
