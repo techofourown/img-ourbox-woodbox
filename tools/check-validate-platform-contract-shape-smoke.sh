@@ -67,13 +67,6 @@ cat > "${PROFILE_DIR}/profile.env" <<'EOF_PROFILE'
 OURBOX_PLATFORM_PROFILE=demo-apps
 EOF_PROFILE
 
-cat > "${PROFILE_DIR}/images.lock.json" <<'EOF_IMAGES_LOCK'
-{
-  "schema": 1,
-  "images": []
-}
-EOF_IMAGES_LOCK
-
 cat > "${CONTRACT_DIR}/catalog.json" <<'EOF_CATALOG'
 {
   "schema": 1,
