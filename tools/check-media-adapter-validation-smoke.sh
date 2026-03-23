@@ -34,7 +34,7 @@ OURBOX_RECIPE_GIT_HASH=abc123def456
 BUILD_TS=2026-03-12T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=abc123def456
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.1
+OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_PLATFORM_CONTRACT_CREATED=2026-03-12T00:00:00Z
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -272,6 +272,26 @@ bash "${ROOT}/tools/media-adapter/validate-media.sh" \
   --os-payload "${OS_PAYLOAD}" \
   --os-meta-env "${OS_META_ENV}"
 
+ORIG_META_ENV="${TMP}/os.meta.orig.env"
+cp "${OS_META_ENV}" "${ORIG_META_ENV}"
+
+# dev is emitted by edge-channel builds before semantic-release tags the commit,
+# and should remain acceptable to the validator.
+sed 's/^OURBOX_PLATFORM_CONTRACT_VERSION=.*/OURBOX_PLATFORM_CONTRACT_VERSION=dev/' \
+  "${ORIG_META_ENV}" > "${OS_META_ENV}"
+bash "${ROOT}/tools/media-adapter/validate-media.sh" \
+  --mission-dir "${MISSION_DIR}" \
+  --os-payload "${OS_PAYLOAD}" \
+  --os-meta-env "${OS_META_ENV}"
+
+# too-old payload contracts must still be rejected because the selected app
+# surface requires the newer runtime capability.
+sed 's/^OURBOX_PLATFORM_CONTRACT_VERSION=.*/OURBOX_PLATFORM_CONTRACT_VERSION=v0.19.9/' \
+  "${ORIG_META_ENV}" > "${OS_META_ENV}"
+expect_validation_failure "a too-old payload platform contract version"
+
+cp "${ORIG_META_ENV}" "${OS_META_ENV}"
+
 write_manifest 0
 expect_validation_failure "mission manifests missing selected_airgap and selected_applications"
 
@@ -338,7 +358,7 @@ OURBOX_RECIPE_GIT_HASH=abc123def456
 BUILD_TS=2026-03-12T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=abc123def456
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.1
+OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
