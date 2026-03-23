@@ -774,8 +774,6 @@ manifest_path = pathlib.Path(sys.argv[1])
 with manifest_path.open("r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
-if manifest.get("schema") != 1:
-    raise SystemExit("embedded mission manifest schema must be 1")
 if manifest.get("kind") != "ourbox-mission":
     raise SystemExit("embedded mission manifest kind must be 'ourbox-mission'")
 target = manifest.get("target", {})
@@ -784,11 +782,17 @@ if target.get("id") != "woodbox":
 operator_mode = manifest.get("operator_mode", {})
 if operator_mode.get("mode") != "install":
     raise SystemExit("embedded mission operator_mode.mode must be 'install'")
+requested = manifest.get("requested")
+if not isinstance(requested, dict) or not requested:
+    raise SystemExit("embedded mission manifest must include a requested object")
+resolved = manifest.get("resolved")
+if not isinstance(resolved, dict) or not resolved:
+    raise SystemExit("embedded mission manifest must include a resolved object")
 
-selected_os = manifest.get("selected_os", {})
-selected_airgap = manifest.get("selected_airgap", {})
-selected_applications = manifest.get("selected_applications")
-installed_target_ssh = manifest.get("installed_target_ssh")
+selected_os = resolved.get("os") or {}
+selected_airgap = resolved.get("airgap") or {}
+selected_applications = resolved.get("applications")
+installed_target_ssh = resolved.get("installed_target_ssh")
 supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
 
 app_present = False

@@ -118,7 +118,7 @@ import sys
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
-selected_apps = manifest.get("selected_applications", {})
+selected_apps = (manifest.get("resolved") or {}).get("applications", {})
 if selected_apps.get("catalog_id") != "demo-apps":
     raise SystemExit("unexpected selected_applications.catalog_id")
 if selected_apps.get("selection_mode") != "catalog-defaults":
