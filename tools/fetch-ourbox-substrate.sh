@@ -35,7 +35,7 @@ resolve_selected_bundle_identity() {
     pinned_ref="${REF}"
   else
     digest="$(grep -Eo 'sha256:[0-9a-f]{64}' "${META_DIR}/oras.pull.log" | tail -n1 || true)"
-    [[ -n "${digest}" ]] || die "unable to determine fetched airgap-platform digest from ${META_DIR}/oras.pull.log"
+    [[ -n "${digest}" ]] || die "unable to determine fetched ourbox-substrate digest from ${META_DIR}/oras.pull.log"
     pinned_ref="$(ref_repo_base "${REF}")@${digest}"
   fi
 
@@ -55,35 +55,35 @@ write_selected_bundle_metadata() {
   [[ -f "${strict_metadata_parser}" ]] || die "strict metadata parser not found: ${strict_metadata_parser}"
   manifest_dump="$(
     python3 "${strict_metadata_parser}" "${manifest}" \
-      --allow OURBOX_AIRGAP_PLATFORM_SCHEMA \
-      --allow OURBOX_AIRGAP_PLATFORM_KIND \
-      --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --allow OURBOX_AIRGAP_PLATFORM_REVISION \
-      --allow OURBOX_AIRGAP_PLATFORM_VERSION \
-      --allow OURBOX_AIRGAP_PLATFORM_CREATED \
+      --allow OURBOX_SUBSTRATE_SCHEMA \
+      --allow OURBOX_SUBSTRATE_KIND \
+      --allow OURBOX_SUBSTRATE_SOURCE \
+      --allow OURBOX_SUBSTRATE_REVISION \
+      --allow OURBOX_SUBSTRATE_VERSION \
+      --allow OURBOX_SUBSTRATE_CREATED \
       --allow OURBOX_PLATFORM_CONTRACT_REF \
       --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --allow AIRGAP_PLATFORM_ARCH \
+      --allow OURBOX_SUBSTRATE_ARCH \
       --allow K3S_VERSION \
       --allow OURBOX_PLATFORM_PROFILE \
       --allow OURBOX_PLATFORM_IMAGES_LOCK_PATH \
       --allow OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
-      --require OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --require OURBOX_AIRGAP_PLATFORM_REVISION \
-      --require OURBOX_AIRGAP_PLATFORM_VERSION \
-      --require OURBOX_AIRGAP_PLATFORM_CREATED \
+      --require OURBOX_SUBSTRATE_SOURCE \
+      --require OURBOX_SUBSTRATE_REVISION \
+      --require OURBOX_SUBSTRATE_VERSION \
+      --require OURBOX_SUBSTRATE_CREATED \
       --require OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --require AIRGAP_PLATFORM_ARCH \
+      --require OURBOX_SUBSTRATE_ARCH \
       --require K3S_VERSION \
       --require OURBOX_PLATFORM_PROFILE \
       --require OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
-      --print OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --print OURBOX_AIRGAP_PLATFORM_REVISION \
-      --print OURBOX_AIRGAP_PLATFORM_VERSION \
-      --print OURBOX_AIRGAP_PLATFORM_CREATED \
+      --print OURBOX_SUBSTRATE_SOURCE \
+      --print OURBOX_SUBSTRATE_REVISION \
+      --print OURBOX_SUBSTRATE_VERSION \
+      --print OURBOX_SUBSTRATE_CREATED \
       --print OURBOX_PLATFORM_CONTRACT_REF \
       --print OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --print AIRGAP_PLATFORM_ARCH \
+      --print OURBOX_SUBSTRATE_ARCH \
       --print K3S_VERSION \
       --print OURBOX_PLATFORM_PROFILE \
       --print OURBOX_PLATFORM_IMAGES_LOCK_SHA256
@@ -91,21 +91,21 @@ write_selected_bundle_metadata() {
   mapfile -t manifest_fields <<<"${manifest_dump}"
   [[ "${#manifest_fields[@]}" -eq 10 ]] || die "failed to parse ${manifest}"
 
-  [[ "${manifest_fields[6]}" == "amd64" ]] || die "airgap-platform arch mismatch: expected amd64, got ${manifest_fields[6]:-unknown}"
-  [[ "${manifest_fields[5]}" == "${expected_contract_digest}" ]] || die "airgap-platform contract digest mismatch: expected ${expected_contract_digest}, got ${manifest_fields[5]:-unknown}"
-  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "airgap-platform manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
+  [[ "${manifest_fields[6]}" == "amd64" ]] || die "ourbox-substrate arch mismatch: expected amd64, got ${manifest_fields[6]:-unknown}"
+  [[ "${manifest_fields[5]}" == "${expected_contract_digest}" ]] || die "ourbox-substrate contract digest mismatch: expected ${expected_contract_digest}, got ${manifest_fields[5]:-unknown}"
+  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "ourbox-substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
 
   cat > "${OUT}/selected-bundle.env" <<EOF
-OURBOX_AIRGAP_PLATFORM_REF=${selected_pinned_ref}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${selected_digest}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${manifest_fields[0]}
-OURBOX_AIRGAP_PLATFORM_REVISION=${manifest_fields[1]}
-OURBOX_AIRGAP_PLATFORM_VERSION=${manifest_fields[2]}
-OURBOX_AIRGAP_PLATFORM_CREATED=${manifest_fields[3]}
-OURBOX_AIRGAP_PLATFORM_ARCH=${manifest_fields[6]}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${manifest_fields[8]}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${manifest_fields[7]}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${manifest_fields[9]}
+OURBOX_SUBSTRATE_REF=${selected_pinned_ref}
+OURBOX_SUBSTRATE_DIGEST=${selected_digest}
+OURBOX_SUBSTRATE_SOURCE=${manifest_fields[0]}
+OURBOX_SUBSTRATE_REVISION=${manifest_fields[1]}
+OURBOX_SUBSTRATE_VERSION=${manifest_fields[2]}
+OURBOX_SUBSTRATE_CREATED=${manifest_fields[3]}
+OURBOX_SUBSTRATE_ARCH=${manifest_fields[6]}
+OURBOX_SUBSTRATE_PROFILE=${manifest_fields[8]}
+OURBOX_SUBSTRATE_K3S_VERSION=${manifest_fields[7]}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${manifest_fields[9]}
 OURBOX_PLATFORM_CONTRACT_REF=${manifest_fields[4]}
 OURBOX_PLATFORM_CONTRACT_DIGEST=${manifest_fields[5]}
 EOF
@@ -117,9 +117,9 @@ validate_complete_application_metadata() {
   local selected_apps_path="${bundle_dir}/platform/selected-apps.json"
   local images_lock_path="${bundle_dir}/platform/images.lock.json"
 
-  [[ -f "${catalog_path}" ]] || die "airgap bundle missing platform/catalog.json"
-  [[ -f "${selected_apps_path}" ]] || die "airgap bundle missing platform/selected-apps.json"
-  [[ -f "${images_lock_path}" ]] || die "airgap bundle missing platform/images.lock.json"
+  [[ -f "${catalog_path}" ]] || die "substrate bundle missing platform/catalog.json"
+  [[ -f "${selected_apps_path}" ]] || die "substrate bundle missing platform/selected-apps.json"
+  [[ -f "${images_lock_path}" ]] || die "substrate bundle missing platform/images.lock.json"
 
   python3 - <<'PY' "${catalog_path}" "${selected_apps_path}" "${images_lock_path}"
 import json
@@ -139,96 +139,96 @@ with images_lock_path.open("r", encoding="utf-8") as handle:
     images_lock = json.load(handle)
 
 if catalog.get("schema") != 1:
-    raise SystemExit("airgap bundle platform/catalog.json must declare schema=1")
+    raise SystemExit("substrate bundle platform/catalog.json must declare schema=1")
 if catalog.get("kind") != "ourbox-application-catalog":
-    raise SystemExit("airgap bundle platform/catalog.json must declare kind=ourbox-application-catalog")
+    raise SystemExit("substrate bundle platform/catalog.json must declare kind=ourbox-application-catalog")
 catalog_id = str(catalog.get("catalog_id", "")).strip()
 if not catalog_id:
-    raise SystemExit("airgap bundle platform/catalog.json must declare catalog_id")
+    raise SystemExit("substrate bundle platform/catalog.json must declare catalog_id")
 catalog_apps = catalog.get("apps")
 if not isinstance(catalog_apps, list) or not catalog_apps:
-    raise SystemExit("airgap bundle platform/catalog.json must declare a non-empty apps list")
+    raise SystemExit("substrate bundle platform/catalog.json must declare a non-empty apps list")
 catalog_app_ids = []
 seen_catalog_ids = set()
 for app in catalog_apps:
     app_id = str(app.get("id", "")).strip()
     if not app_id:
-        raise SystemExit("airgap bundle platform/catalog.json contains an app without an id")
+        raise SystemExit("substrate bundle platform/catalog.json contains an app without an id")
     if app_id in seen_catalog_ids:
-        raise SystemExit(f"airgap bundle platform/catalog.json duplicates app id {app_id}")
+        raise SystemExit(f"substrate bundle platform/catalog.json duplicates app id {app_id}")
     seen_catalog_ids.add(app_id)
     catalog_app_ids.append(app_id)
 
 if selected.get("schema") != 1:
-    raise SystemExit("airgap bundle platform/selected-apps.json must declare schema=1")
+    raise SystemExit("substrate bundle platform/selected-apps.json must declare schema=1")
 if selected.get("kind") != "ourbox-selected-applications":
-    raise SystemExit("airgap bundle platform/selected-apps.json must declare kind=ourbox-selected-applications")
+    raise SystemExit("substrate bundle platform/selected-apps.json must declare kind=ourbox-selected-applications")
 if str(selected.get("catalog_id", "")).strip() != catalog_id:
-    raise SystemExit("airgap bundle platform/selected-apps.json catalog_id must match platform/catalog.json")
+    raise SystemExit("substrate bundle platform/selected-apps.json catalog_id must match platform/catalog.json")
 selection_mode = str(selected.get("selection_mode", "")).strip()
 if selection_mode not in supported_selection_modes:
     raise SystemExit(
-        "airgap bundle platform/selected-apps.json selection_mode must be one of "
+        "substrate bundle platform/selected-apps.json selection_mode must be one of "
         "catalog-defaults, all-apps, custom"
     )
 selected_ids = selected.get("selected_app_ids")
 if not isinstance(selected_ids, list) or not selected_ids:
-    raise SystemExit("airgap bundle platform/selected-apps.json must declare a non-empty selected_app_ids list")
+    raise SystemExit("substrate bundle platform/selected-apps.json must declare a non-empty selected_app_ids list")
 normalized_selected_ids = []
 seen_selected_ids = set()
 for raw_app_id in selected_ids:
     app_id = str(raw_app_id).strip()
     if not app_id:
-        raise SystemExit("airgap bundle platform/selected-apps.json contains an empty app id")
+        raise SystemExit("substrate bundle platform/selected-apps.json contains an empty app id")
     if app_id in seen_selected_ids:
-        raise SystemExit(f"airgap bundle platform/selected-apps.json duplicates app id {app_id}")
+        raise SystemExit(f"substrate bundle platform/selected-apps.json duplicates app id {app_id}")
     if app_id not in seen_catalog_ids:
-        raise SystemExit(f"airgap bundle platform/selected-apps.json references unknown app id {app_id}")
+        raise SystemExit(f"substrate bundle platform/selected-apps.json references unknown app id {app_id}")
     seen_selected_ids.add(app_id)
     normalized_selected_ids.append(app_id)
 
 images = images_lock.get("images")
 if not isinstance(images, list) or not images:
-    raise SystemExit("airgap bundle platform/images.lock.json must declare a non-empty images list")
+    raise SystemExit("substrate bundle platform/images.lock.json must declare a non-empty images list")
 for image in images:
     name = str(image.get("name", "")).strip()
     ref = str(image.get("ref", "")).strip()
     if not name:
-        raise SystemExit("airgap bundle platform/images.lock.json contains an image without a name")
+        raise SystemExit("substrate bundle platform/images.lock.json contains an image without a name")
     if not ref:
-        raise SystemExit("airgap bundle platform/images.lock.json contains an image without a ref")
+        raise SystemExit("substrate bundle platform/images.lock.json contains an image without a ref")
 PY
 }
 
-# Resolve airgap platform ref.
+# Resolve ourbox-substrate ref.
 # Callers must resolve channel intent at workflow/build start and pass the
 # selected immutable ref explicitly.
-[[ -n "${OURBOX_AIRGAP_PLATFORM_REF:-}" ]] || die \
-  "OURBOX_AIRGAP_PLATFORM_REF is required.
-Resolve the upstream airgap-platform channel at workflow/build start and pass
+[[ -n "${OURBOX_SUBSTRATE_REF:-}" ]] || die \
+  "OURBOX_SUBSTRATE_REF is required.
+Resolve the upstream ourbox-substrate channel at workflow/build start and pass
 the resulting digest-pinned ref in the environment."
-REF="${OURBOX_AIRGAP_PLATFORM_REF}"
+REF="${OURBOX_SUBSTRATE_REF}"
 
 need_cmd oras
 
 OUT="${ROOT}/artifacts/airgap"
-PULL_DIR="${ROOT}/artifacts/.airgap-platform-pull"
-META_DIR="${ROOT}/artifacts/.airgap-platform-meta"
+PULL_DIR="${ROOT}/artifacts/.ourbox-substrate-pull"
+META_DIR="${ROOT}/artifacts/.ourbox-substrate-meta"
 
-log "Using airgap platform ref: ${REF}"
+log "Using ourbox-substrate ref: ${REF}"
 
 # Enforce digest pinning in official builds.
 # Nightly: warn (non-reproducible but permitted for bootstrap).
 # Official candidate/release lanes: hard fail.
 if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ "${REF}" != *"@sha256:"* ]]; then
   if [[ "${OURBOX_REQUIRE_PINNED_OFFICIAL_INPUTS:-0}" == "1" ]] || [[ "${GITHUB_WORKFLOW:-}" =~ [Rr]elease ]]; then
-    die "AIRGAP_PLATFORM_REF '${REF}' is not digest-pinned.
+    die "OURBOX_SUBSTRATE_REF '${REF}' is not digest-pinned.
   Official candidate/release builds require @sha256: refs to ensure reproducibility.
-  Resolve the upstream channel before calling fetch-airgap-platform.sh and pass
-  the pinned ref via OURBOX_AIRGAP_PLATFORM_REF."
+  Resolve the upstream channel before calling fetch-ourbox-substrate.sh and pass
+  the pinned ref via OURBOX_SUBSTRATE_REF."
   elif [[ "${GITHUB_WORKFLOW:-}" =~ [Nn]ightly ]]; then
-    log "WARNING: AIRGAP_PLATFORM_REF is not digest-pinned — nightly build will not be reproducible"
-    log "  Resolve the upstream channel before calling fetch-airgap-platform.sh"
+    log "WARNING: OURBOX_SUBSTRATE_REF is not digest-pinned — nightly build will not be reproducible"
+    log "  Resolve the upstream channel before calling fetch-ourbox-substrate.sh"
   fi
 fi
 
@@ -260,10 +260,10 @@ fi
 rm -rf "${PULL_DIR}" "${META_DIR}"
 mkdir -p "${PULL_DIR}" "${META_DIR}" "${OUT}"
 
-log "Pulling airgap platform bundle (amd64)"
+log "Pulling ourbox-substrate bundle (amd64)"
 oras pull "${REF}" -o "${PULL_DIR}" | tee "${META_DIR}/oras.pull.log"
 
-TARBALL="${PULL_DIR}/dist/airgap-platform.tar.gz"
+TARBALL="${PULL_DIR}/dist/ourbox-substrate.tar.gz"
 [[ -f "${TARBALL}" ]] || {
   echo "Expected ${TARBALL} not found. Pulled files:" >&2
   find "${PULL_DIR}" -maxdepth 4 -type f -print >&2 || true
@@ -289,9 +289,9 @@ validate_complete_application_metadata "${OUT}"
 log "Artifacts created:"
 ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/manifest.env"
 
-log "Deriving platform contract ref from airgap bundle manifest"
+log "Deriving platform contract ref from substrate bundle manifest"
 BUNDLE_CONTRACT_REF="$(grep '^OURBOX_PLATFORM_CONTRACT_REF=' "${OUT}/manifest.env" | cut -d= -f2- | tr -d '\r')"
-[[ -n "${BUNDLE_CONTRACT_REF}" ]] || die "OURBOX_PLATFORM_CONTRACT_REF not found in airgap bundle manifest: ${OUT}/manifest.env"
+[[ -n "${BUNDLE_CONTRACT_REF}" ]] || die "OURBOX_PLATFORM_CONTRACT_REF not found in substrate bundle manifest: ${OUT}/manifest.env"
 [[ "${BUNDLE_CONTRACT_REF}" =~ @sha256:[0-9a-f]{64}$ ]] || die "OURBOX_PLATFORM_CONTRACT_REF in bundle manifest is not digest-pinned: ${BUNDLE_CONTRACT_REF}"
 export OURBOX_PLATFORM_CONTRACT_REF="${BUNDLE_CONTRACT_REF}"
 
@@ -306,12 +306,12 @@ EXPECTED_CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}")"
 mapfile -t bundle_identity < <(resolve_selected_bundle_identity)
 SELECTED_AIRGAP_PINNED_REF="${bundle_identity[0]:-}"
 SELECTED_AIRGAP_DIGEST="${bundle_identity[1]:-}"
-[[ -n "${SELECTED_AIRGAP_PINNED_REF}" ]] || die "selected airgap pinned ref was not resolved"
-[[ "${SELECTED_AIRGAP_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected airgap digest is invalid: ${SELECTED_AIRGAP_DIGEST:-missing}"
+[[ -n "${SELECTED_AIRGAP_PINNED_REF}" ]] || die "selected substrate pinned ref was not resolved"
+[[ "${SELECTED_AIRGAP_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected substrate digest is invalid: ${SELECTED_AIRGAP_DIGEST:-missing}"
 
 write_selected_bundle_metadata "${EXPECTED_CONTRACT_DIGEST}" "${SELECTED_AIRGAP_PINNED_REF}" "${SELECTED_AIRGAP_DIGEST}"
-log "Selected baked airgap bundle recorded at ${OUT}/selected-bundle.env"
+log "Selected baked substrate bundle recorded at ${OUT}/selected-bundle.env"
 
 log "Syncing pinned platform contract into installer tree"
 "${ROOT}/tools/sync-platform-contract-into-installer.sh"
-log "Validated complete baked application metadata in fetched airgap bundle"
+log "Validated complete baked application metadata in fetched substrate bundle"

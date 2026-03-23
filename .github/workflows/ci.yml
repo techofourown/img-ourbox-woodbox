@@ -277,15 +277,15 @@ jobs:
       - name: Verify mission-media smoke helper
         run: bash tools/check-prepare-mission-media-smoke.sh
 
-  fetch-airgap-platform:
-    name: Fetch airgap platform smoke
+  fetch-ourbox-substrate:
+    name: Fetch ourbox-substrate smoke
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify fetched airgap-platform bundle shape
-        run: bash tools/check-fetch-airgap-platform-smoke.sh
+      - name: Verify fetched ourbox-substrate bundle shape
+        run: bash tools/check-fetch-ourbox-substrate-smoke.sh
 
   bootstrap-platform-profile:
     name: Bootstrap platform profile smoke

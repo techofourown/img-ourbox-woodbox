@@ -88,7 +88,7 @@ Mission media contains:
 - embedded OS payload
 - substrate-local target package repo
 - embedded mission manifest
-- embedded selected `airgap-platform` bundle
+- embedded selected `ourbox-substrate` bundle
 
 Install flow:
 
@@ -97,7 +97,7 @@ Install flow:
    - shared installer SSH mode/user/root/auth semantics come from the vendored helper at `/cdrom/ourbox/tools/installer-ssh-helper.sh`, which realizes the upstream installer SSH contract from `sw-ourbox-os`
 3. Operator may set a temporary password for the live-installer SSH account, or press Enter to keep the current installer SSH posture
 4. `ourbox-preinstall` stages the embedded OS payload into `/opt/ourbox/installer/cache/payload/`
-5. `ourbox-preinstall` reads mission-selected OS and `airgap-platform` provenance from the embedded mission manifest
+5. `ourbox-preinstall` reads mission-selected OS and `ourbox-substrate` provenance from the embedded mission manifest
 6. `ourbox-preinstall` prepares the offline target helpers, including local package installation and netplan rendering from hardware inventory
 7. Operator confirms disk selection, identity, and `INSTALL`
 8. Autoinstall late-commands extract the staged OS payload to `/target/`

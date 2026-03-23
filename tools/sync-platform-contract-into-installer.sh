@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sync the pulled upstream platform contract into the Woodbox installer rootfs overlay.
 # Must be called after tools/fetch-platform-contract.sh.
-# Called automatically by tools/fetch-airgap-platform.sh.
+# Called automatically by tools/fetch-ourbox-substrate.sh.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

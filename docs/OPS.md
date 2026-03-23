@@ -12,7 +12,7 @@ cd sw-ourbox-installer
 This will:
 
 1. Resolve the selected OS payload on the trusted host
-2. Resolve the selected `airgap-platform` bundle on the trusted host
+2. Resolve the selected `ourbox-substrate` bundle on the trusted host
 3. Pull and verify those bytes locally
 4. Pull the published Woodbox installer substrate artifact
 5. Compose Woodbox mission media using the adapter in this repo
@@ -99,7 +99,7 @@ If ready, you should be able to reach:
 ```bash
 sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.) — idempotent
 
-./tools/fetch-airgap-platform.sh       # Pull pinned airgap bundle + platform contract via ORAS
+./tools/fetch-ourbox-substrate.sh      # Pull pinned ourbox-substrate bundle + platform contract via ORAS
 
 ./tools/build-os-payload.sh            # Build OS payload tarball (rootfs overlay + airgap)
 
@@ -143,13 +143,13 @@ still require host-composed mission media from `sw-ourbox-installer`.
 
 ## Updating upstream platform inputs
 
-When `sw-ourbox-os` publishes new `platform-contract` or `airgap-platform` bundles:
+When `sw-ourbox-os` publishes new `platform-contract` or `ourbox-substrate` bundles:
 
 ```bash
 # 1. Approve the new upstream snapshot in sw-ourbox-os and take the generated lockfile PR
 
 # 2. Pull and sync
-./tools/fetch-airgap-platform.sh
+./tools/fetch-ourbox-substrate.sh
 
 # 3. Rebuild OS payload/substrate as needed; then compose mission media via sw-ourbox-installer
 ```

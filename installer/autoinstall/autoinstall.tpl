@@ -67,11 +67,11 @@ ${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}
     - echo "==>       target packages installed from local substrate repo"
 
     # -----------------------------------------------------------------------
-    # [3/12] Apply optional airgap-platform override (mutable subset only).
+    # [3/12] Apply optional ourbox-substrate override (mutable subset only).
     # -----------------------------------------------------------------------
-    - echo "==> [3/12] Applying optional airgap-platform override"
-    - /bin/bash /opt/ourbox/installer/cache/apply-airgap-platform-override.sh
-    - echo "==>       airgap override step complete"
+    - echo "==> [3/12] Applying optional ourbox-substrate override"
+    - /bin/bash /opt/ourbox/installer/cache/apply-ourbox-substrate-override.sh
+    - echo "==>       substrate override step complete"
 
     # -----------------------------------------------------------------------
     # [4/12] Apply the mission-selected application catalog and app set.
