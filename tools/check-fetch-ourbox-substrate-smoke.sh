@@ -90,47 +90,10 @@ write_bundle() {
   chmod +x "${BUNDLE_DIR}/k3s/k3s"
   : > "${BUNDLE_DIR}/k3s/k3s-airgap-images-amd64.tar"
   : > "${BUNDLE_DIR}/platform/images/app.tar"
-  printf '{"images":[{"name":"landing","ref":"ghcr.io/example/landing@sha256:4444444444444444444444444444444444444444444444444444444444444444"}]}\n' > "${BUNDLE_DIR}/platform/images.lock.json"
-  printf 'PROFILE=demo-apps\n' > "${BUNDLE_DIR}/platform/profile.env"
-  cat > "${BUNDLE_DIR}/platform/catalog.json" <<'EOF'
-{
-  "schema": 1,
-  "kind": "ourbox-application-catalog",
-  "catalog_id": "demo-apps",
-  "catalog_name": "Demo Apps",
-  "default_app_ids": [
-    "landing"
-  ],
-  "apps": [
-    {
-      "id": "landing",
-      "display_name": "Landing"
-    }
-  ]
-}
-EOF
-  if [[ "${variant}" != "missing-selected-apps" ]]; then
-    cat > "${BUNDLE_DIR}/platform/selected-apps.json" <<EOF
-{
-  "schema": 1,
-  "kind": "ourbox-selected-applications",
-  "catalog_id": "demo-apps",
-  "selection_mode": "${variant:-catalog-defaults}"
-}
-EOF
-    python3 - <<'PY' "${BUNDLE_DIR}/platform/selected-apps.json" "${variant}"
-import json
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1])
-variant = sys.argv[2]
-payload = json.loads(path.read_text(encoding="utf-8"))
-payload["selection_mode"] = "catalog-defaults" if variant == "valid" else "defaults"
-payload["selected_app_ids"] = ["landing"]
-path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-PY
+  if [[ "${variant}" != "missing-images-lock" ]]; then
+    printf '{"images":[{"name":"landing","ref":"ghcr.io/example/landing@sha256:4444444444444444444444444444444444444444444444444444444444444444"}]}\n' > "${BUNDLE_DIR}/platform/images.lock.json"
   fi
+  printf 'PROFILE=demo-apps\n' > "${BUNDLE_DIR}/platform/profile.env"
   cat > "${BUNDLE_DIR}/manifest.env" <<EOF
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-substrate-revision
@@ -168,6 +131,14 @@ grep -F "OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate
 grep -F "OURBOX_SUBSTRATE_DIGEST=${SUBSTRATE_DIGEST}" "${SELECTED_ENV}" >/dev/null
 grep -F "OURBOX_SUBSTRATE_ARCH=amd64" "${SELECTED_ENV}" >/dev/null
 grep -F "OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_CONTRACT_DIGEST}" "${SELECTED_ENV}" >/dev/null
+[[ ! -f "${FIXTURE_ROOT}/artifacts/airgap/platform/catalog.json" ]] || {
+  echo "fetch-ourbox-substrate.sh must not expect or stage platform/catalog.json" >&2
+  exit 1
+}
+[[ ! -f "${FIXTURE_ROOT}/artifacts/airgap/platform/selected-apps.json" ]] || {
+  echo "fetch-ourbox-substrate.sh must not expect or stage platform/selected-apps.json" >&2
+  exit 1
+}
 
 write_bundle "${MISMATCH_CONTRACT_DIGEST}" valid
 set +e
@@ -181,34 +152,20 @@ set -e
 grep -F "ourbox-substrate contract digest mismatch" "${TMP}/mismatch.log" >/dev/null \
   || {
     cat "${TMP}/mismatch.log" >&2
-    exit 1
-  }
-
-write_bundle "${PLATFORM_CONTRACT_DIGEST}" missing-selected-apps
-set +e
-run_fetch >"${TMP}/missing-selected-apps.log" 2>&1
-status=$?
-set -e
-[[ "${status}" -ne 0 ]] || {
-  echo "fetch-ourbox-substrate.sh should reject bundles missing selected-apps.json" >&2
-  exit 1
-}
-grep -F "substrate bundle missing platform/selected-apps.json" "${TMP}/missing-selected-apps.log" >/dev/null || {
-  cat "${TMP}/missing-selected-apps.log" >/dev/null >&2
   exit 1
 }
 
-write_bundle "${PLATFORM_CONTRACT_DIGEST}" invalid-selection-mode
+write_bundle "${PLATFORM_CONTRACT_DIGEST}" missing-images-lock
 set +e
-run_fetch >"${TMP}/invalid-selection-mode.log" 2>&1
+run_fetch >"${TMP}/missing-images-lock.log" 2>&1
 status=$?
 set -e
 [[ "${status}" -ne 0 ]] || {
-  echo "fetch-ourbox-substrate.sh should reject bundles with invalid selected-apps selection_mode" >&2
+  echo "fetch-ourbox-substrate.sh should reject bundles missing platform/images.lock.json" >&2
   exit 1
 }
-grep -F "selection_mode must be one of catalog-defaults, all-apps, custom" "${TMP}/invalid-selection-mode.log" >/dev/null || {
-  cat "${TMP}/invalid-selection-mode.log" >&2
+grep -F "substrate bundle missing platform/images.lock.json" "${TMP}/missing-images-lock.log" >/dev/null || {
+  cat "${TMP}/missing-images-lock.log" >&2
   exit 1
 }
 

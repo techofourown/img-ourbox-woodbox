@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "catalog-defaults",
+  "selected_app_ids": [
+    "landing"
+  ]
+}

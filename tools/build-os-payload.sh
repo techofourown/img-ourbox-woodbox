@@ -3,7 +3,7 @@
 #
 # The OS payload contains everything needed to install Woodbox onto a target:
 #   - rootfs overlay (installer/ourbox/rootfs/)
-#   - airgap bundle (k3s binary + image tars from artifacts/airgap/)
+#   - substrate bundle (k3s binary + platform image tars from artifacts/airgap/)
 #   - platform contract content (synced from sw-ourbox-os by fetch-ourbox-substrate.sh)
 #   - payload provenance metadata (payload.meta.env)
 #
@@ -52,21 +52,17 @@ OUT_SHA="${OUT_TAR}.sha256"
   die "missing artifacts/airgap/manifest.env — run: ./tools/fetch-ourbox-substrate.sh"
 [[ -f "${ROOT}/artifacts/airgap/platform/images.lock.json" ]] || \
   die "missing artifacts/airgap/platform/images.lock.json — run: ./tools/fetch-ourbox-substrate.sh"
-[[ -f "${ROOT}/artifacts/airgap/platform/catalog.json" ]] || \
-  die "missing artifacts/airgap/platform/catalog.json — run: ./tools/fetch-ourbox-substrate.sh"
-[[ -f "${ROOT}/artifacts/airgap/platform/selected-apps.json" ]] || \
-  die "missing artifacts/airgap/platform/selected-apps.json — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Require platform contract sync
 [[ -f "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env" ]] || \
   die "missing synced platform contract — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Load upstream metadata for provenance recording
-AIRGAP_SELECTED_BUNDLE_ENV="${ROOT}/artifacts/airgap/selected-bundle.env"
-[[ -f "${AIRGAP_SELECTED_BUNDLE_ENV}" ]] || \
+SUBSTRATE_SELECTED_BUNDLE_ENV="${ROOT}/artifacts/airgap/selected-bundle.env"
+[[ -f "${SUBSTRATE_SELECTED_BUNDLE_ENV}" ]] || \
   die "missing artifacts/airgap/selected-bundle.env — run: ./tools/fetch-ourbox-substrate.sh"
 # shellcheck disable=SC1090
-source "${AIRGAP_SELECTED_BUNDLE_ENV}"
+source "${SUBSTRATE_SELECTED_BUNDLE_ENV}"
 
 CONTRACT_ENV="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env"
 CONTRACT_DIGEST_FILE="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.digest"

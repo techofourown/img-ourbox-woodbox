@@ -10,6 +10,8 @@ PAYLOAD_ROOT="${TMP}/payload-root"
 PAYLOAD_AIRGAP="${PAYLOAD_ROOT}/airgap"
 PAYLOAD_ROOTFS="${PAYLOAD_ROOT}/rootfs"
 OUT_DIR="${TMP}/out"
+APPLICATION_CATALOG="${TMP}/catalog.json"
+SELECTED_APPS="${TMP}/selected-apps.json"
 mkdir -p "${PAYLOAD_AIRGAP}/k3s" "${PAYLOAD_AIRGAP}/platform/images" "${PAYLOAD_ROOTFS}"
 
 printf '#!/bin/sh\nexit 0\n' > "${PAYLOAD_AIRGAP}/k3s/k3s"
@@ -18,34 +20,6 @@ printf 'fixture\n' > "${PAYLOAD_AIRGAP}/k3s/k3s-airgap-images-amd64.tar"
 printf 'fixture image tar\n' > "${PAYLOAD_AIRGAP}/platform/images/landing.tar"
 printf '{"images":[]}\n' > "${PAYLOAD_AIRGAP}/platform/images.lock.json"
 printf 'PROFILE=demo-apps\n' > "${PAYLOAD_AIRGAP}/platform/profile.env"
-cat > "${PAYLOAD_AIRGAP}/platform/catalog.json" <<'EOF'
-{
-  "schema": 1,
-  "kind": "ourbox-application-catalog",
-  "catalog_id": "demo-apps",
-  "catalog_name": "Demo Apps",
-  "default_app_ids": [
-    "landing"
-  ],
-  "apps": [
-    {
-      "id": "landing",
-      "display_name": "Landing"
-    }
-  ]
-}
-EOF
-cat > "${PAYLOAD_AIRGAP}/platform/selected-apps.json" <<'EOF'
-{
-  "schema": 1,
-  "kind": "ourbox-selected-applications",
-  "catalog_id": "demo-apps",
-  "selection_mode": "catalog-defaults",
-  "selected_app_ids": [
-    "landing"
-  ]
-}
-EOF
 cat > "${PAYLOAD_AIRGAP}/manifest.env" <<'EOF'
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-revision
@@ -87,9 +61,58 @@ OURBOX_SUBSTRATE_K3S_VERSION=v1.35.0+k3s1
 OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 EOF
 
+cat > "${APPLICATION_CATALOG}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-application-catalog",
+  "catalog_id": "demo-apps",
+  "catalog_name": "Demo Apps",
+  "default_app_ids": [
+    "landing"
+  ],
+  "apps": [
+    {
+      "id": "landing",
+      "display_name": "Landing"
+    }
+  ]
+}
+EOF
+
+cat > "${SELECTED_APPS}" <<'EOF'
+{
+  "schema": 1,
+  "kind": "ourbox-selected-applications",
+  "catalog_id": "demo-apps",
+  "selection_mode": "catalog-defaults",
+  "selected_app_ids": [
+    "landing"
+  ]
+}
+EOF
+
+set +e
 bash "${ROOT}/tools/prepare-mission-media-smoke.sh" \
   --os-payload "${PAYLOAD_TAR}" \
   --os-meta-env "${META_ENV}" \
+  --output-dir "${TMP}/missing-app-selection" \
+  --mission-only >"${TMP}/missing-app-selection.log" 2>&1
+status=$?
+set -e
+[[ "${status}" -ne 0 ]] || {
+  echo "prepare-mission-media-smoke.sh should require explicit application metadata" >&2
+  exit 1
+}
+grep -F -- "--application-catalog is required" "${TMP}/missing-app-selection.log" >/dev/null || {
+  cat "${TMP}/missing-app-selection.log" >&2
+  exit 1
+}
+
+bash "${ROOT}/tools/prepare-mission-media-smoke.sh" \
+  --os-payload "${PAYLOAD_TAR}" \
+  --os-meta-env "${META_ENV}" \
+  --application-catalog "${APPLICATION_CATALOG}" \
+  --selected-apps "${SELECTED_APPS}" \
   --output-dir "${OUT_DIR}" \
   --mission-only
 

@@ -9,6 +9,8 @@ OS_PAYLOAD=""
 OS_META_ENV=""
 SUBSTRATE_ISO=""
 OUTPUT_DIR=""
+APPLICATION_CATALOG=""
+SELECTED_APPS=""
 MISSION_ONLY=0
 
 usage() {
@@ -18,6 +20,8 @@ Usage:
     --os-payload PATH \
     --os-meta-env PATH \
     --output-dir DIR \
+    --application-catalog PATH \
+    --selected-apps PATH \
     [--substrate-iso PATH] \
     [--mission-only]
 
@@ -48,6 +52,16 @@ while [[ $# -gt 0 ]]; do
       OUTPUT_DIR="$2"
       shift 2
       ;;
+    --application-catalog)
+      [[ $# -ge 2 ]] || die "--application-catalog requires a value"
+      APPLICATION_CATALOG="$2"
+      shift 2
+      ;;
+    --selected-apps)
+      [[ $# -ge 2 ]] || die "--selected-apps requires a value"
+      SELECTED_APPS="$2"
+      shift 2
+      ;;
     --mission-only)
       MISSION_ONLY=1
       shift
@@ -68,6 +82,10 @@ done
 [[ -n "${OS_META_ENV}" ]] || die "--os-meta-env is required"
 [[ -f "${OS_META_ENV}" ]] || die "OS metadata not found: ${OS_META_ENV}"
 [[ -n "${OUTPUT_DIR}" ]] || die "--output-dir is required"
+[[ -n "${APPLICATION_CATALOG}" ]] || die "--application-catalog is required"
+[[ -f "${APPLICATION_CATALOG}" ]] || die "application catalog not found: ${APPLICATION_CATALOG}"
+[[ -n "${SELECTED_APPS}" ]] || die "--selected-apps is required"
+[[ -f "${SELECTED_APPS}" ]] || die "selected apps file not found: ${SELECTED_APPS}"
 if [[ "${MISSION_ONLY}" != "1" ]]; then
   [[ -n "${SUBSTRATE_ISO}" ]] || die "--substrate-iso is required unless --mission-only is set"
   [[ -f "${SUBSTRATE_ISO}" ]] || die "substrate ISO not found: ${SUBSTRATE_ISO}"
@@ -99,8 +117,6 @@ mkdir -p "${PAYLOAD_ROOT}" "${MISSION_OS_DIR}" "${MISSION_AIRGAP_DIR}" "${BUNDLE
 tar -xzf "${OS_PAYLOAD}" -C "${PAYLOAD_ROOT}"
 [[ -f "${PAYLOAD_ROOT}/airgap/manifest.env" ]] || die "OS payload missing airgap/manifest.env"
 [[ -x "${PAYLOAD_ROOT}/airgap/k3s/k3s" ]] || die "OS payload missing airgap/k3s/k3s"
-[[ -f "${PAYLOAD_ROOT}/airgap/platform/catalog.json" ]] || die "OS payload missing airgap/platform/catalog.json"
-[[ -f "${PAYLOAD_ROOT}/airgap/platform/selected-apps.json" ]] || die "OS payload missing airgap/platform/selected-apps.json"
 [[ -f "${PAYLOAD_ROOT}/airgap/platform/images.lock.json" ]] || die "OS payload missing airgap/platform/images.lock.json"
 
 meta_dump="$(
@@ -204,9 +220,13 @@ OS_PAYLOAD_SIZE="$(stat -c '%s' "${OS_PAYLOAD}")"
 OS_ARTIFACT_REF="ghcr.io/techofourown/ourbox-woodbox-os-smoke@sha256:${OS_PAYLOAD_SHA}"
 
 cp -a "${PAYLOAD_ROOT}/airgap/." "${BUNDLE_ROOT}/"
+rm -f "${BUNDLE_ROOT}/platform/catalog.json" "${BUNDLE_ROOT}/platform/selected-apps.json"
 
-cp -f "${BUNDLE_ROOT}/platform/catalog.json" "${MISSION_AIRGAP_DIR}/catalog.json"
-cp -f "${BUNDLE_ROOT}/platform/selected-apps.json" "${MISSION_AIRGAP_DIR}/selected-apps.json"
+MISSION_APPLICATION_CATALOG_PATH="${MISSION_AIRGAP_DIR}/catalog.json"
+MISSION_SELECTED_APPS_PATH="${MISSION_AIRGAP_DIR}/selected-apps.json"
+cp -f "${APPLICATION_CATALOG}" "${MISSION_APPLICATION_CATALOG_PATH}"
+cp -f "${SELECTED_APPS}" "${MISSION_SELECTED_APPS_PATH}"
+
 cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
 tar -C "${BUNDLE_ROOT}" -czf "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
 printf '%s  %s\n' "$(sha256sum "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" | awk '{print $1}')" "ourbox-substrate.tar.gz" \
@@ -397,8 +417,6 @@ manifest = {
                 {
                     "catalog_id": str(catalog.get("catalog_id", "")),
                     "catalog_name": str(catalog.get("catalog_name", "")),
-                    "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
-                    "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
                 }
             ],
         },
