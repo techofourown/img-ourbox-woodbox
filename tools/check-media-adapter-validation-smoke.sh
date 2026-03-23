@@ -34,7 +34,7 @@ OURBOX_RECIPE_GIT_HASH=abc123def456
 BUILD_TS=2026-03-12T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=abc123def456
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.1
+OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_PLATFORM_CONTRACT_CREATED=2026-03-12T00:00:00Z
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -135,60 +135,106 @@ write_manifest() {
   local include_selected_airgap="${1}"
   cat > "${MISSION_MANIFEST}" <<'EOF'
 {
-  "schema": 1,
   "kind": "ourbox-mission",
+  "compose_id": "woodbox-fixture",
+  "created": "2026-03-12T00:00:00Z",
   "target": {
     "id": "woodbox",
     "media_kind": "installer-usb"
   },
+  "composer": {
+    "name": "img-ourbox-woodbox",
+    "phase": "adapter-validation-smoke",
+    "source_revision": "abc123def456"
+  },
+  "adapter": {
+    "source_repo": "https://github.com/techofourown/img-ourbox-woodbox",
+    "source_revision": "abc123def456",
+    "adapter_json_relpath": "tools/media-adapter/adapter.json",
+    "runtime_prompts_kept": [
+      "os-disk-selection",
+      "data-disk-selection",
+      "data-disk-format-confirmation",
+      "identity",
+      "install-confirmation"
+    ]
+  },
   "operator_mode": {
-    "mode": "install"
+    "mode": "install",
+    "prompt_hostname_on_target": true,
+    "prompt_identity_on_target": true
+  },
+  "mission_media": {
+    "compose_strategy": "woodbox-fat-iso-with-host-selected-os-application-catalog-and-app-selection",
+    "mission_only": false
   },
   "platform_contract": {
     "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
-  "selected_os": {
-    "selection_source": "catalog",
-    "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "artifact_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "artifact_type": "application/vnd.techofourown.ourbox.woodbox.os-payload.v1",
-    "platform_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "payload": {
-      "relpath": "artifacts/os/os-payload.tar.gz"
+  "requested": {
+    "os": {
+      "selection_source": "catalog",
+      "release_channel": "stable",
+      "requested_ref": ""
     },
-    "metadata_relpath": "artifacts/os/os.meta.env"
+    "airgap": {
+      "selection_mode": "host-selected",
+      "selection_source": "catalog",
+      "release_channel": "stable",
+      "requested_ref": ""
+    }
+  },
+  "resolved": {
+    "os": {
+      "selection_source": "catalog",
+      "release_channel": "stable",
+      "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "artifact_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "artifact_type": "application/vnd.techofourown.ourbox.woodbox.os-payload.v1",
+      "platform_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "payload": {
+        "relpath": "artifacts/os/os-payload.tar.gz"
+      },
+      "metadata_relpath": "artifacts/os/os.meta.env"
+    }
+  }
   }
 EOF
   if [[ "${include_selected_airgap}" == "1" ]]; then
-    cat >> "${MISSION_MANIFEST}" <<'EOF'
-,
-  "selected_airgap": {
+    python3 - <<'PY' "${MISSION_MANIFEST}"
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+
+manifest["resolved"]["airgap"] = {
     "selection_mode": "host-selected",
     "selection_source": "catalog",
+    "release_channel": "stable",
     "artifact_ref": "ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "arch": "amd64",
     "platform_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
     "manifest_relpath": "artifacts/airgap/manifest.env",
-    "present_in_selected_os_payload": false
-  },
-  "selected_applications": {
+    "present_in_selected_os_payload": False,
+}
+manifest["resolved"]["applications"] = {
     "catalog_id": "demo-apps",
     "catalog_name": "Demo Apps",
     "selection_mode": "catalog-defaults",
-    "selected_app_ids": [
-      "landing",
-      "dufs"
-    ],
+    "selected_app_ids": ["landing", "dufs"],
     "catalog_relpath": "artifacts/airgap/catalog.json",
-    "selection_relpath": "artifacts/airgap/selected-apps.json"
-  }
-EOF
-  fi
-  cat >> "${MISSION_MANIFEST}" <<'EOF'
+    "selection_relpath": "artifacts/airgap/selected-apps.json",
 }
-EOF
+
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle, indent=2)
+    handle.write("\n")
+PY
+  fi
 }
 
 expect_validation_failure() {
@@ -226,22 +272,42 @@ bash "${ROOT}/tools/media-adapter/validate-media.sh" \
   --os-payload "${OS_PAYLOAD}" \
   --os-meta-env "${OS_META_ENV}"
 
+ORIG_META_ENV="${TMP}/os.meta.orig.env"
+cp "${OS_META_ENV}" "${ORIG_META_ENV}"
+
+# dev is emitted by edge-channel builds before semantic-release tags the commit,
+# and should remain acceptable to the validator.
+sed 's/^OURBOX_PLATFORM_CONTRACT_VERSION=.*/OURBOX_PLATFORM_CONTRACT_VERSION=dev/' \
+  "${ORIG_META_ENV}" > "${OS_META_ENV}"
+bash "${ROOT}/tools/media-adapter/validate-media.sh" \
+  --mission-dir "${MISSION_DIR}" \
+  --os-payload "${OS_PAYLOAD}" \
+  --os-meta-env "${OS_META_ENV}"
+
+# too-old payload contracts must still be rejected because the selected app
+# surface requires the newer runtime capability.
+sed 's/^OURBOX_PLATFORM_CONTRACT_VERSION=.*/OURBOX_PLATFORM_CONTRACT_VERSION=v0.19.9/' \
+  "${ORIG_META_ENV}" > "${OS_META_ENV}"
+expect_validation_failure "a too-old payload platform contract version"
+
+cp "${ORIG_META_ENV}" "${OS_META_ENV}"
+
 write_manifest 0
 expect_validation_failure "mission manifests missing selected_airgap and selected_applications"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'del manifest["selected_airgap"]["artifact_digest"]'
+mutate_manifest 'del manifest["resolved"]["airgap"]["artifact_digest"]'
 expect_validation_failure "mission manifests missing selected_airgap.artifact_digest"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'del manifest["selected_applications"]'
+mutate_manifest 'del manifest["resolved"]["applications"]'
 expect_validation_failure "mission manifests missing selected_applications"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'del manifest["selected_applications"]["selection_relpath"]'
+mutate_manifest 'del manifest["resolved"]["applications"]["selection_relpath"]'
 expect_validation_failure "mission manifests missing selected_applications.selection_relpath"
 
 build_airgap_bundle valid
@@ -292,7 +358,7 @@ OURBOX_RECIPE_GIT_HASH=abc123def456
 BUILD_TS=2026-03-12T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=abc123def456
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.1
+OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/example/airgap-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
@@ -327,27 +393,27 @@ expect_validation_failure "mission airgap payloads with mismatched airgap-platfo
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'manifest["selected_os"]["artifact_digest"] = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'
+mutate_manifest 'manifest["resolved"]["os"]["artifact_digest"] = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'
 expect_validation_failure "mission manifests with mismatched selected_os artifact digest"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'manifest["selected_airgap"]["artifact_digest"] = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'
+mutate_manifest 'manifest["resolved"]["airgap"]["artifact_digest"] = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'
 expect_validation_failure "mission manifests with mismatched selected_airgap artifact digest"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'manifest["selected_airgap"]["payload_relpath"] = "../outside.tar.gz"'
+mutate_manifest 'manifest["resolved"]["airgap"]["payload_relpath"] = "../outside.tar.gz"'
 expect_validation_failure "mission manifests with selected_airgap.payload_relpath escaping the mission directory"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'manifest["selected_airgap"]["manifest_relpath"] = "../outside.env"'
+mutate_manifest 'manifest["resolved"]["airgap"]["manifest_relpath"] = "../outside.env"'
 expect_validation_failure "mission manifests with selected_airgap.manifest_relpath escaping the mission directory"
 
 build_airgap_bundle valid
 write_manifest 1
-mutate_manifest 'manifest["selected_os"]["metadata_relpath"] = "../outside.env"'
+mutate_manifest 'manifest["resolved"]["os"]["metadata_relpath"] = "../outside.env"'
 expect_validation_failure "mission manifests with selected_os.metadata_relpath escaping the mission directory"
 
 build_airgap_bundle invalid-tar

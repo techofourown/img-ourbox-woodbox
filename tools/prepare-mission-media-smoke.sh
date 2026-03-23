@@ -252,6 +252,7 @@ export OURBOX_TARGET
 export OURBOX_SKU
 export OURBOX_VARIANT
 export OURBOX_VERSION
+export MISSION_ONLY
 
 python3 - <<'PY'
 import hashlib
@@ -288,7 +289,6 @@ for path in sorted(mission_dir.rglob("*")):
     )
 
 manifest = {
-    "schema": 1,
     "kind": "ourbox-mission",
     "compose_id": f"woodbox-revalidation-{os.environ['OURBOX_VERSION']}",
     "created": os.environ["MISSION_CREATED"],
@@ -301,10 +301,26 @@ manifest = {
         "phase": "revalidation-smoke",
         "source_revision": os.environ["COMPOSER_REVISION"],
     },
+    "adapter": {
+        "source_repo": "https://github.com/techofourown/img-ourbox-woodbox",
+        "source_revision": os.environ["COMPOSER_REVISION"],
+        "adapter_json_relpath": "tools/media-adapter/adapter.json",
+        "runtime_prompts_kept": [
+            "os-disk-selection",
+            "data-disk-selection",
+            "data-disk-format-confirmation",
+            "identity",
+            "install-confirmation",
+        ],
+    },
     "operator_mode": {
         "mode": "install",
         "prompt_hostname_on_target": True,
         "prompt_identity_on_target": True,
+    },
+    "mission_media": {
+        "compose_strategy": "woodbox-fat-iso-with-host-selected-os-application-catalog-and-app-selection",
+        "mission_only": os.environ["MISSION_ONLY"] == "1",
     },
     "platform_contract": {
         "digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
@@ -313,52 +329,79 @@ manifest = {
         "version": os.environ["PLATFORM_CONTRACT_VERSION"],
         "created": os.environ["PLATFORM_CONTRACT_CREATED"],
     },
-    "selected_os": {
-        "selection_source": "branch-smoke",
-        "release_channel": "revalidation",
-        "artifact_ref": os.environ["OS_ARTIFACT_REF"],
-        "artifact_digest": f"sha256:{os.environ['OS_PAYLOAD_SHA']}",
-        "artifact_type": os.environ["OS_ARTIFACT_TYPE"],
-        "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
-        "payload": {
-            "relpath": "artifacts/os/os-payload.tar.gz",
-            "sha256": os.environ["OS_PAYLOAD_SHA"],
-            "size_bytes": int(os.environ["OS_PAYLOAD_SIZE"]),
+    "requested": {
+        "os": {
+            "selection_source": "branch-smoke",
+            "release_channel": "revalidation",
+            "requested_ref": "",
         },
-        "metadata_relpath": "artifacts/os/os.meta.env",
+        "airgap": {
+            "selection_mode": "baked-from-selected-os",
+            "selection_source": "branch-smoke",
+            "release_channel": "revalidation",
+            "requested_ref": "",
+        },
+        "applications": {
+            "catalog_id": str(catalog.get("catalog_id", "")),
+            "catalog_name": str(catalog.get("catalog_name", "")),
+            "selection_mode": str(selection.get("selection_mode", "")),
+            "selected_app_ids": list(selection.get("selected_app_ids", [])),
+            "source_catalogs": [
+                {
+                    "catalog_id": str(catalog.get("catalog_id", "")),
+                    "catalog_name": str(catalog.get("catalog_name", "")),
+                }
+            ],
+        },
     },
-    "selected_airgap": {
-        "selection_mode": "baked-from-selected-os",
-        "selection_source": "branch-smoke",
-        "release_channel": "revalidation",
-        "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
-        "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
-        "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
-        "arch": os.environ["BAKED_AIRGAP_ARCH"],
-        "profile": os.environ["BAKED_AIRGAP_PROFILE"],
-        "version": os.environ["BAKED_AIRGAP_VERSION"],
-        "created": os.environ["BAKED_AIRGAP_CREATED"],
-        "k3s_version": os.environ["BAKED_AIRGAP_K3S_VERSION"],
-        "images_lock_sha256": os.environ["BAKED_AIRGAP_IMAGES_LOCK_SHA256"],
-        "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
-        "manifest_relpath": "artifacts/airgap/manifest.env",
-        "present_in_selected_os_payload": True,
-    },
-    "selected_applications": {
-        "catalog_id": str(catalog.get("catalog_id", "")),
-        "catalog_name": str(catalog.get("catalog_name", "")),
-        "selection_mode": str(selection.get("selection_mode", "")),
-        "selected_app_ids": list(selection.get("selected_app_ids", [])),
-        "catalog_relpath": "artifacts/airgap/catalog.json",
-        "selection_relpath": "artifacts/airgap/selected-apps.json",
-        "source_catalogs": [
-            {
-                "catalog_id": str(catalog.get("catalog_id", "")),
-                "catalog_name": str(catalog.get("catalog_name", "")),
-                "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
-                "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
-            }
-        ],
+    "resolved": {
+        "os": {
+            "selection_source": "branch-smoke",
+            "release_channel": "revalidation",
+            "artifact_ref": os.environ["OS_ARTIFACT_REF"],
+            "artifact_digest": f"sha256:{os.environ['OS_PAYLOAD_SHA']}",
+            "artifact_type": os.environ["OS_ARTIFACT_TYPE"],
+            "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
+            "payload": {
+                "relpath": "artifacts/os/os-payload.tar.gz",
+                "sha256": os.environ["OS_PAYLOAD_SHA"],
+                "size_bytes": int(os.environ["OS_PAYLOAD_SIZE"]),
+            },
+            "metadata_relpath": "artifacts/os/os.meta.env",
+        },
+        "airgap": {
+            "selection_mode": "baked-from-selected-os",
+            "selection_source": "branch-smoke",
+            "release_channel": "revalidation",
+            "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
+            "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
+            "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
+            "arch": os.environ["BAKED_AIRGAP_ARCH"],
+            "profile": os.environ["BAKED_AIRGAP_PROFILE"],
+            "version": os.environ["BAKED_AIRGAP_VERSION"],
+            "created": os.environ["BAKED_AIRGAP_CREATED"],
+            "k3s_version": os.environ["BAKED_AIRGAP_K3S_VERSION"],
+            "images_lock_sha256": os.environ["BAKED_AIRGAP_IMAGES_LOCK_SHA256"],
+            "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
+            "manifest_relpath": "artifacts/airgap/manifest.env",
+            "present_in_selected_os_payload": True,
+        },
+        "applications": {
+            "catalog_id": str(catalog.get("catalog_id", "")),
+            "catalog_name": str(catalog.get("catalog_name", "")),
+            "selection_mode": str(selection.get("selection_mode", "")),
+            "selected_app_ids": list(selection.get("selected_app_ids", [])),
+            "catalog_relpath": "artifacts/airgap/catalog.json",
+            "selection_relpath": "artifacts/airgap/selected-apps.json",
+            "source_catalogs": [
+                {
+                    "catalog_id": str(catalog.get("catalog_id", "")),
+                    "catalog_name": str(catalog.get("catalog_name", "")),
+                    "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
+                    "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
+                }
+            ],
+        },
     },
     "staged_files": staged_files,
 }

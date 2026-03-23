@@ -73,7 +73,7 @@ OURBOX_VARIANT=prod
 OURBOX_VERSION=fixture
 OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=fixture-contract
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.0
+OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_PLATFORM_CONTRACT_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -118,7 +118,7 @@ import sys
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
-selected_apps = manifest.get("selected_applications", {})
+selected_apps = (manifest.get("resolved") or {}).get("applications", {})
 if selected_apps.get("catalog_id") != "demo-apps":
     raise SystemExit("unexpected selected_applications.catalog_id")
 if selected_apps.get("selection_mode") != "catalog-defaults":
