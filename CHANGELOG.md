@@ -1,3 +1,10 @@
+## [0.14.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.2...v0.14.3) (2026-03-23)
+
+
+### Bug Fixes
+
+* restore the woodbox contract version gate ([21bac94](https://github.com/techofourown/img-ourbox-woodbox/commit/21bac94f6a62ed7b69fcfc113af3bbf404a6b112))
+
 ## [0.14.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.1...v0.14.2) (2026-03-21)
 
 
