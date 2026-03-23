@@ -1,3 +1,10 @@
+## [0.14.5](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.4...v0.14.5) (2026-03-23)
+
+
+### Bug Fixes
+
+* correct mission-airgap smoke var name and revert vendored script ([f3cb78b](https://github.com/techofourown/img-ourbox-woodbox/commit/f3cb78bada37d0870a3d396af8b019282f7f952f))
+
 ## [0.14.4](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.3...v0.14.4) (2026-03-23)
 
 
