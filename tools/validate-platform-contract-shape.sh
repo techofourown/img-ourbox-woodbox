@@ -24,7 +24,6 @@ required_paths=(
   "tools/render-contract.py"
   "tools/verify-runtime.sh"
   "profiles/demo-apps/profile.env"
-  "profiles/demo-apps/images.lock.json"
   "rendered/defaults/demo-apps/selected-app-surface.json"
 )
 
