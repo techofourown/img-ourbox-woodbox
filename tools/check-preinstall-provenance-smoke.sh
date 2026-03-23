@@ -30,19 +30,19 @@ export OS_ARTIFACT_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 export OS_IMAGE_SHA256="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 export RELEASE_CHANNEL="stable"
 export INSTALL_SELECTION_SOURCE="os-default-ref"
-export OURBOX_AIRGAP_PLATFORM_SOURCE="https://github.com/techofourown/sw-ourbox-os"
-export OURBOX_AIRGAP_PLATFORM_REVISION="fixture-airgap-revision"
-export OURBOX_AIRGAP_PLATFORM_VERSION="v0.0.0-fixture"
-export OURBOX_AIRGAP_PLATFORM_CREATED="2026-03-11T00:00:00Z"
-export OURBOX_AIRGAP_PLATFORM_ARCH="amd64"
-export OURBOX_AIRGAP_PLATFORM_PROFILE="demo-apps"
-export OURBOX_AIRGAP_PLATFORM_K3S_VERSION="v1.35.0+k3s1"
-export OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-export OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"
-export OURBOX_AIRGAP_PLATFORM_REF="ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-export OURBOX_AIRGAP_PLATFORM_DIGEST="sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-export OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="catalog"
-export OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="stable"
+export OURBOX_SUBSTRATE_SOURCE="https://github.com/techofourown/sw-ourbox-os"
+export OURBOX_SUBSTRATE_REVISION="fixture-airgap-revision"
+export OURBOX_SUBSTRATE_VERSION="v0.0.0-fixture"
+export OURBOX_SUBSTRATE_CREATED="2026-03-11T00:00:00Z"
+export OURBOX_SUBSTRATE_ARCH="amd64"
+export OURBOX_SUBSTRATE_PROFILE="demo-apps"
+export OURBOX_SUBSTRATE_K3S_VERSION="v1.35.0+k3s1"
+export OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+export OURBOX_SUBSTRATE_ARTIFACT_SOURCE="registry"
+export OURBOX_SUBSTRATE_REF="ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+export OURBOX_SUBSTRATE_DIGEST="sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+export OURBOX_SUBSTRATE_SELECTION_SOURCE="catalog"
+export OURBOX_SUBSTRATE_RELEASE_CHANNEL="stable"
 export OURBOX_APPLICATION_CATALOG_ID="demo-apps"
 export OURBOX_APPLICATION_CATALOG_NAME="Demo Apps"
 export OURBOX_APPLICATION_SELECTION_MODE="catalog-defaults"
@@ -51,7 +51,7 @@ export OURBOX_SELECTED_APPLICATION_IDS="landing,dufs"
 write_install_provenance
 
 TARGET_DIR="${TMP}/target"
-OVERRIDE_DIR="${TMP}/airgap-platform-override"
+OVERRIDE_DIR="${TMP}/ourbox-substrate-override"
 APPLICATION_SELECTION_DIR="${TMP}/application-selection"
 mkdir -p "${TARGET_DIR}/etc/ourbox"
 mkdir -p "${TARGET_DIR}/opt/ourbox/airgap/platform" \
@@ -70,8 +70,8 @@ OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
   echo "append-provenance.sh was not generated" >&2
   exit 1
 }
-[[ -f "${CACHE_DIR}/apply-airgap-platform-override.sh" ]] || {
-  echo "apply-airgap-platform-override.sh was not generated" >&2
+[[ -f "${CACHE_DIR}/apply-ourbox-substrate-override.sh" ]] || {
+  echo "apply-ourbox-substrate-override.sh was not generated" >&2
   exit 1
 }
 [[ -f "${CACHE_DIR}/apply-application-selection.sh" ]] || {
@@ -79,21 +79,21 @@ OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
   exit 1
 }
 
-grep -F 'AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${CACHE_DIR}/install-provenance.env" >/dev/null
+grep -F 'SUBSTRATE_ARTIFACT_SOURCE="registry"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F 'APPLICATION_CATALOG_ID="demo-apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F 'APPLICATION_CATALOG_NAME="Demo Apps"' "${CACHE_DIR}/install-provenance.env" >/dev/null
 grep -F 'SELECTED_APPLICATION_IDS="landing,dufs"' "${CACHE_DIR}/install-provenance.env" >/dev/null
-grep -F 'OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
-grep -F 'OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR:-/opt/ourbox/installer/cache/airgap-platform-override' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+grep -F 'OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null
+grep -F 'OURBOX_INSTALLER_SUBSTRATE_OVERRIDE_DIR:-/opt/ourbox/installer/cache/ourbox-substrate-override' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null
 grep -F 'OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/installer/cache/catalog.json' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 grep -F 'OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
-grep -F 'OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="registry"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
+grep -F 'OURBOX_SUBSTRATE_ARTIFACT_SOURCE="registry"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'OURBOX_APPLICATION_CATALOG_ID="demo-apps"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'OURBOX_APPLICATION_CATALOG_NAME="Demo Apps"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'OURBOX_SELECTED_APPLICATION_IDS="landing,dufs"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 grep -F 'EXISTING_KEY="existing-value"' "${TARGET_DIR}/etc/ourbox/release" >/dev/null
 # shellcheck disable=SC2016
-grep -F 'if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null
+grep -F 'if [ "${SUBSTRATE_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null
 # shellcheck disable=SC2016
 grep -F 'cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
@@ -104,7 +104,7 @@ if grep -Fq "OURBOX_INSTALL_DEFAULTS_" "${CACHE_DIR}/append-provenance.sh"; then
   echo "legacy install-defaults release fields must not be appended" >&2
   exit 1
 fi
-if grep -F 'contract.digest' "${CACHE_DIR}/apply-airgap-platform-override.sh" >/dev/null; then
+if grep -F 'contract.digest' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null; then
   echo "override helper must not replace platform contract files" >&2
   exit 1
 fi
@@ -117,8 +117,8 @@ printf 'K3S_VERSION=v1.35.0+k3s1\n' > "${OVERRIDE_DIR}/manifest.env"
 printf 'keep-me\n' > "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest"
 
 OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
-OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR="${OVERRIDE_DIR}" \
-  "${CACHE_DIR}/apply-airgap-platform-override.sh" "${TARGET_DIR}"
+OURBOX_INSTALLER_SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}" \
+  "${CACHE_DIR}/apply-ourbox-substrate-override.sh" "${TARGET_DIR}"
 
 [[ -f "${TARGET_DIR}/opt/ourbox/airgap/k3s/README" ]] || {
   echo "override helper did not stage k3s payload into target" >&2

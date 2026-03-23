@@ -1065,7 +1065,7 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_approved_parser.add_argument("--github-path")
     resolve_approved_parser.add_argument("--artifact-key", required=True)
     resolve_approved_parser.add_argument("--channel-key", required=True)
-    resolve_approved_parser.add_argument("--env-var", default="OURBOX_AIRGAP_PLATFORM_REF")
+    resolve_approved_parser.add_argument("--env-var", default="OURBOX_SUBSTRATE_REF")
     resolve_approved_parser.add_argument("--github-env")
     resolve_approved_parser.set_defaults(func=cmd_resolve_approved_upstream_input)
 

@@ -114,9 +114,8 @@ Official Woodbox builds publish:
 
 Terminology note:
 
-- the transport artifact is still named `airgap-platform` in the current OCI
-  and runtime surfaces
-- the user-facing meaning is now “application catalogs” plus a selected app set
+- the transport artifact is named `ourbox-substrate` in OCI and runtime surfaces
+- the user-facing meaning is "application catalogs" plus a selected app set
 
 Candidate builds resolve exact upstream refs from the approved
 `sw-ourbox-os/release/approved-upstream-inputs.json` snapshot pinned in
@@ -128,7 +127,7 @@ The offline-install contract now lives in the Woodbox substrate itself:
 
 - target package installation comes from substrate-local media, not Ubuntu mirrors
 - target netplan is rendered from hardware inventory, not the live installer's default route
-- target-side OS and `airgap-platform` browsing/pulling are removed from the supported path
+- target-side OS and `ourbox-substrate` browsing/pulling are removed from the supported path
 
 ## Documentation
 

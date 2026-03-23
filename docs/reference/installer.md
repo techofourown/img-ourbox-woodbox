@@ -8,7 +8,7 @@ Woodbox now distinguishes two different objects:
 
 - target-owned boot/install runtime
 - no selected OS bytes
-- no selected `airgap-platform` bytes
+- no selected `ourbox-substrate` bytes
 - not a supported standalone install path
 
 ### Mission media
@@ -50,7 +50,7 @@ Baked into ISO at build time:
 - `/cdrom/ourbox/installer/defaults.env`
 
 This file now carries installer-local posture only. It does not carry OS
-selection policy, `airgap-platform` selection policy, ORAS versioning, or
+selection policy, `ourbox-substrate` selection policy, ORAS versioning, or
 remote `install-defaults` state.
 
 Current fields:
@@ -115,7 +115,7 @@ The `ourbox-preinstall` service runs on TTY1 before Subiquity starts. It:
 1. Prompts for the OS disk
 2. Prompts for the DATA disk
 3. Loads the staged OS payload from mission media
-4. Stages the selected `airgap-platform` bundle from mission media
+4. Stages the selected `ourbox-substrate` bundle from mission media
    and stages the selected application catalog / selected app set metadata
 5. Prompts for hostname, username, password, and installed-target SSH password posture
 6. Prompts for final destructive confirmation (`INSTALL`)
@@ -125,7 +125,7 @@ Critical boundary:
 - the target never browses catalogs
 - the target never resolves refs
 - the target never logs into registries
-- the target never pulls OS or `airgap-platform` artifacts
+- the target never pulls OS or `ourbox-substrate` artifacts
 - the target never fetches remote `install-defaults`
 
 Step 3:
@@ -138,13 +138,13 @@ Step 3:
 
 Step 4:
 
-- reads the selected `airgap-platform` identity from the embedded mission
+- reads the selected `ourbox-substrate` identity from the embedded mission
   manifest
 - reads the selected application catalog ids and selected app ids from the
   embedded mission manifest
-- if the mission-selected airgap bundle matches the baked bundle already inside
+- if the mission-selected substrate bundle matches the baked bundle already inside
   the OS payload, uses the baked bundle
-- otherwise extracts the staged mission airgap bundle into the override cache
+- otherwise extracts the staged mission substrate bundle into the override cache
 - validates the extracted bundle locally against:
   - required `OURBOX_PLATFORM_CONTRACT_DIGEST`
   - expected `amd64` arch
@@ -256,9 +256,9 @@ target-side runtime input.
 
 Late-commands in `autoinstall.tpl`:
 
-1. Extract `os-payload.tar.gz` and copy the payload rootfs + baked airgap bytes into `/target/`
+1. Extract `os-payload.tar.gz` and copy the payload rootfs + baked substrate bytes into `/target/`
 2. Install the remaining target packages from the substrate-local APT repo only
-3. If the mission-selected airgap bundle differs from the baked bundle, overlay the validated mutable airgap subset from the override cache
+3. If the mission-selected substrate bundle differs from the baked bundle, overlay the validated mutable substrate subset from the override cache
 4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory
 5. Install the `k3s` binary from `airgap/k3s/k3s`
 6. Append install-time provenance to `/target/etc/ourbox/release`
@@ -282,19 +282,19 @@ Late-commands in `autoinstall.tpl`:
 - `OURBOX_OS_IMAGE_SHA256`
 - `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
-- `OURBOX_AIRGAP_PLATFORM_SOURCE`
-- `OURBOX_AIRGAP_PLATFORM_REVISION`
-- `OURBOX_AIRGAP_PLATFORM_VERSION`
-- `OURBOX_AIRGAP_PLATFORM_CREATED`
-- `OURBOX_AIRGAP_PLATFORM_ARCH`
-- `OURBOX_AIRGAP_PLATFORM_PROFILE`
-- `OURBOX_AIRGAP_PLATFORM_K3S_VERSION`
-- `OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256`
-- `OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE`
-- `OURBOX_AIRGAP_PLATFORM_REF`
-- `OURBOX_AIRGAP_PLATFORM_DIGEST`
-- `OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE`
-- `OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL`
+- `OURBOX_SUBSTRATE_SOURCE`
+- `OURBOX_SUBSTRATE_REVISION`
+- `OURBOX_SUBSTRATE_VERSION`
+- `OURBOX_SUBSTRATE_CREATED`
+- `OURBOX_SUBSTRATE_ARCH`
+- `OURBOX_SUBSTRATE_PROFILE`
+- `OURBOX_SUBSTRATE_K3S_VERSION`
+- `OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256`
+- `OURBOX_SUBSTRATE_ARTIFACT_SOURCE`
+- `OURBOX_SUBSTRATE_REF`
+- `OURBOX_SUBSTRATE_DIGEST`
+- `OURBOX_SUBSTRATE_SELECTION_SOURCE`
+- `OURBOX_SUBSTRATE_RELEASE_CHANNEL`
 - `OURBOX_APPLICATION_CATALOG_ID`
 - `OURBOX_APPLICATION_CATALOG_NAME`
 - `OURBOX_APPLICATION_SELECTION_MODE`

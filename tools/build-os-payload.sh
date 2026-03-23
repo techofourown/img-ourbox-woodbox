@@ -4,12 +4,12 @@
 # The OS payload contains everything needed to install Woodbox onto a target:
 #   - rootfs overlay (installer/ourbox/rootfs/)
 #   - airgap bundle (k3s binary + image tars from artifacts/airgap/)
-#   - platform contract content (synced from sw-ourbox-os by fetch-airgap-platform.sh)
+#   - platform contract content (synced from sw-ourbox-os by fetch-ourbox-substrate.sh)
 #   - payload provenance metadata (payload.meta.env)
 #
 # Output: deploy/os-payload-ourbox-woodbox-<target>-<sku>-<variant>-<version>.tar.gz
 #
-# Run fetch-airgap-platform.sh first (which also fetches and syncs the platform contract).
+# Run fetch-ourbox-substrate.sh first (which also fetches and syncs the platform contract).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,24 +47,24 @@ OUT_SHA="${OUT_TAR}.sha256"
 
 # Require airgap artifacts
 [[ -x "${ROOT}/artifacts/airgap/k3s/k3s" ]] || \
-  die "missing artifacts/airgap/k3s/k3s — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/k3s/k3s — run: ./tools/fetch-ourbox-substrate.sh"
 [[ -f "${ROOT}/artifacts/airgap/manifest.env" ]] || \
-  die "missing artifacts/airgap/manifest.env — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/manifest.env — run: ./tools/fetch-ourbox-substrate.sh"
 [[ -f "${ROOT}/artifacts/airgap/platform/images.lock.json" ]] || \
-  die "missing artifacts/airgap/platform/images.lock.json — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/platform/images.lock.json — run: ./tools/fetch-ourbox-substrate.sh"
 [[ -f "${ROOT}/artifacts/airgap/platform/catalog.json" ]] || \
-  die "missing artifacts/airgap/platform/catalog.json — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/platform/catalog.json — run: ./tools/fetch-ourbox-substrate.sh"
 [[ -f "${ROOT}/artifacts/airgap/platform/selected-apps.json" ]] || \
-  die "missing artifacts/airgap/platform/selected-apps.json — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/platform/selected-apps.json — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Require platform contract sync
 [[ -f "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env" ]] || \
-  die "missing synced platform contract — run: ./tools/fetch-airgap-platform.sh"
+  die "missing synced platform contract — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Load upstream metadata for provenance recording
 AIRGAP_SELECTED_BUNDLE_ENV="${ROOT}/artifacts/airgap/selected-bundle.env"
 [[ -f "${AIRGAP_SELECTED_BUNDLE_ENV}" ]] || \
-  die "missing artifacts/airgap/selected-bundle.env — run: ./tools/fetch-airgap-platform.sh"
+  die "missing artifacts/airgap/selected-bundle.env — run: ./tools/fetch-ourbox-substrate.sh"
 # shellcheck disable=SC1090
 source "${AIRGAP_SELECTED_BUNDLE_ENV}"
 
@@ -74,17 +74,17 @@ CONTRACT_DIGEST_FILE="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform
 source "${CONTRACT_ENV}"
 CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}" 2>/dev/null || echo unknown)"
 
-OURBOX_AIRGAP_PLATFORM_REF="${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-OURBOX_AIRGAP_PLATFORM_DIGEST="${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-OURBOX_AIRGAP_PLATFORM_SOURCE="${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}"
-OURBOX_AIRGAP_PLATFORM_REVISION="${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-OURBOX_AIRGAP_PLATFORM_VERSION="${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-OURBOX_AIRGAP_PLATFORM_CREATED="${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}"
-OURBOX_AIRGAP_PLATFORM_ARCH="${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}"
-OURBOX_AIRGAP_PLATFORM_PROFILE="${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}"
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
-K3S_VERSION="${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
+OURBOX_SUBSTRATE_REF="${OURBOX_SUBSTRATE_REF:-unknown}"
+OURBOX_SUBSTRATE_DIGEST="${OURBOX_SUBSTRATE_DIGEST:-unknown}"
+OURBOX_SUBSTRATE_SOURCE="${OURBOX_SUBSTRATE_SOURCE:-unknown}"
+OURBOX_SUBSTRATE_REVISION="${OURBOX_SUBSTRATE_REVISION:-unknown}"
+OURBOX_SUBSTRATE_VERSION="${OURBOX_SUBSTRATE_VERSION:-unknown}"
+OURBOX_SUBSTRATE_CREATED="${OURBOX_SUBSTRATE_CREATED:-unknown}"
+OURBOX_SUBSTRATE_ARCH="${OURBOX_SUBSTRATE_ARCH:-unknown}"
+OURBOX_SUBSTRATE_PROFILE="${OURBOX_SUBSTRATE_PROFILE:-unknown}"
+OURBOX_SUBSTRATE_K3S_VERSION="${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}"
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}"
+K3S_VERSION="${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}"
 
 GIT_SHA="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 GIT_SHA_SHORT="$(git -C "${ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
@@ -146,16 +146,16 @@ OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
 OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
 OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}
 OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
-OURBOX_AIRGAP_PLATFORM_REF=${OURBOX_AIRGAP_PLATFORM_REF}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${OURBOX_AIRGAP_PLATFORM_DIGEST}
-OURBOX_AIRGAP_PLATFORM_SOURCE=${OURBOX_AIRGAP_PLATFORM_SOURCE}
-OURBOX_AIRGAP_PLATFORM_REVISION=${OURBOX_AIRGAP_PLATFORM_REVISION}
-OURBOX_AIRGAP_PLATFORM_VERSION=${OURBOX_AIRGAP_PLATFORM_VERSION}
-OURBOX_AIRGAP_PLATFORM_CREATED=${OURBOX_AIRGAP_PLATFORM_CREATED}
-OURBOX_AIRGAP_PLATFORM_ARCH=${OURBOX_AIRGAP_PLATFORM_ARCH}
-OURBOX_AIRGAP_PLATFORM_PROFILE=${OURBOX_AIRGAP_PLATFORM_PROFILE}
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${OURBOX_AIRGAP_PLATFORM_K3S_VERSION}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256}
+OURBOX_SUBSTRATE_REF=${OURBOX_SUBSTRATE_REF}
+OURBOX_SUBSTRATE_DIGEST=${OURBOX_SUBSTRATE_DIGEST}
+OURBOX_SUBSTRATE_SOURCE=${OURBOX_SUBSTRATE_SOURCE}
+OURBOX_SUBSTRATE_REVISION=${OURBOX_SUBSTRATE_REVISION}
+OURBOX_SUBSTRATE_VERSION=${OURBOX_SUBSTRATE_VERSION}
+OURBOX_SUBSTRATE_CREATED=${OURBOX_SUBSTRATE_CREATED}
+OURBOX_SUBSTRATE_ARCH=${OURBOX_SUBSTRATE_ARCH}
+OURBOX_SUBSTRATE_PROFILE=${OURBOX_SUBSTRATE_PROFILE}
+OURBOX_SUBSTRATE_K3S_VERSION=${OURBOX_SUBSTRATE_K3S_VERSION}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256}
 OURBOX_BASE_ISO_URL=${UBUNTU_ISO_URL:-unknown}
 OURBOX_BASE_ISO_SHA256=${UBUNTU_ISO_SHA256:-unknown}
 K3S_VERSION=${K3S_VERSION:-unknown}

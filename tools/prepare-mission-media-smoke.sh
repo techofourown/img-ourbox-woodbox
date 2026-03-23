@@ -123,16 +123,16 @@ meta_dump="$(
     --allow OURBOX_PLATFORM_CONTRACT_VERSION \
     --allow OURBOX_PLATFORM_CONTRACT_CREATED \
     --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
-    --allow OURBOX_AIRGAP_PLATFORM_REF \
-    --allow OURBOX_AIRGAP_PLATFORM_DIGEST \
-    --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
-    --allow OURBOX_AIRGAP_PLATFORM_REVISION \
-    --allow OURBOX_AIRGAP_PLATFORM_VERSION \
-    --allow OURBOX_AIRGAP_PLATFORM_CREATED \
-    --allow OURBOX_AIRGAP_PLATFORM_ARCH \
-    --allow OURBOX_AIRGAP_PLATFORM_PROFILE \
-    --allow OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-    --allow OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+    --allow OURBOX_SUBSTRATE_REF \
+    --allow OURBOX_SUBSTRATE_DIGEST \
+    --allow OURBOX_SUBSTRATE_SOURCE \
+    --allow OURBOX_SUBSTRATE_REVISION \
+    --allow OURBOX_SUBSTRATE_VERSION \
+    --allow OURBOX_SUBSTRATE_CREATED \
+    --allow OURBOX_SUBSTRATE_ARCH \
+    --allow OURBOX_SUBSTRATE_PROFILE \
+    --allow OURBOX_SUBSTRATE_K3S_VERSION \
+    --allow OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
     --allow OURBOX_BASE_ISO_URL \
     --allow OURBOX_BASE_ISO_SHA256 \
     --allow K3S_VERSION \
@@ -140,16 +140,16 @@ meta_dump="$(
     --allow GITHUB_RUN_ATTEMPT \
     --require OS_ARTIFACT_TYPE \
     --require OURBOX_PLATFORM_CONTRACT_DIGEST \
-    --require OURBOX_AIRGAP_PLATFORM_REF \
-    --require OURBOX_AIRGAP_PLATFORM_DIGEST \
-    --require OURBOX_AIRGAP_PLATFORM_SOURCE \
-    --require OURBOX_AIRGAP_PLATFORM_REVISION \
-    --require OURBOX_AIRGAP_PLATFORM_VERSION \
-    --require OURBOX_AIRGAP_PLATFORM_CREATED \
-    --require OURBOX_AIRGAP_PLATFORM_ARCH \
-    --require OURBOX_AIRGAP_PLATFORM_PROFILE \
-    --require OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-    --require OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+    --require OURBOX_SUBSTRATE_REF \
+    --require OURBOX_SUBSTRATE_DIGEST \
+    --require OURBOX_SUBSTRATE_SOURCE \
+    --require OURBOX_SUBSTRATE_REVISION \
+    --require OURBOX_SUBSTRATE_VERSION \
+    --require OURBOX_SUBSTRATE_CREATED \
+    --require OURBOX_SUBSTRATE_ARCH \
+    --require OURBOX_SUBSTRATE_PROFILE \
+    --require OURBOX_SUBSTRATE_K3S_VERSION \
+    --require OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
     --print OS_ARTIFACT_TYPE \
     --print OURBOX_PRODUCT \
     --print OURBOX_DEVICE \
@@ -162,16 +162,16 @@ meta_dump="$(
     --print OURBOX_PLATFORM_CONTRACT_VERSION \
     --print OURBOX_PLATFORM_CONTRACT_CREATED \
     --print OURBOX_PLATFORM_CONTRACT_DIGEST \
-    --print OURBOX_AIRGAP_PLATFORM_REF \
-    --print OURBOX_AIRGAP_PLATFORM_DIGEST \
-    --print OURBOX_AIRGAP_PLATFORM_SOURCE \
-    --print OURBOX_AIRGAP_PLATFORM_REVISION \
-    --print OURBOX_AIRGAP_PLATFORM_VERSION \
-    --print OURBOX_AIRGAP_PLATFORM_CREATED \
-    --print OURBOX_AIRGAP_PLATFORM_ARCH \
-    --print OURBOX_AIRGAP_PLATFORM_PROFILE \
-    --print OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-    --print OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256
+    --print OURBOX_SUBSTRATE_REF \
+    --print OURBOX_SUBSTRATE_DIGEST \
+    --print OURBOX_SUBSTRATE_SOURCE \
+    --print OURBOX_SUBSTRATE_REVISION \
+    --print OURBOX_SUBSTRATE_VERSION \
+    --print OURBOX_SUBSTRATE_CREATED \
+    --print OURBOX_SUBSTRATE_ARCH \
+    --print OURBOX_SUBSTRATE_PROFILE \
+    --print OURBOX_SUBSTRATE_K3S_VERSION \
+    --print OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256
 )"
 mapfile -t meta_fields <<<"${meta_dump}"
 [[ "${#meta_fields[@]}" -eq 22 ]] || die "unexpected metadata parse result from ${OS_META_ENV}"
@@ -208,9 +208,9 @@ cp -a "${PAYLOAD_ROOT}/airgap/." "${BUNDLE_ROOT}/"
 cp -f "${BUNDLE_ROOT}/platform/catalog.json" "${MISSION_AIRGAP_DIR}/catalog.json"
 cp -f "${BUNDLE_ROOT}/platform/selected-apps.json" "${MISSION_AIRGAP_DIR}/selected-apps.json"
 cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
-tar -C "${BUNDLE_ROOT}" -czf "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" k3s platform manifest.env
-printf '%s  %s\n' "$(sha256sum "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz" | awk '{print $1}')" "airgap-platform.tar.gz" \
-  > "${MISSION_AIRGAP_DIR}/airgap-platform.tar.gz.sha256"
+tar -C "${BUNDLE_ROOT}" -czf "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
+printf '%s  %s\n' "$(sha256sum "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" | awk '{print $1}')" "ourbox-substrate.tar.gz" \
+  > "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz.sha256"
 
 cp -f "${OS_PAYLOAD}" "${MISSION_OS_DIR}/os-payload.tar.gz"
 printf '%s  %s\n' "${OS_PAYLOAD_SHA}" "os-payload.tar.gz" > "${MISSION_OS_DIR}/os-payload.tar.gz.sha256"
@@ -382,7 +382,7 @@ manifest = {
             "created": os.environ["BAKED_AIRGAP_CREATED"],
             "k3s_version": os.environ["BAKED_AIRGAP_K3S_VERSION"],
             "images_lock_sha256": os.environ["BAKED_AIRGAP_IMAGES_LOCK_SHA256"],
-            "payload_relpath": "artifacts/airgap/airgap-platform.tar.gz",
+            "payload_relpath": "artifacts/airgap/ourbox-substrate.tar.gz",
             "manifest_relpath": "artifacts/airgap/manifest.env",
             "present_in_selected_os_payload": True,
         },

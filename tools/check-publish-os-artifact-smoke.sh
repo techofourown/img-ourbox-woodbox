@@ -27,16 +27,16 @@ OURBOX_PLATFORM_CONTRACT_SOURCE=ghcr.io/techofourown/sw-ourbox-os/platform-contr
 OURBOX_PLATFORM_CONTRACT_REVISION=fixture-revision
 OURBOX_PLATFORM_CONTRACT_VERSION=v0.0.0-fixture
 K3S_VERSION=${FIXTURE_K3S_VERSION}
-OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@${AIRGAP_BUNDLE_DIGEST}
-OURBOX_AIRGAP_PLATFORM_DIGEST=${AIRGAP_BUNDLE_DIGEST}
-OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_AIRGAP_PLATFORM_REVISION=fixture-airgap-revision
-OURBOX_AIRGAP_PLATFORM_VERSION=v0.0.0-airgap-fixture
-OURBOX_AIRGAP_PLATFORM_CREATED=2026-03-09T00:00:00Z
-OURBOX_AIRGAP_PLATFORM_ARCH=amd64
-OURBOX_AIRGAP_PLATFORM_PROFILE=demo-apps
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=${FIXTURE_K3S_VERSION}
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=${AIRGAP_LOCK_SHA}
+OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@${AIRGAP_BUNDLE_DIGEST}
+OURBOX_SUBSTRATE_DIGEST=${AIRGAP_BUNDLE_DIGEST}
+OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
+OURBOX_SUBSTRATE_REVISION=fixture-airgap-revision
+OURBOX_SUBSTRATE_VERSION=v0.0.0-airgap-fixture
+OURBOX_SUBSTRATE_CREATED=2026-03-09T00:00:00Z
+OURBOX_SUBSTRATE_ARCH=amd64
+OURBOX_SUBSTRATE_PROFILE=demo-apps
+OURBOX_SUBSTRATE_K3S_VERSION=${FIXTURE_K3S_VERSION}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${AIRGAP_LOCK_SHA}
 EOF
 
 export ORAS_STUB_STATE="${STATE_DIR}"
@@ -109,18 +109,18 @@ with open(catalog_path, "r", encoding="utf-8") as fh:
     catalog = fh.read()
 
 assert meta["OURBOX_PLATFORM_CONTRACT_DIGEST"] == override_digest
-assert meta["OURBOX_AIRGAP_PLATFORM_REF"] == f"ghcr.io/techofourown/sw-ourbox-os/airgap-platform@{airgap_digest}"
-assert meta["OURBOX_AIRGAP_PLATFORM_DIGEST"] == airgap_digest
-assert meta["OURBOX_AIRGAP_PLATFORM_SOURCE"] == "https://github.com/techofourown/sw-ourbox-os"
-assert meta["OURBOX_AIRGAP_PLATFORM_ARCH"] == "amd64"
-assert meta["OURBOX_AIRGAP_PLATFORM_PROFILE"] == "demo-apps"
-assert meta["OURBOX_AIRGAP_PLATFORM_K3S_VERSION"] == k3s_version
-assert meta["OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256"] == lock_sha
+assert meta["OURBOX_SUBSTRATE_REF"] == f"ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@{airgap_digest}"
+assert meta["OURBOX_SUBSTRATE_DIGEST"] == airgap_digest
+assert meta["OURBOX_SUBSTRATE_SOURCE"] == "https://github.com/techofourown/sw-ourbox-os"
+assert meta["OURBOX_SUBSTRATE_ARCH"] == "amd64"
+assert meta["OURBOX_SUBSTRATE_PROFILE"] == "demo-apps"
+assert meta["OURBOX_SUBSTRATE_K3S_VERSION"] == k3s_version
+assert meta["OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256"] == lock_sha
 assert "GITHUB_WORKFLOW" not in meta
 assert publish["control_fields"]["platform_contract_digest"] == override_digest
 assert publish["meta_env"]["OURBOX_PLATFORM_CONTRACT_DIGEST"] == override_digest
-assert publish["meta_env"]["OURBOX_AIRGAP_PLATFORM_DIGEST"] == airgap_digest
-assert publish["meta_env"]["OURBOX_AIRGAP_PLATFORM_K3S_VERSION"] == k3s_version
+assert publish["meta_env"]["OURBOX_SUBSTRATE_DIGEST"] == airgap_digest
+assert publish["meta_env"]["OURBOX_SUBSTRATE_K3S_VERSION"] == k3s_version
 assert "GITHUB_WORKFLOW" not in publish["meta_env"]
 assert override_digest in catalog
 assert raw_digest not in catalog

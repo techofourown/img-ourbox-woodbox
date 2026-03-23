@@ -47,12 +47,12 @@ cat > "${PAYLOAD_AIRGAP}/platform/selected-apps.json" <<'EOF'
 }
 EOF
 cat > "${PAYLOAD_AIRGAP}/manifest.env" <<'EOF'
-OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_AIRGAP_PLATFORM_REVISION=fixture-revision
-OURBOX_AIRGAP_PLATFORM_VERSION=v0.0.0-fixture
-OURBOX_AIRGAP_PLATFORM_CREATED=2026-03-13T00:00:00Z
+OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
+OURBOX_SUBSTRATE_REVISION=fixture-revision
+OURBOX_SUBSTRATE_VERSION=v0.0.0-fixture
+OURBOX_SUBSTRATE_CREATED=2026-03-13T00:00:00Z
 OURBOX_PLATFORM_CONTRACT_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-AIRGAP_PLATFORM_ARCH=amd64
+OURBOX_SUBSTRATE_ARCH=amd64
 K3S_VERSION=v1.35.0+k3s1
 OURBOX_PLATFORM_PROFILE=demo-apps
 OURBOX_PLATFORM_IMAGES_LOCK_PATH=platform/images.lock.json
@@ -75,16 +75,16 @@ OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_PLATFORM_CONTRACT_REVISION=fixture-contract
 OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
 OURBOX_PLATFORM_CONTRACT_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-OURBOX_AIRGAP_PLATFORM_DIGEST=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-OURBOX_AIRGAP_PLATFORM_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_AIRGAP_PLATFORM_REVISION=fixture-revision
-OURBOX_AIRGAP_PLATFORM_VERSION=v0.0.0-fixture
-OURBOX_AIRGAP_PLATFORM_CREATED=2026-03-13T00:00:00Z
-OURBOX_AIRGAP_PLATFORM_ARCH=amd64
-OURBOX_AIRGAP_PLATFORM_PROFILE=demo-apps
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=v1.35.0+k3s1
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+OURBOX_SUBSTRATE_DIGEST=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
+OURBOX_SUBSTRATE_REVISION=fixture-revision
+OURBOX_SUBSTRATE_VERSION=v0.0.0-fixture
+OURBOX_SUBSTRATE_CREATED=2026-03-13T00:00:00Z
+OURBOX_SUBSTRATE_ARCH=amd64
+OURBOX_SUBSTRATE_PROFILE=demo-apps
+OURBOX_SUBSTRATE_K3S_VERSION=v1.35.0+k3s1
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 EOF
 
 bash "${ROOT}/tools/prepare-mission-media-smoke.sh" \
@@ -106,8 +106,8 @@ MISSION_DIR="${OUT_DIR}/mission"
   echo "selected-apps.json missing from mission output" >&2
   exit 1
 }
-[[ -f "${MISSION_DIR}/artifacts/airgap/airgap-platform.tar.gz.sha256" ]] || {
-  echo "airgap checksum sidecar missing from mission output" >&2
+[[ -f "${MISSION_DIR}/artifacts/airgap/ourbox-substrate.tar.gz.sha256" ]] || {
+  echo "substrate bundle checksum sidecar missing from mission output" >&2
   exit 1
 }
 

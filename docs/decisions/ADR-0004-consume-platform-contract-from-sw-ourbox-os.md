@@ -46,10 +46,10 @@ digest-pinned refs at workflow start from the approved upstream snapshot in
 `tools/approved-upstream-inputs.upstream.env`. The following upstream artifacts are consumed:
 
 1. **platform-contract** (arch-agnostic): manifests, landing, todo-bloom assets, contract metadata
-2. **airgap-platform** (amd64-specific): `k3s` binary, `k3s-airgap-images-amd64.tar`, platform
+2. **ourbox-substrate** (amd64-specific): `k3s` binary, `k3s-airgap-images-amd64.tar`, platform
    image tars, `manifest.env`
 
-Both are pulled by `./tools/fetch-airgap-platform.sh` and synced into the installer rootfs by
+Both are pulled by `./tools/fetch-ourbox-substrate.sh` and synced into the installer rootfs by
 `./tools/sync-platform-contract-into-installer.sh`.
 
 The platform contract content is staged under `installer/ourbox/rootfs/opt/ourbox/airgap/platform/`
@@ -73,7 +73,7 @@ and `contract.digest` files.
 ### 4) Platform manifests are gitkeep placeholders
 
 `installer/ourbox/rootfs/opt/ourbox/airgap/platform/{manifests,landing,todo-bloom}/` are kept as
-`.gitkeep` placeholders in version control. They are populated by `fetch-airgap-platform.sh` from
+`.gitkeep` placeholders in version control. They are populated by `fetch-ourbox-substrate.sh` from
 the upstream OCI artifact, not authored in this repo. This makes the dependency explicit.
 
 ## Rationale
@@ -96,7 +96,7 @@ the upstream OCI artifact, not authored in this repo. This makes the dependency 
 
 ### Mitigation
 - Local/manual development builds may pass explicit `OURBOX_PLATFORM_CONTRACT_REF` and
-  `OURBOX_AIRGAP_PLATFORM_REF` overrides when they need a non-default upstream input.
+  `OURBOX_SUBSTRATE_REF` overrides when they need a non-default upstream input.
 - Official builds resolve approved upstream intent into digest-pinned refs at workflow start rather
   than approving mirrored TOOO digests in this repo's source control.
 - See `docs/reference/platform-contract.md` for the consumption workflow.

@@ -406,31 +406,31 @@ OS_IMAGE_SHA256=""
 INSTALLER_ID="woodbox"
 INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
-AIRGAP_PLATFORM_OVERRIDE_DIR="/opt/ourbox/installer/cache/airgap-platform-override"
-REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST=""
-BAKED_AIRGAP_PLATFORM_REF=""
-BAKED_AIRGAP_PLATFORM_DIGEST=""
-BAKED_AIRGAP_PLATFORM_SOURCE=""
-BAKED_AIRGAP_PLATFORM_REVISION=""
-BAKED_AIRGAP_PLATFORM_VERSION=""
-BAKED_AIRGAP_PLATFORM_CREATED=""
-BAKED_AIRGAP_PLATFORM_ARCH=""
-BAKED_AIRGAP_PLATFORM_PROFILE=""
-BAKED_AIRGAP_PLATFORM_K3S_VERSION=""
-BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
-OURBOX_AIRGAP_PLATFORM_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_REVISION=""
-OURBOX_AIRGAP_PLATFORM_VERSION=""
-OURBOX_AIRGAP_PLATFORM_CREATED=""
-OURBOX_AIRGAP_PLATFORM_ARCH=""
-OURBOX_AIRGAP_PLATFORM_PROFILE=""
-OURBOX_AIRGAP_PLATFORM_K3S_VERSION=""
-OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=""
-OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_REF=""
-OURBOX_AIRGAP_PLATFORM_DIGEST=""
-OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE=""
-OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL=""
+SUBSTRATE_OVERRIDE_DIR="/opt/ourbox/installer/cache/ourbox-substrate-override"
+REQUIRED_SUBSTRATE_CONTRACT_DIGEST=""
+BAKED_SUBSTRATE_REF=""
+BAKED_SUBSTRATE_DIGEST=""
+BAKED_SUBSTRATE_SOURCE=""
+BAKED_SUBSTRATE_REVISION=""
+BAKED_SUBSTRATE_VERSION=""
+BAKED_SUBSTRATE_CREATED=""
+BAKED_SUBSTRATE_ARCH=""
+BAKED_SUBSTRATE_PROFILE=""
+BAKED_SUBSTRATE_K3S_VERSION=""
+BAKED_SUBSTRATE_IMAGES_LOCK_SHA256=""
+OURBOX_SUBSTRATE_SOURCE=""
+OURBOX_SUBSTRATE_REVISION=""
+OURBOX_SUBSTRATE_VERSION=""
+OURBOX_SUBSTRATE_CREATED=""
+OURBOX_SUBSTRATE_ARCH=""
+OURBOX_SUBSTRATE_PROFILE=""
+OURBOX_SUBSTRATE_K3S_VERSION=""
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=""
+OURBOX_SUBSTRATE_ARTIFACT_SOURCE=""
+OURBOX_SUBSTRATE_REF=""
+OURBOX_SUBSTRATE_DIGEST=""
+OURBOX_SUBSTRATE_SELECTION_SOURCE=""
+OURBOX_SUBSTRATE_RELEASE_CHANNEL=""
 OURBOX_APPLICATION_CATALOG_ID=""
 OURBOX_APPLICATION_CATALOG_NAME=""
 OURBOX_APPLICATION_SELECTION_MODE=""
@@ -447,7 +447,7 @@ MISSION_AIRGAP_ARTIFACT_REF=""
 MISSION_AIRGAP_ARTIFACT_DIGEST=""
 MISSION_AIRGAP_SELECTION_SOURCE=""
 MISSION_AIRGAP_RELEASE_CHANNEL=""
-MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST=""
+MISSION_SUBSTRATE_CONTRACT_DIGEST=""
 MISSION_AIRGAP_ARCH=""
 MISSION_AIRGAP_PAYLOAD_PATH=""
 MISSION_AIRGAP_MANIFEST_PATH=""
@@ -534,7 +534,7 @@ render_installed_target_ssh_autoinstall_block() {
   fi
 }
 
-validate_extracted_airgap_platform_bundle() {
+validate_extracted_substrate_bundle() {
   local bundle_dir="$1"
   local required_contract_digest="$2"
   local expected_arch="$3"
@@ -543,69 +543,69 @@ validate_extracted_airgap_platform_bundle() {
   local manifest_dump=""
   local -a manifest_fields=()
 
-  [[ -f "${manifest}" ]] || die "airgap-platform bundle missing manifest.env: ${manifest}"
-  [[ -x "${bundle_dir}/k3s/k3s" ]] || die "airgap-platform bundle missing k3s binary: ${bundle_dir}/k3s/k3s"
-  [[ -f "${airgap_images_tar}" ]] || die "airgap-platform bundle missing k3s airgap images tar: ${airgap_images_tar}"
-  [[ -f "${bundle_dir}/platform/images.lock.json" ]] || die "airgap-platform bundle missing platform/images.lock.json"
-  [[ -f "${bundle_dir}/platform/profile.env" ]] || die "airgap-platform bundle missing platform/profile.env"
-  [[ -d "${bundle_dir}/platform/images" ]] || die "airgap-platform bundle missing platform/images directory"
+  [[ -f "${manifest}" ]] || die "substrate bundle missing manifest.env: ${manifest}"
+  [[ -x "${bundle_dir}/k3s/k3s" ]] || die "substrate bundle missing k3s binary: ${bundle_dir}/k3s/k3s"
+  [[ -f "${airgap_images_tar}" ]] || die "substrate bundle missing k3s airgap images tar: ${airgap_images_tar}"
+  [[ -f "${bundle_dir}/platform/images.lock.json" ]] || die "substrate bundle missing platform/images.lock.json"
+  [[ -f "${bundle_dir}/platform/profile.env" ]] || die "substrate bundle missing platform/profile.env"
+  [[ -d "${bundle_dir}/platform/images" ]] || die "substrate bundle missing platform/images directory"
   find "${bundle_dir}/platform/images" -maxdepth 1 -type f -name '*.tar' -print -quit | grep -q . \
-    || die "airgap-platform bundle missing platform image tar payloads: ${bundle_dir}/platform/images"
+    || die "substrate bundle missing platform image tar payloads: ${bundle_dir}/platform/images"
 
   manifest_dump="$(
     strict_metadata_values "${manifest}" \
-      --allow OURBOX_AIRGAP_PLATFORM_SCHEMA \
-      --allow OURBOX_AIRGAP_PLATFORM_KIND \
-      --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --allow OURBOX_AIRGAP_PLATFORM_REVISION \
-      --allow OURBOX_AIRGAP_PLATFORM_VERSION \
-      --allow OURBOX_AIRGAP_PLATFORM_CREATED \
+      --allow OURBOX_SUBSTRATE_SCHEMA \
+      --allow OURBOX_SUBSTRATE_KIND \
+      --allow OURBOX_SUBSTRATE_SOURCE \
+      --allow OURBOX_SUBSTRATE_REVISION \
+      --allow OURBOX_SUBSTRATE_VERSION \
+      --allow OURBOX_SUBSTRATE_CREATED \
       --allow OURBOX_PLATFORM_CONTRACT_REF \
       --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --allow AIRGAP_PLATFORM_ARCH \
+      --allow OURBOX_SUBSTRATE_ARCH \
       --allow K3S_VERSION \
       --allow OURBOX_PLATFORM_PROFILE \
       --allow OURBOX_PLATFORM_IMAGES_LOCK_PATH \
       --allow OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
-      --require OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --require OURBOX_AIRGAP_PLATFORM_REVISION \
-      --require OURBOX_AIRGAP_PLATFORM_VERSION \
-      --require OURBOX_AIRGAP_PLATFORM_CREATED \
+      --require OURBOX_SUBSTRATE_SOURCE \
+      --require OURBOX_SUBSTRATE_REVISION \
+      --require OURBOX_SUBSTRATE_VERSION \
+      --require OURBOX_SUBSTRATE_CREATED \
       --require OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --require AIRGAP_PLATFORM_ARCH \
+      --require OURBOX_SUBSTRATE_ARCH \
       --require K3S_VERSION \
       --require OURBOX_PLATFORM_PROFILE \
       --require OURBOX_PLATFORM_IMAGES_LOCK_PATH \
       --require OURBOX_PLATFORM_IMAGES_LOCK_SHA256 \
-      --print OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --print OURBOX_AIRGAP_PLATFORM_REVISION \
-      --print OURBOX_AIRGAP_PLATFORM_VERSION \
-      --print OURBOX_AIRGAP_PLATFORM_CREATED \
+      --print OURBOX_SUBSTRATE_SOURCE \
+      --print OURBOX_SUBSTRATE_REVISION \
+      --print OURBOX_SUBSTRATE_VERSION \
+      --print OURBOX_SUBSTRATE_CREATED \
       --print OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --print AIRGAP_PLATFORM_ARCH \
+      --print OURBOX_SUBSTRATE_ARCH \
       --print K3S_VERSION \
       --print OURBOX_PLATFORM_PROFILE \
       --print OURBOX_PLATFORM_IMAGES_LOCK_PATH \
       --print OURBOX_PLATFORM_IMAGES_LOCK_SHA256
-  )" || die "failed to parse airgap-platform manifest: ${manifest}"
+  )" || die "failed to parse substrate manifest: ${manifest}"
   mapfile -t manifest_fields <<<"${manifest_dump}"
   [[ "${#manifest_fields[@]}" -eq 10 ]] \
-    || die "airgap-platform manifest parse produced an unexpected field set: ${manifest}"
+    || die "substrate manifest parse produced an unexpected field set: ${manifest}"
 
-  [[ "${required_contract_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "required platform contract digest must be a sha256:<64 hex> before validating airgap-platform bundle"
-  [[ "${manifest_fields[4]}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "airgap-platform manifest carries invalid OURBOX_PLATFORM_CONTRACT_DIGEST"
-  [[ "${manifest_fields[5]}" == "${expected_arch}" ]] || die "airgap-platform bundle arch mismatch: expected ${expected_arch}, got ${manifest_fields[5]:-unknown}"
-  [[ "${manifest_fields[4]}" == "${required_contract_digest}" ]] || die "airgap-platform bundle contract digest mismatch: expected ${required_contract_digest}, got ${manifest_fields[4]}"
-  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "airgap-platform manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
+  [[ "${required_contract_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "required platform contract digest must be a sha256:<64 hex> before validating substrate bundle"
+  [[ "${manifest_fields[4]}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "substrate manifest carries invalid OURBOX_PLATFORM_CONTRACT_DIGEST"
+  [[ "${manifest_fields[5]}" == "${expected_arch}" ]] || die "substrate bundle arch mismatch: expected ${expected_arch}, got ${manifest_fields[5]:-unknown}"
+  [[ "${manifest_fields[4]}" == "${required_contract_digest}" ]] || die "substrate bundle contract digest mismatch: expected ${required_contract_digest}, got ${manifest_fields[4]}"
+  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
 
-  OURBOX_AIRGAP_PLATFORM_SOURCE="${manifest_fields[0]}"
-  OURBOX_AIRGAP_PLATFORM_REVISION="${manifest_fields[1]}"
-  OURBOX_AIRGAP_PLATFORM_VERSION="${manifest_fields[2]}"
-  OURBOX_AIRGAP_PLATFORM_CREATED="${manifest_fields[3]}"
-  OURBOX_AIRGAP_PLATFORM_ARCH="${manifest_fields[5]}"
-  OURBOX_AIRGAP_PLATFORM_PROFILE="${manifest_fields[7]}"
-  OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${manifest_fields[6]}"
-  OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${manifest_fields[9]}"
+  OURBOX_SUBSTRATE_SOURCE="${manifest_fields[0]}"
+  OURBOX_SUBSTRATE_REVISION="${manifest_fields[1]}"
+  OURBOX_SUBSTRATE_VERSION="${manifest_fields[2]}"
+  OURBOX_SUBSTRATE_CREATED="${manifest_fields[3]}"
+  OURBOX_SUBSTRATE_ARCH="${manifest_fields[5]}"
+  OURBOX_SUBSTRATE_PROFILE="${manifest_fields[7]}"
+  OURBOX_SUBSTRATE_K3S_VERSION="${manifest_fields[6]}"
+  OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${manifest_fields[9]}"
 }
 
 # _stage_embedded_payload — copy embedded payload from mission media into cache dir
@@ -667,72 +667,72 @@ load_selected_payload_airgap_metadata() {
       --allow OURBOX_PLATFORM_CONTRACT_REVISION \
       --allow OURBOX_PLATFORM_CONTRACT_VERSION \
       --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --allow OURBOX_AIRGAP_PLATFORM_REF \
-      --allow OURBOX_AIRGAP_PLATFORM_DIGEST \
-      --allow OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --allow OURBOX_AIRGAP_PLATFORM_REVISION \
-      --allow OURBOX_AIRGAP_PLATFORM_VERSION \
-      --allow OURBOX_AIRGAP_PLATFORM_CREATED \
-      --allow OURBOX_AIRGAP_PLATFORM_ARCH \
-      --allow OURBOX_AIRGAP_PLATFORM_PROFILE \
-      --allow OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-      --allow OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+      --allow OURBOX_SUBSTRATE_REF \
+      --allow OURBOX_SUBSTRATE_DIGEST \
+      --allow OURBOX_SUBSTRATE_SOURCE \
+      --allow OURBOX_SUBSTRATE_REVISION \
+      --allow OURBOX_SUBSTRATE_VERSION \
+      --allow OURBOX_SUBSTRATE_CREATED \
+      --allow OURBOX_SUBSTRATE_ARCH \
+      --allow OURBOX_SUBSTRATE_PROFILE \
+      --allow OURBOX_SUBSTRATE_K3S_VERSION \
+      --allow OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
       --allow OURBOX_BASE_ISO_URL \
       --allow OURBOX_BASE_ISO_SHA256 \
       --allow K3S_VERSION \
       --allow GITHUB_RUN_ID \
       --allow GITHUB_RUN_ATTEMPT \
       --require OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --require OURBOX_AIRGAP_PLATFORM_REF \
-      --require OURBOX_AIRGAP_PLATFORM_DIGEST \
-      --require OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --require OURBOX_AIRGAP_PLATFORM_REVISION \
-      --require OURBOX_AIRGAP_PLATFORM_VERSION \
-      --require OURBOX_AIRGAP_PLATFORM_CREATED \
-      --require OURBOX_AIRGAP_PLATFORM_ARCH \
-      --require OURBOX_AIRGAP_PLATFORM_PROFILE \
-      --require OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-      --require OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+      --require OURBOX_SUBSTRATE_REF \
+      --require OURBOX_SUBSTRATE_DIGEST \
+      --require OURBOX_SUBSTRATE_SOURCE \
+      --require OURBOX_SUBSTRATE_REVISION \
+      --require OURBOX_SUBSTRATE_VERSION \
+      --require OURBOX_SUBSTRATE_CREATED \
+      --require OURBOX_SUBSTRATE_ARCH \
+      --require OURBOX_SUBSTRATE_PROFILE \
+      --require OURBOX_SUBSTRATE_K3S_VERSION \
+      --require OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
       --print OURBOX_PLATFORM_CONTRACT_DIGEST \
-      --print OURBOX_AIRGAP_PLATFORM_REF \
-      --print OURBOX_AIRGAP_PLATFORM_DIGEST \
-      --print OURBOX_AIRGAP_PLATFORM_SOURCE \
-      --print OURBOX_AIRGAP_PLATFORM_REVISION \
-      --print OURBOX_AIRGAP_PLATFORM_VERSION \
-      --print OURBOX_AIRGAP_PLATFORM_CREATED \
-      --print OURBOX_AIRGAP_PLATFORM_ARCH \
-      --print OURBOX_AIRGAP_PLATFORM_PROFILE \
-      --print OURBOX_AIRGAP_PLATFORM_K3S_VERSION \
-      --print OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 \
+      --print OURBOX_SUBSTRATE_REF \
+      --print OURBOX_SUBSTRATE_DIGEST \
+      --print OURBOX_SUBSTRATE_SOURCE \
+      --print OURBOX_SUBSTRATE_REVISION \
+      --print OURBOX_SUBSTRATE_VERSION \
+      --print OURBOX_SUBSTRATE_CREATED \
+      --print OURBOX_SUBSTRATE_ARCH \
+      --print OURBOX_SUBSTRATE_PROFILE \
+      --print OURBOX_SUBSTRATE_K3S_VERSION \
+      --print OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
       --print OURBOX_VERSION \
       --print OURBOX_VARIANT
   )" || die "failed to parse selected OS payload metadata: ${meta_env}"
   mapfile -t meta_fields <<<"${meta_dump}"
   (( ${#meta_fields[@]} >= 11 && ${#meta_fields[@]} <= 13 )) || die "selected OS payload metadata parse produced an unexpected field set: ${meta_env}"
 
-  REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST="${meta_fields[0]}"
-  [[ "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_PLATFORM_CONTRACT_DIGEST in ${meta_env}"
+  REQUIRED_SUBSTRATE_CONTRACT_DIGEST="${meta_fields[0]}"
+  [[ "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_PLATFORM_CONTRACT_DIGEST in ${meta_env}"
 
-  BAKED_AIRGAP_PLATFORM_REF="${meta_fields[1]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_REF}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_REF in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_DIGEST="${meta_fields[2]}"
-  [[ "${BAKED_AIRGAP_PLATFORM_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_AIRGAP_PLATFORM_DIGEST in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_SOURCE="${meta_fields[3]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_SOURCE}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_SOURCE in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_REVISION="${meta_fields[4]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_REVISION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_REVISION in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_VERSION="${meta_fields[5]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_VERSION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_VERSION in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_CREATED="${meta_fields[6]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_CREATED}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_CREATED in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_ARCH="${meta_fields[7]}"
-  [[ "${BAKED_AIRGAP_PLATFORM_ARCH}" == "amd64" ]] || die "selected OS payload airgap arch mismatch: expected amd64, got ${BAKED_AIRGAP_PLATFORM_ARCH:-unknown}"
-  BAKED_AIRGAP_PLATFORM_PROFILE="${meta_fields[8]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_PROFILE}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_PROFILE in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_K3S_VERSION="${meta_fields[9]}"
-  [[ -n "${BAKED_AIRGAP_PLATFORM_K3S_VERSION}" ]] || die "selected OS payload is missing OURBOX_AIRGAP_PLATFORM_K3S_VERSION in ${meta_env}"
-  BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${meta_fields[10]}"
-  [[ "${BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256 in ${meta_env}"
+  BAKED_SUBSTRATE_REF="${meta_fields[1]}"
+  [[ -n "${BAKED_SUBSTRATE_REF}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_REF in ${meta_env}"
+  BAKED_SUBSTRATE_DIGEST="${meta_fields[2]}"
+  [[ "${BAKED_SUBSTRATE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_SUBSTRATE_DIGEST in ${meta_env}"
+  BAKED_SUBSTRATE_SOURCE="${meta_fields[3]}"
+  [[ -n "${BAKED_SUBSTRATE_SOURCE}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_SOURCE in ${meta_env}"
+  BAKED_SUBSTRATE_REVISION="${meta_fields[4]}"
+  [[ -n "${BAKED_SUBSTRATE_REVISION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_REVISION in ${meta_env}"
+  BAKED_SUBSTRATE_VERSION="${meta_fields[5]}"
+  [[ -n "${BAKED_SUBSTRATE_VERSION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_VERSION in ${meta_env}"
+  BAKED_SUBSTRATE_CREATED="${meta_fields[6]}"
+  [[ -n "${BAKED_SUBSTRATE_CREATED}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_CREATED in ${meta_env}"
+  BAKED_SUBSTRATE_ARCH="${meta_fields[7]}"
+  [[ "${BAKED_SUBSTRATE_ARCH}" == "amd64" ]] || die "selected OS payload airgap arch mismatch: expected amd64, got ${BAKED_SUBSTRATE_ARCH:-unknown}"
+  BAKED_SUBSTRATE_PROFILE="${meta_fields[8]}"
+  [[ -n "${BAKED_SUBSTRATE_PROFILE}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_PROFILE in ${meta_env}"
+  BAKED_SUBSTRATE_K3S_VERSION="${meta_fields[9]}"
+  [[ -n "${BAKED_SUBSTRATE_K3S_VERSION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_K3S_VERSION in ${meta_env}"
+  BAKED_SUBSTRATE_IMAGES_LOCK_SHA256="${meta_fields[10]}"
+  [[ "${BAKED_SUBSTRATE_IMAGES_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 in ${meta_env}"
   PAYLOAD_VERSION="${meta_fields[11]:-unknown}"
   [[ -n "${PAYLOAD_VERSION}" ]] || PAYLOAD_VERSION="unknown"
   PAYLOAD_VARIANT="${meta_fields[12]:-unknown}"
@@ -922,7 +922,7 @@ PY
   MISSION_AIRGAP_ARTIFACT_DIGEST="$(mission_json_field selected_airgap_artifact_digest)"
   MISSION_AIRGAP_SELECTION_SOURCE="$(mission_json_field selected_airgap_selection_source)"
   MISSION_AIRGAP_RELEASE_CHANNEL="$(mission_json_field selected_airgap_release_channel)"
-  MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST="$(mission_json_field selected_airgap_platform_contract_digest)"
+  MISSION_SUBSTRATE_CONTRACT_DIGEST="$(mission_json_field selected_airgap_platform_contract_digest)"
   MISSION_AIRGAP_ARCH="$(mission_json_field selected_airgap_arch)"
   MISSION_AIRGAP_PAYLOAD_PATH="$(
     resolve_mission_relpath \
@@ -969,13 +969,13 @@ PY
 
   [[ -n "${MISSION_OS_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_os.artifact_ref"
   [[ "${MISSION_OS_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_os.artifact_digest"
-  [[ "${MISSION_OS_PLATFORM_CONTRACT_DIGEST}" == "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" ]] || \
-    die "embedded mission selected_os.platform_contract_digest mismatch: expected ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}, got ${MISSION_OS_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  [[ "${MISSION_OS_PLATFORM_CONTRACT_DIGEST}" == "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" ]] || \
+    die "embedded mission selected_os.platform_contract_digest mismatch: expected ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}, got ${MISSION_OS_PLATFORM_CONTRACT_DIGEST:-unknown}"
 
   [[ -n "${MISSION_AIRGAP_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_airgap.artifact_ref"
   [[ "${MISSION_AIRGAP_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_airgap.artifact_digest"
-  [[ "${MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST}" == "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" ]] || \
-    die "embedded mission selected_airgap.platform_contract_digest mismatch: expected ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}, got ${MISSION_AIRGAP_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  [[ "${MISSION_SUBSTRATE_CONTRACT_DIGEST}" == "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" ]] || \
+    die "embedded mission selected_airgap.platform_contract_digest mismatch: expected ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}, got ${MISSION_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
   [[ "${MISSION_AIRGAP_ARCH}" == "amd64" ]] || die "embedded mission selected_airgap.arch mismatch: expected amd64, got ${MISSION_AIRGAP_ARCH:-unknown}"
   [[ -f "${MISSION_AIRGAP_PAYLOAD_PATH}" ]] || die "embedded mission airgap payload missing: ${MISSION_AIRGAP_PAYLOAD_PATH}"
   [[ -f "${MISSION_AIRGAP_MANIFEST_PATH}" ]] || die "embedded mission airgap manifest missing: ${MISSION_AIRGAP_MANIFEST_PATH}"
@@ -1113,32 +1113,32 @@ verify_mission_selected_airgap_tarball() {
 stage_embedded_mission_airgap_bundle() {
   verify_mission_selected_airgap_tarball "${MISSION_AIRGAP_PAYLOAD_PATH}"
 
-  OURBOX_AIRGAP_PLATFORM_REF="${MISSION_AIRGAP_ARTIFACT_REF}"
-  OURBOX_AIRGAP_PLATFORM_DIGEST="${MISSION_AIRGAP_ARTIFACT_DIGEST}"
-  OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE="${MISSION_AIRGAP_SELECTION_SOURCE:-mission}"
-  OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL="${MISSION_AIRGAP_RELEASE_CHANNEL:-}"
+  OURBOX_SUBSTRATE_REF="${MISSION_AIRGAP_ARTIFACT_REF}"
+  OURBOX_SUBSTRATE_DIGEST="${MISSION_AIRGAP_ARTIFACT_DIGEST}"
+  OURBOX_SUBSTRATE_SELECTION_SOURCE="${MISSION_AIRGAP_SELECTION_SOURCE:-mission}"
+  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${MISSION_AIRGAP_RELEASE_CHANNEL:-}"
 
-  if [[ "${MISSION_AIRGAP_ARTIFACT_DIGEST}" == "${BAKED_AIRGAP_PLATFORM_DIGEST}" && "${MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD}" == "1" ]]; then
-    OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="baked"
-    OURBOX_AIRGAP_PLATFORM_SOURCE="${BAKED_AIRGAP_PLATFORM_SOURCE}"
-    OURBOX_AIRGAP_PLATFORM_REVISION="${BAKED_AIRGAP_PLATFORM_REVISION}"
-    OURBOX_AIRGAP_PLATFORM_VERSION="${BAKED_AIRGAP_PLATFORM_VERSION}"
-    OURBOX_AIRGAP_PLATFORM_CREATED="${BAKED_AIRGAP_PLATFORM_CREATED}"
-    OURBOX_AIRGAP_PLATFORM_ARCH="${BAKED_AIRGAP_PLATFORM_ARCH}"
-    OURBOX_AIRGAP_PLATFORM_PROFILE="${BAKED_AIRGAP_PLATFORM_PROFILE}"
-    OURBOX_AIRGAP_PLATFORM_K3S_VERSION="${BAKED_AIRGAP_PLATFORM_K3S_VERSION}"
-    OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256="${BAKED_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256}"
+  if [[ "${MISSION_AIRGAP_ARTIFACT_DIGEST}" == "${BAKED_SUBSTRATE_DIGEST}" && "${MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD}" == "1" ]]; then
+    OURBOX_SUBSTRATE_ARTIFACT_SOURCE="baked"
+    OURBOX_SUBSTRATE_SOURCE="${BAKED_SUBSTRATE_SOURCE}"
+    OURBOX_SUBSTRATE_REVISION="${BAKED_SUBSTRATE_REVISION}"
+    OURBOX_SUBSTRATE_VERSION="${BAKED_SUBSTRATE_VERSION}"
+    OURBOX_SUBSTRATE_CREATED="${BAKED_SUBSTRATE_CREATED}"
+    OURBOX_SUBSTRATE_ARCH="${BAKED_SUBSTRATE_ARCH}"
+    OURBOX_SUBSTRATE_PROFILE="${BAKED_SUBSTRATE_PROFILE}"
+    OURBOX_SUBSTRATE_K3S_VERSION="${BAKED_SUBSTRATE_K3S_VERSION}"
+    OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${BAKED_SUBSTRATE_IMAGES_LOCK_SHA256}"
     return 0
   fi
 
-  rm -rf "${AIRGAP_PLATFORM_OVERRIDE_DIR}"
-  mkdir -p "${AIRGAP_PLATFORM_OVERRIDE_DIR}"
-  tar -xzf "${MISSION_AIRGAP_PAYLOAD_PATH}" -C "${AIRGAP_PLATFORM_OVERRIDE_DIR}"
-  validate_extracted_airgap_platform_bundle "${AIRGAP_PLATFORM_OVERRIDE_DIR}" "${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST}" "amd64"
-  OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE="mission"
+  rm -rf "${SUBSTRATE_OVERRIDE_DIR}"
+  mkdir -p "${SUBSTRATE_OVERRIDE_DIR}"
+  tar -xzf "${MISSION_AIRGAP_PAYLOAD_PATH}" -C "${SUBSTRATE_OVERRIDE_DIR}"
+  validate_extracted_substrate_bundle "${SUBSTRATE_OVERRIDE_DIR}" "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" "amd64"
+  OURBOX_SUBSTRATE_ARTIFACT_SOURCE="mission"
 }
 
-prepare_selected_airgap_platform_bundle() {
+prepare_selected_substrate_bundle() {
   [[ "${MISSION_PRESENT}" == "1" ]] || die "Woodbox install requires host-composed mission media; target-side airgap selection and pulls have been removed"
   stage_embedded_mission_airgap_bundle
 }
@@ -1154,22 +1154,22 @@ stage_selected_application_metadata() {
   cp -f "${MISSION_SELECTED_APPLICATIONS_PATH}" "${cache_dir}/selected-apps.json"
 }
 
-show_airgap_platform_panel() {
+show_ourbox_substrate_panel() {
   echo
   echo "  =================================================================="
-  echo "  Airgap Platform"
+  echo "  OurBox Substrate"
   echo "  =================================================================="
-  echo "  Source   : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Ref      : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Digest   : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
-  echo "  Revision : ${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}"
-  echo "  Version  : ${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}"
-  echo "  Arch     : ${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}"
-  echo "  Profile  : ${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}"
-  echo "  K3s      : ${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
-  echo "  Select   : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Channel  : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Source   : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Ref      : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Digest   : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
+  echo "  Revision : ${OURBOX_SUBSTRATE_REVISION:-unknown}"
+  echo "  Version  : ${OURBOX_SUBSTRATE_VERSION:-unknown}"
+  echo "  Arch     : ${OURBOX_SUBSTRATE_ARCH:-unknown}"
+  echo "  Profile  : ${OURBOX_SUBSTRATE_PROFILE:-unknown}"
+  echo "  K3s      : ${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}"
+  echo "  Select   : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Channel  : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
   echo "  =================================================================="
   echo
@@ -1206,7 +1206,7 @@ _show_artifact_panel() {
   echo "  SHA256   : ${OS_IMAGE_SHA256}"
   echo "  Version  : ${PAYLOAD_VERSION}"
   echo "  Variant  : ${PAYLOAD_VARIANT}"
-  echo "  Contract : ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Contract : ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
   echo "  Selection: ${INSTALL_SELECTION_SOURCE}"
   if [[ -n "${RELEASE_CHANNEL}" ]]; then
     echo "  Channel  : ${RELEASE_CHANNEL}"
@@ -1255,19 +1255,19 @@ write_install_provenance() {
     printf 'OS_IMAGE_SHA256=%s\n' "$(shell_quote_sh "${OS_IMAGE_SHA256:-unknown}")"
     printf 'RELEASE_CHANNEL=%s\n' "$(shell_quote_sh "${RELEASE_CHANNEL:-}")"
     printf 'INSTALL_SELECTION_SOURCE=%s\n' "$(shell_quote_sh "${INSTALL_SELECTION_SOURCE:-unknown}")"
-    printf 'AIRGAP_PLATFORM_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_SOURCE:-unknown}")"
-    printf 'AIRGAP_PLATFORM_REVISION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_REVISION:-unknown}")"
-    printf 'AIRGAP_PLATFORM_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_VERSION:-unknown}")"
-    printf 'AIRGAP_PLATFORM_CREATED=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_CREATED:-unknown}")"
-    printf 'AIRGAP_PLATFORM_ARCH=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_ARCH:-unknown}")"
-    printf 'AIRGAP_PLATFORM_PROFILE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_PROFILE:-unknown}")"
-    printf 'AIRGAP_PLATFORM_K3S_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_K3S_VERSION:-unknown}")"
-    printf 'AIRGAP_PLATFORM_IMAGES_LOCK_SHA256=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}")"
-    printf 'AIRGAP_PLATFORM_ARTIFACT_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}")"
-    printf 'AIRGAP_PLATFORM_REF=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_REF:-unknown}")"
-    printf 'AIRGAP_PLATFORM_DIGEST=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}")"
-    printf 'AIRGAP_PLATFORM_SELECTION_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}")"
-    printf 'AIRGAP_PLATFORM_RELEASE_CHANNEL=%s\n' "$(shell_quote_sh "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL:-}")"
+    printf 'SUBSTRATE_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_SOURCE:-unknown}")"
+    printf 'SUBSTRATE_REVISION=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_REVISION:-unknown}")"
+    printf 'SUBSTRATE_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_VERSION:-unknown}")"
+    printf 'SUBSTRATE_CREATED=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_CREATED:-unknown}")"
+    printf 'SUBSTRATE_ARCH=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_ARCH:-unknown}")"
+    printf 'SUBSTRATE_PROFILE=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_PROFILE:-unknown}")"
+    printf 'SUBSTRATE_K3S_VERSION=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_K3S_VERSION:-unknown}")"
+    printf 'SUBSTRATE_IMAGES_LOCK_SHA256=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}")"
+    printf 'SUBSTRATE_ARTIFACT_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}")"
+    printf 'SUBSTRATE_REF=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_REF:-unknown}")"
+    printf 'SUBSTRATE_DIGEST=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_DIGEST:-unknown}")"
+    printf 'SUBSTRATE_SELECTION_SOURCE=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}")"
+    printf 'SUBSTRATE_RELEASE_CHANNEL=%s\n' "$(shell_quote_sh "${OURBOX_SUBSTRATE_RELEASE_CHANNEL:-}")"
     printf 'APPLICATION_CATALOG_ID=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_CATALOG_ID:-}")"
     printf 'APPLICATION_CATALOG_NAME=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_CATALOG_NAME:-}")"
     printf 'APPLICATION_SELECTION_MODE=%s\n' "$(shell_quote_sh "${OURBOX_APPLICATION_SELECTION_MODE:-}")"
@@ -1311,19 +1311,19 @@ append_release_value "OURBOX_OS_ARTIFACT_DIGEST" "${OS_ARTIFACT_DIGEST:-unknown}
 append_release_value "OURBOX_OS_IMAGE_SHA256" "${OS_IMAGE_SHA256:-unknown}"
 append_release_value "OURBOX_RELEASE_CHANNEL" "${RELEASE_CHANNEL:-}"
 append_release_value "OURBOX_INSTALL_SELECTION_SOURCE" "${INSTALL_SELECTION_SOURCE:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_SOURCE" "${AIRGAP_PLATFORM_SOURCE:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_REVISION" "${AIRGAP_PLATFORM_REVISION:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_VERSION" "${AIRGAP_PLATFORM_VERSION:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_CREATED" "${AIRGAP_PLATFORM_CREATED:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_ARCH" "${AIRGAP_PLATFORM_ARCH:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_PROFILE" "${AIRGAP_PLATFORM_PROFILE:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_K3S_VERSION" "${AIRGAP_PLATFORM_K3S_VERSION:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_IMAGES_LOCK_SHA256" "${AIRGAP_PLATFORM_IMAGES_LOCK_SHA256:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE" "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_REF" "${AIRGAP_PLATFORM_REF:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_DIGEST" "${AIRGAP_PLATFORM_DIGEST:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE" "${AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-append_release_value "OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL" "${AIRGAP_PLATFORM_RELEASE_CHANNEL:-}"
+append_release_value "OURBOX_SUBSTRATE_SOURCE" "${SUBSTRATE_SOURCE:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_REVISION" "${SUBSTRATE_REVISION:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_VERSION" "${SUBSTRATE_VERSION:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_CREATED" "${SUBSTRATE_CREATED:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_ARCH" "${SUBSTRATE_ARCH:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_PROFILE" "${SUBSTRATE_PROFILE:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_K3S_VERSION" "${SUBSTRATE_K3S_VERSION:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256" "${SUBSTRATE_IMAGES_LOCK_SHA256:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_ARTIFACT_SOURCE" "${SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_REF" "${SUBSTRATE_REF:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_DIGEST" "${SUBSTRATE_DIGEST:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_SELECTION_SOURCE" "${SUBSTRATE_SELECTION_SOURCE:-unknown}"
+append_release_value "OURBOX_SUBSTRATE_RELEASE_CHANNEL" "${SUBSTRATE_RELEASE_CHANNEL:-}"
 append_release_value "OURBOX_APPLICATION_CATALOG_ID" "${APPLICATION_CATALOG_ID:-}"
 append_release_value "OURBOX_APPLICATION_CATALOG_NAME" "${APPLICATION_CATALOG_NAME:-}"
 append_release_value "OURBOX_APPLICATION_SELECTION_MODE" "${APPLICATION_SELECTION_MODE:-}"
@@ -1331,21 +1331,21 @@ append_release_value "OURBOX_SELECTED_APPLICATION_IDS" "${SELECTED_APPLICATION_I
 SCRIPT
   chmod +x "${cache_dir}/append-provenance.sh"
 
-  cat > "${cache_dir}/apply-airgap-platform-override.sh" <<'SCRIPT'
+  cat > "${cache_dir}/apply-ourbox-substrate-override.sh" <<'SCRIPT'
 #!/bin/sh
 set -e
 PROV="${OURBOX_INSTALLER_PROVENANCE_FILE:-/opt/ourbox/installer/cache/install-provenance.env}"
-SOURCE_DIR="${OURBOX_INSTALLER_AIRGAP_OVERRIDE_DIR:-/opt/ourbox/installer/cache/airgap-platform-override}"
+SOURCE_DIR="${OURBOX_INSTALLER_SUBSTRATE_OVERRIDE_DIR:-/opt/ourbox/installer/cache/ourbox-substrate-override}"
 TARGET="${1:-/target}"
 
 if [ ! -f "${PROV}" ]; then
-  echo "apply-airgap-platform-override.sh: ${PROV} not found, skipping" >&2
+  echo "apply-ourbox-substrate-override.sh: ${PROV} not found, skipping" >&2
   exit 0
 fi
 # shellcheck disable=SC1090
 . "${PROV}"
 
-if [ "${AIRGAP_PLATFORM_ARTIFACT_SOURCE:-baked}" = "baked" ]; then
+if [ "${SUBSTRATE_ARTIFACT_SOURCE:-baked}" = "baked" ]; then
   exit 0
 fi
 
@@ -1363,7 +1363,7 @@ cp -f "${SOURCE_DIR}/platform/images.lock.json" "${TARGET}/opt/ourbox/airgap/pla
 cp -f "${SOURCE_DIR}/platform/profile.env" "${TARGET}/opt/ourbox/airgap/platform/profile.env"
 cp -f "${SOURCE_DIR}/manifest.env" "${TARGET}/opt/ourbox/airgap/manifest.env"
 SCRIPT
-  chmod +x "${cache_dir}/apply-airgap-platform-override.sh"
+  chmod +x "${cache_dir}/apply-ourbox-substrate-override.sh"
 
   cat > "${cache_dir}/apply-application-selection.sh" <<'SCRIPT'
 #!/bin/sh
@@ -1690,13 +1690,13 @@ main() {
 
   # --- Step 4: Airgap platform ---
   banner
-  echo "  Step 4 of 6: Stage the selected airgap-platform bundle"
+  echo "  Step 4 of 6: Stage the selected ourbox-substrate bundle"
   echo "  Using the host-selected airgap bundle staged on this mission media."
   echo "  No target-side registry browsing or pulling will be used."
   echo
-  prepare_selected_airgap_platform_bundle
+  prepare_selected_substrate_bundle
   stage_selected_application_metadata
-  show_airgap_platform_panel
+  show_ourbox_substrate_panel
   show_selected_applications_panel
   write_install_provenance
 
@@ -1730,19 +1730,19 @@ main() {
   fi
   echo "  OS digest    : ${OS_ARTIFACT_DIGEST:-unknown}"
   echo "  OS SHA256    : ${OS_IMAGE_SHA256}"
-  echo "  Apps bundle  : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps source  : ${OURBOX_AIRGAP_PLATFORM_ARTIFACT_SOURCE:-unknown}"
-  echo "  Apps select  : ${OURBOX_AIRGAP_PLATFORM_SELECTION_SOURCE:-unknown}"
-  if [[ -n "${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}" ]]; then
-    echo "  Apps lane    : ${OURBOX_AIRGAP_PLATFORM_RELEASE_CHANNEL}"
+  echo "  Apps bundle  : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps source  : ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE:-unknown}"
+  echo "  Apps select  : ${OURBOX_SUBSTRATE_SELECTION_SOURCE:-unknown}"
+  if [[ -n "${OURBOX_SUBSTRATE_RELEASE_CHANNEL}" ]]; then
+    echo "  Apps lane    : ${OURBOX_SUBSTRATE_RELEASE_CHANNEL}"
   fi
-  echo "  Apps digest  : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps digest  : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   if [[ -n "${OURBOX_APPLICATION_CATALOG_ID}" ]]; then
     echo "  App catalog  : ${OURBOX_APPLICATION_CATALOG_NAME:-unknown} (${OURBOX_APPLICATION_CATALOG_ID})"
     echo "  App mode     : ${OURBOX_APPLICATION_SELECTION_MODE:-unknown}"
     echo "  Applications : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"
   fi
-  echo "  Contract     : ${REQUIRED_AIRGAP_PLATFORM_CONTRACT_DIGEST:-unknown}"
+  echo "  Contract     : ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
     configured-hash)
@@ -1808,8 +1808,8 @@ main() {
   echo "  DATA disk     : ${DATA_DISK} (${DATA_DISK_REAL})"
   echo "  OS artifact   : ${OS_ARTIFACT_REF}"
   echo "  OS SHA256     : ${OS_IMAGE_SHA256}"
-  echo "  Apps bundle   : ${OURBOX_AIRGAP_PLATFORM_REF:-unknown}"
-  echo "  Apps digest   : ${OURBOX_AIRGAP_PLATFORM_DIGEST:-unknown}"
+  echo "  Apps bundle   : ${OURBOX_SUBSTRATE_REF:-unknown}"
+  echo "  Apps digest   : ${OURBOX_SUBSTRATE_DIGEST:-unknown}"
   if [[ -n "${OURBOX_APPLICATION_CATALOG_ID}" ]]; then
     echo "  App catalog   : ${OURBOX_APPLICATION_CATALOG_NAME:-unknown} (${OURBOX_APPLICATION_CATALOG_ID})"
     echo "  Applications  : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"

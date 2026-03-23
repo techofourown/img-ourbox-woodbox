@@ -13,5 +13,5 @@ They are NOT hand-authored in this repo. The authoritative source is:
 - the repo-local pointer to that snapshot in `tools/approved-upstream-inputs.upstream.env`
 - the workflow-time resolved `OURBOX_PLATFORM_CONTRACT_REF` captured in build provenance
 
-Running `tools/fetch-airgap-platform.sh` will automatically fetch the
+Running `tools/fetch-ourbox-substrate.sh` will automatically fetch the
 upstream platform contract and sync the full tree into this directory.

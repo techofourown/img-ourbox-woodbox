@@ -15,7 +15,7 @@ this repo.
 - Official candidate/revalidation workflows resolve exact upstream refs from that approved snapshot
   at workflow start
 - Local/manual builds must pass explicit `OURBOX_PLATFORM_CONTRACT_REF` and
-  `OURBOX_AIRGAP_PLATFORM_REF` overrides when they need non-default upstream inputs
+  `OURBOX_SUBSTRATE_REF` overrides when they need non-default upstream inputs
 
 ---
 
@@ -28,9 +28,9 @@ Woodbox pulls two GHCR artifacts published by `sw-ourbox-os`:
    - Pulled via `./tools/fetch-platform-contract.sh`
    - Synced into installer rootfs via `./tools/sync-platform-contract-into-installer.sh`
 
-2) **airgap-platform** (arch-specific: amd64)
+2) **ourbox-substrate** (arch-specific: amd64)
    - Contents: `k3s` binary, `k3s-airgap-images-amd64.tar`, platform image tars, `manifest.env`
-   - Pulled via `./tools/fetch-airgap-platform.sh` (which also triggers the contract sync)
+   - Pulled via `./tools/fetch-ourbox-substrate.sh` (which also triggers the contract sync)
    - Staged in the OS payload tarball as `airgap/`
 
 Runtime layout on the installed system:
@@ -63,8 +63,8 @@ These are read from the synced `contract.env` and `contract.digest` files in the
    approved snapshot.
 3. Official workflows resolve exact upstream refs from that snapshot at workflow start.
 4. For local/manual runs, export explicit `OURBOX_PLATFORM_CONTRACT_REF` and
-   `OURBOX_AIRGAP_PLATFORM_REF` overrides before fetch/build if you want the same curated inputs.
-5. Run `./tools/fetch-airgap-platform.sh` to pull/sync into `installer/ourbox/rootfs/`.
+   `OURBOX_SUBSTRATE_REF` overrides before fetch/build if you want the same curated inputs.
+5. Run `./tools/fetch-ourbox-substrate.sh` to pull/sync into `installer/ourbox/rootfs/`.
 6. Rebuild OS payload; update release notes/changelog with new digests.
 
 ---

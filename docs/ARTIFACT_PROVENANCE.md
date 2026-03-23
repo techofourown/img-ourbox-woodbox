@@ -11,7 +11,7 @@ and
 
 | Artifact | Description |
 |---|---|
-| OS payload | Rootfs overlay + airgap bundle for Woodbox x86-64 (`.tar.gz` + SHA-256 checksum + metadata) |
+| OS payload | Rootfs overlay + platform bundle for Woodbox x86-64 (`.tar.gz` + SHA-256 checksum + metadata) |
 | Installer substrate | Bootable Ubuntu autoinstall ISO used as the base for host-composed Woodbox mission media (`.iso` + SHA-256 checksum + metadata) |
 
 Both are published as ORAS OCI artifacts (non-runnable) to GHCR.
@@ -58,7 +58,7 @@ These are the only authorized triggers for the official publication lane.
 | Operation | Entrypoint |
 |---|---|
 | Compose + optionally flash Woodbox mission media | `sw-ourbox-installer/tools/prepare-installer-media.sh` |
-| Fetch upstream platform inputs | `./tools/fetch-airgap-platform.sh` |
+| Fetch upstream platform inputs | `./tools/fetch-ourbox-substrate.sh` |
 | Build OS payload only | `./tools/build-os-payload.sh` |
 | Build installer substrate ISO only | `./tools/build-installer-iso.sh` |
 | Publish OS artifact | `./tools/publish-os-artifact.sh deploy` |
@@ -192,7 +192,7 @@ digest-pinned refs for:
 
 ```
 OURBOX_PLATFORM_CONTRACT_REF=ghcr.io/techofourown/sw-ourbox-os/platform-contract@sha256:<digest>
-OURBOX_AIRGAP_PLATFORM_REF=ghcr.io/techofourown/sw-ourbox-os/airgap-platform@sha256:<digest>
+OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@sha256:<digest>
 ```
 
 Those resolved refs MUST be digest-pinned (never floating tags) in official candidate builds.
