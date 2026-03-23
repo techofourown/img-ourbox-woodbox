@@ -32,7 +32,7 @@ OURBOX_PREINSTALL_TOOLS_ROOT="${TOOLS_DIR}" \
 MISSION_DIR="${MISSION_ROOT}"
 MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
 PAYLOAD_CACHE_DIR="${PAYLOAD_DIR}"
-OURBOX_SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}"
+SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}"
 
 PLATFORM_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 BAKED_AIRGAP_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -277,11 +277,11 @@ stage_selected_application_metadata
   echo "unexpected mission airgap ref: ${OURBOX_SUBSTRATE_REF}" >&2
   exit 1
 }
-[[ -x "${OURBOX_SUBSTRATE_OVERRIDE_DIR}/k3s/k3s" ]] || {
+[[ -x "${SUBSTRATE_OVERRIDE_DIR}/k3s/k3s" ]] || {
   echo "mission airgap bundle was not extracted into override dir" >&2
   exit 1
 }
-[[ -f "${OURBOX_SUBSTRATE_OVERRIDE_DIR}/platform/images/platform-demo.tar" ]] || {
+[[ -f "${SUBSTRATE_OVERRIDE_DIR}/platform/images/platform-demo.tar" ]] || {
   echo "mission airgap platform image tar missing from override dir" >&2
   exit 1
 }
