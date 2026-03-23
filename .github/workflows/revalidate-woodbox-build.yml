@@ -144,6 +144,8 @@ jobs:
           bash ./tools/prepare-mission-media-smoke.sh \
             --os-payload "${PAYLOAD}" \
             --os-meta-env "${META_ENV}" \
+            --application-catalog ./tools/fixtures/revalidation-application-catalog.json \
+            --selected-apps ./tools/fixtures/revalidation-selected-apps.json \
             --substrate-iso "${SUBSTRATE_ISO}" \
             --output-dir deploy/mission-smoke
 
