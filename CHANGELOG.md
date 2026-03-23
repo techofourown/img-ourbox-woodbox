@@ -1,3 +1,10 @@
+## [0.14.7](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.6...v0.14.7) (2026-03-23)
+
+
+### Bug Fixes
+
+* accept current platform-contract shape ([0c8e14e](https://github.com/techofourown/img-ourbox-woodbox/commit/0c8e14e0db091b5d67ad7212a3a0040246fe1c12))
+
 ## [0.14.6](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.5...v0.14.6) (2026-03-23)
 
 
