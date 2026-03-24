@@ -55,6 +55,8 @@ write_selected_bundle_metadata() {
   [[ -f "${strict_metadata_parser}" ]] || die "strict metadata parser not found: ${strict_metadata_parser}"
   manifest_dump="$(
     python3 "${strict_metadata_parser}" "${manifest}" \
+      --allow OURBOX_SUBSTRATE_SCHEMA \
+      --allow OURBOX_SUBSTRATE_KIND \
       --allow OURBOX_SUBSTRATE_SOURCE \
       --allow OURBOX_SUBSTRATE_REVISION \
       --allow OURBOX_SUBSTRATE_VERSION \
