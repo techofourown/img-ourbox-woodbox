@@ -1,3 +1,10 @@
+## [0.14.8](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.7...v0.14.8) (2026-03-24)
+
+
+### Bug Fixes
+
+* allow transitional SCHEMA/KIND keys in substrate manifest ([d1d7a33](https://github.com/techofourown/img-ourbox-woodbox/commit/d1d7a3395c262f4dbf3329b6f44065a7221018f9)), closes [#140](https://github.com/techofourown/img-ourbox-woodbox/issues/140)
+
 ## [0.14.7](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.6...v0.14.7) (2026-03-23)
 
 
