@@ -1,3 +1,10 @@
+## [0.14.9](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.8...v0.14.9) (2026-03-25)
+
+
+### Bug Fixes
+
+* rewire platform-contract ref resolution into publish workflows ([175621a](https://github.com/techofourown/img-ourbox-woodbox/commit/175621a4679e31e9e49dcfb8ac9ee7a9080a3ccf))
+
 ## [0.14.8](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.7...v0.14.8) (2026-03-24)
 
 
