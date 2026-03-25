@@ -69,7 +69,17 @@ cat > "${APPLICATION_CATALOG}" <<'EOF'
   "apps": [
     {
       "id": "landing",
-      "display_name": "Landing"
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
     }
   ]
 }
