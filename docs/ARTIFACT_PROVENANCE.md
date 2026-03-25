@@ -135,7 +135,6 @@ Every published artifact carries the following provenance in its OCI annotations
 | `techofourown.target` | `x86` |
 | `techofourown.variant` | `prod` |
 | `techofourown.sku` | `TOO-OBX-WBX-BASE-JU3XK8` |
-| `techofourown.platform-contract.digest` | Digest of platform-contract bundle baked in |
 | `techofourown.build.workflow` | GitHub workflow name |
 | `techofourown.build.run-id` | GitHub run ID |
 | `techofourown.build.run-attempt` | GitHub run attempt |
@@ -143,10 +142,14 @@ Every published artifact carries the following provenance in its OCI annotations
 Additional metadata is published as artifact files:
 
 - `os.meta.env` / `installer.meta.env` — full provenance record including K3S version, upstream
-  contract source/revision/version/digest, SHA-256, and size
+  substrate ref/digest/source/revision/version/profile, SHA-256, and size
 - `os.meta.json` / `installer.meta.json` — JSON form of the same flat metadata map for
   machine-readable consumption
 - `os-payload.tar.gz.sha256` / `installer.iso.sha256` — SHA-256 checksum for offline verification
+
+Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear in transitional
+artifact-carried metadata. They are informational only and not compatibility
+gates.
 
 Canonical artifact identity for consumption is **by digest**
 (e.g., `ghcr.io/techofourown/ourbox-woodbox-os@sha256:...`).
@@ -170,9 +173,12 @@ Every installed Woodbox system records provenance in `/etc/ourbox/release`. Full
 **Build-time fields** (from `build-os-payload.sh`):
 - `OURBOX_PRODUCT`, `OURBOX_DEVICE`, `OURBOX_TARGET`, `OURBOX_SKU`
 - `OURBOX_VARIANT`, `OURBOX_VERSION`, `OURBOX_RECIPE_GIT_HASH`
-- `OURBOX_PLATFORM_CONTRACT_SOURCE`, `OURBOX_PLATFORM_CONTRACT_REVISION`
-- `OURBOX_PLATFORM_CONTRACT_VERSION`, `OURBOX_PLATFORM_CONTRACT_CREATED`
-- `OURBOX_PLATFORM_CONTRACT_DIGEST`, `OURBOX_BUILD_TS`
+- `OURBOX_SUBSTRATE_REF`, `OURBOX_SUBSTRATE_DIGEST`
+- `OURBOX_SUBSTRATE_SOURCE`, `OURBOX_SUBSTRATE_REVISION`
+- `OURBOX_SUBSTRATE_VERSION`, `OURBOX_SUBSTRATE_CREATED`
+- `OURBOX_SUBSTRATE_ARCH`, `OURBOX_SUBSTRATE_PROFILE`
+- `OURBOX_SUBSTRATE_K3S_VERSION`, `OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256`
+- `OURBOX_BUILD_TS`
 
 **Install-time fields** (appended by autoinstall late-commands):
 - `OURBOX_INSTALLER_ID`, `OURBOX_OS_ARTIFACT_SOURCE`, `OURBOX_OS_ARTIFACT_REF`
@@ -197,6 +203,10 @@ OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@sha256:<
 
 Those resolved refs MUST be digest-pinned (never floating tags) in official candidate builds.
 This repository does not independently approve mirrored TOOO digests in source control.
+
+Runtime and install compatibility are then enforced by exact selected artifact
+identity plus local bundle-shape and runtime-capability checks, not by matching
+copied platform-contract metadata fields.
 
 The scheduled nightly integration build intentionally bypasses the approved snapshot and resolves
 the latest upstream nightly/platform inputs at workflow time before building.

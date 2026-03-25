@@ -6,7 +6,7 @@ substrate consumed by the unified host-side installer.
 
 **Hardware**: x86-64 desktop-class PC, UEFI, NVMe system disk, SATA data disk
 **OS base**: Ubuntu Server LTS 24.04 (x86-64), autoinstall via cloud-init
-**Runtime**: airgapped single-node k3s, deployed from OCI platform bundle
+**Runtime**: offline single-node k3s, deployed from the selected substrate bundle
 
 ## Identifiers
 
@@ -139,5 +139,5 @@ The offline-install contract now lives in the Woodbox substrate itself:
 | [`docs/ARTIFACT_PROVENANCE.md`](./docs/ARTIFACT_PROVENANCE.md) | Artifact provenance and release policy |
 | [`docs/reference/contracts.md`](./docs/reference/contracts.md) | Host contracts (release metadata, storage, installer) |
 | [`docs/reference/installer.md`](./docs/reference/installer.md) | Installer reference (defaults, UX flow, artifact contract) |
-| [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md) | Platform contract consumption from sw-ourbox-os |
+| [`docs/reference/platform-contract.md`](./docs/reference/platform-contract.md) | Platform input consumption from sw-ourbox-os |
 | [`docs/decisions/`](./docs/decisions/) | Architectural Decision Records |

@@ -1,5 +1,11 @@
 # ADR-0004: Consume the OurBox OS Platform Contract from `sw-ourbox-os`
 
+> Status note (2026-03): Woodbox now consumes both `platform-contract` and
+> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Legacy
+> platform-contract metadata may still appear in provenance, but compatibility
+> is enforced by exact selected artifact identities plus local bundle and
+> capability checks, not by contract-digest matching.
+
 
 ## Context
 
@@ -10,7 +16,7 @@ for Woodbox hardware. It is responsible for:
 - disk/storage contract enforcement (`LABEL=OURBOX_DATA`)
 - installer-time artifact selection and OS staging
 - first-boot bootstrap services (k3s bring-up, applying baseline manifests, etc.)
-- airgap/offline operation
+- offline operation
 
 Historically, image repos become the accidental "home" of the platform baseline (manifests, images,
 components that make the box feel like an appliance). That creates drift and makes it easy for the
@@ -46,33 +52,24 @@ digest-pinned refs at workflow start from the approved upstream snapshot in
 `tools/approved-upstream-inputs.upstream.env`. The following upstream artifacts are consumed:
 
 1. **platform-contract** (arch-agnostic): manifests, landing, todo-bloom assets, contract metadata
-2. **ourbox-substrate** (amd64-specific): `k3s` binary, `k3s-airgap-images-amd64.tar`, platform
+2. **ourbox-substrate** (amd64-specific): `k3s` binary, `k3s-images-amd64.tar`, platform
    image tars, `manifest.env`
 
 Both are pulled by `./tools/fetch-ourbox-substrate.sh` and synced into the installer rootfs by
 `./tools/sync-platform-contract-into-installer.sh`.
 
-The platform contract content is staged under `installer/ourbox/rootfs/opt/ourbox/airgap/platform/`
+The platform contract content is staged under `installer/ourbox/rootfs/opt/ourbox/substrate/platform/`
 as part of the OS payload — it is baked into the installed system when the payload is extracted.
 
 ### 3) Provenance is mandatory
 
-The installed system MUST record platform contract provenance in `/etc/ourbox/release` so operators
-can answer "what platform baseline is running?" locally.
-
-Required keys:
-- `OURBOX_PLATFORM_CONTRACT_SOURCE`
-- `OURBOX_PLATFORM_CONTRACT_REVISION`
-- `OURBOX_PLATFORM_CONTRACT_VERSION`
-- `OURBOX_PLATFORM_CONTRACT_CREATED`
-- `OURBOX_PLATFORM_CONTRACT_DIGEST`
-
-These are written to the OS payload during `build-os-payload.sh` from the synced `contract.env`
-and `contract.digest` files.
+The installed system MUST record build-time and install-time provenance in `/etc/ourbox/release`
+so operators can answer which OS payload, selected substrate bundle, and application selection are
+running locally.
 
 ### 4) Platform manifests are gitkeep placeholders
 
-`installer/ourbox/rootfs/opt/ourbox/airgap/platform/{manifests,landing,todo-bloom}/` are kept as
+`installer/ourbox/rootfs/opt/ourbox/substrate/platform/{manifests,landing,todo-bloom}/` are kept as
 `.gitkeep` placeholders in version control. They are populated by `fetch-ourbox-substrate.sh` from
 the upstream OCI artifact, not authored in this repo. This makes the dependency explicit.
 
@@ -80,7 +77,8 @@ the upstream OCI artifact, not authored in this repo. This makes the dependency 
 
 - Keeps the platform baseline "officialness" anchored in one producer repo.
 - Prevents silent baseline drift across multiple image repos.
-- Makes support and debugging possible: "show me the platform contract revision/digest."
+- Makes support and debugging possible: "show me the exact upstream platform
+  inputs and selected artifact identities."
 - Preserves hackability: users can replace the contract, but the provenance boundary stays legible.
 
 ## Consequences

@@ -6,7 +6,7 @@
 Woodbox builds produce two large artifacts that must be transferred to other machines for
 installation and recovery:
 
-1. **OS payload** — a `.tar.gz` containing the rootfs overlay, airgap bundle (k3s + image tars),
+1. **OS payload** — a `.tar.gz` containing the rootfs overlay, substrate bundle (k3s + image tars),
    and platform contract content, staged at install time from the installer USB.
 2. **Installer ISO** — a bootable Ubuntu autoinstall ISO that the operator flashes to a USB stick
    and boots on the Woodbox.
