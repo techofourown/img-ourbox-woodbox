@@ -107,7 +107,7 @@ keeping the existing SATA DATA disk breaks the boot sequence:
 
 - `bootstrap.done` on the DATA disk causes `ourbox-bootstrap` to exit early
 - k3s starts at boot (now enabled via late-commands) before bootstrap has
-  hydrated the airgap image tars into `/var/lib/ourbox/k3s/agent/images/`
+  hydrated the substrate image tars into `/var/lib/ourbox/k3s/agent/images/`
 - Result: k3s is running but app pods fail with `ErrImageNeverPull` because
   the image cache is empty; the user must manually restart k3s after bootstrap
 

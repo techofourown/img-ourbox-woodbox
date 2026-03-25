@@ -111,13 +111,13 @@ MISSION_BUILD_ROOT="${TMP_DIR}/mission-build"
 BUNDLE_ROOT="${TMP_DIR}/bundle-root"
 MISSION_DIR="${MISSION_BUILD_ROOT}/mission"
 MISSION_OS_DIR="${MISSION_DIR}/artifacts/os"
-MISSION_AIRGAP_DIR="${MISSION_DIR}/artifacts/airgap"
-mkdir -p "${PAYLOAD_ROOT}" "${MISSION_OS_DIR}" "${MISSION_AIRGAP_DIR}" "${BUNDLE_ROOT}"
+MISSION_SUBSTRATE_DIR="${MISSION_DIR}/artifacts/substrate"
+mkdir -p "${PAYLOAD_ROOT}" "${MISSION_OS_DIR}" "${MISSION_SUBSTRATE_DIR}" "${BUNDLE_ROOT}"
 
 tar -xzf "${OS_PAYLOAD}" -C "${PAYLOAD_ROOT}"
-[[ -f "${PAYLOAD_ROOT}/airgap/manifest.env" ]] || die "OS payload missing airgap/manifest.env"
-[[ -x "${PAYLOAD_ROOT}/airgap/k3s/k3s" ]] || die "OS payload missing airgap/k3s/k3s"
-[[ -f "${PAYLOAD_ROOT}/airgap/platform/images.lock.json" ]] || die "OS payload missing airgap/platform/images.lock.json"
+[[ -f "${PAYLOAD_ROOT}/substrate/manifest.env" ]] || die "OS payload missing substrate/manifest.env"
+[[ -x "${PAYLOAD_ROOT}/substrate/k3s/k3s" ]] || die "OS payload missing substrate/k3s/k3s"
+[[ -f "${PAYLOAD_ROOT}/substrate/platform/images.lock.json" ]] || die "OS payload missing substrate/platform/images.lock.json"
 
 meta_dump="$(
   python3 "${STRICT_METADATA_PARSER}" "${OS_META_ENV}" \
@@ -134,11 +134,6 @@ meta_dump="$(
     --allow OURBOX_RECIPE_GIT_HASH \
     --allow BUILD_TS \
     --allow GIT_SHA \
-    --allow OURBOX_PLATFORM_CONTRACT_SOURCE \
-    --allow OURBOX_PLATFORM_CONTRACT_REVISION \
-    --allow OURBOX_PLATFORM_CONTRACT_VERSION \
-    --allow OURBOX_PLATFORM_CONTRACT_CREATED \
-    --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
     --allow OURBOX_SUBSTRATE_REF \
     --allow OURBOX_SUBSTRATE_DIGEST \
     --allow OURBOX_SUBSTRATE_SOURCE \
@@ -155,7 +150,6 @@ meta_dump="$(
     --allow GITHUB_RUN_ID \
     --allow GITHUB_RUN_ATTEMPT \
     --require OS_ARTIFACT_TYPE \
-    --require OURBOX_PLATFORM_CONTRACT_DIGEST \
     --require OURBOX_SUBSTRATE_REF \
     --require OURBOX_SUBSTRATE_DIGEST \
     --require OURBOX_SUBSTRATE_SOURCE \
@@ -173,11 +167,6 @@ meta_dump="$(
     --print OURBOX_SKU \
     --print OURBOX_VARIANT \
     --print OURBOX_VERSION \
-    --print OURBOX_PLATFORM_CONTRACT_SOURCE \
-    --print OURBOX_PLATFORM_CONTRACT_REVISION \
-    --print OURBOX_PLATFORM_CONTRACT_VERSION \
-    --print OURBOX_PLATFORM_CONTRACT_CREATED \
-    --print OURBOX_PLATFORM_CONTRACT_DIGEST \
     --print OURBOX_SUBSTRATE_REF \
     --print OURBOX_SUBSTRATE_DIGEST \
     --print OURBOX_SUBSTRATE_SOURCE \
@@ -190,7 +179,7 @@ meta_dump="$(
     --print OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256
 )"
 mapfile -t meta_fields <<<"${meta_dump}"
-[[ "${#meta_fields[@]}" -eq 22 ]] || die "unexpected metadata parse result from ${OS_META_ENV}"
+[[ "${#meta_fields[@]}" -eq 17 ]] || die "unexpected metadata parse result from ${OS_META_ENV}"
 
 OS_ARTIFACT_TYPE="${meta_fields[0]}"
 OURBOX_PRODUCT="${meta_fields[1]}"
@@ -199,44 +188,38 @@ OURBOX_TARGET="${meta_fields[3]}"
 OURBOX_SKU="${meta_fields[4]}"
 OURBOX_VARIANT="${meta_fields[5]}"
 OURBOX_VERSION="${meta_fields[6]}"
-PLATFORM_CONTRACT_SOURCE="${meta_fields[7]}"
-PLATFORM_CONTRACT_REVISION="${meta_fields[8]}"
-PLATFORM_CONTRACT_VERSION="${meta_fields[9]}"
-PLATFORM_CONTRACT_CREATED="${meta_fields[10]}"
-PLATFORM_CONTRACT_DIGEST="${meta_fields[11]}"
-BAKED_AIRGAP_REF="${meta_fields[12]}"
-BAKED_AIRGAP_DIGEST="${meta_fields[13]}"
-BAKED_AIRGAP_SOURCE="${meta_fields[14]}"
-BAKED_AIRGAP_REVISION="${meta_fields[15]}"
-BAKED_AIRGAP_VERSION="${meta_fields[16]}"
-BAKED_AIRGAP_CREATED="${meta_fields[17]}"
-BAKED_AIRGAP_ARCH="${meta_fields[18]}"
-BAKED_AIRGAP_PROFILE="${meta_fields[19]}"
-BAKED_AIRGAP_K3S_VERSION="${meta_fields[20]}"
-BAKED_AIRGAP_IMAGES_LOCK_SHA256="${meta_fields[21]}"
+BAKED_SUBSTRATE_REF="${meta_fields[7]}"
+BAKED_SUBSTRATE_DIGEST="${meta_fields[8]}"
+BAKED_SUBSTRATE_SOURCE="${meta_fields[9]}"
+BAKED_SUBSTRATE_REVISION="${meta_fields[10]}"
+BAKED_SUBSTRATE_VERSION="${meta_fields[11]}"
+BAKED_SUBSTRATE_CREATED="${meta_fields[12]}"
+BAKED_SUBSTRATE_ARCH="${meta_fields[13]}"
+BAKED_SUBSTRATE_PROFILE="${meta_fields[14]}"
+BAKED_SUBSTRATE_K3S_VERSION="${meta_fields[15]}"
+BAKED_SUBSTRATE_IMAGES_LOCK_SHA256="${meta_fields[16]}"
 
 OS_PAYLOAD_SHA="$(sha256sum "${OS_PAYLOAD}" | awk '{print $1}')"
 OS_PAYLOAD_SIZE="$(stat -c '%s' "${OS_PAYLOAD}")"
 OS_ARTIFACT_REF="ghcr.io/techofourown/ourbox-woodbox-os-smoke@sha256:${OS_PAYLOAD_SHA}"
 
-cp -a "${PAYLOAD_ROOT}/airgap/." "${BUNDLE_ROOT}/"
-rm -f "${BUNDLE_ROOT}/platform/catalog.json" "${BUNDLE_ROOT}/platform/selected-apps.json"
+cp -a "${PAYLOAD_ROOT}/substrate/." "${BUNDLE_ROOT}/"
 
-MISSION_APPLICATION_CATALOG_PATH="${MISSION_AIRGAP_DIR}/catalog.json"
-MISSION_SELECTED_APPS_PATH="${MISSION_AIRGAP_DIR}/selected-apps.json"
+MISSION_APPLICATION_CATALOG_PATH="${MISSION_SUBSTRATE_DIR}/catalog.json"
+MISSION_SELECTED_APPS_PATH="${MISSION_SUBSTRATE_DIR}/selected-apps.json"
 cp -f "${APPLICATION_CATALOG}" "${MISSION_APPLICATION_CATALOG_PATH}"
 cp -f "${SELECTED_APPS}" "${MISSION_SELECTED_APPS_PATH}"
 
-cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
-tar -C "${BUNDLE_ROOT}" -czf "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
-printf '%s  %s\n' "$(sha256sum "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" | awk '{print $1}')" "ourbox-substrate.tar.gz" \
-  > "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz.sha256"
+cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_SUBSTRATE_DIR}/manifest.env"
+tar -C "${BUNDLE_ROOT}" -czf "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
+printf '%s  %s\n' "$(sha256sum "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" | awk '{print $1}')" "ourbox-substrate.tar.gz" \
+  > "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz.sha256"
 
 cp -f "${OS_PAYLOAD}" "${MISSION_OS_DIR}/os-payload.tar.gz"
 printf '%s  %s\n' "${OS_PAYLOAD_SHA}" "os-payload.tar.gz" > "${MISSION_OS_DIR}/os-payload.tar.gz.sha256"
 cp -f "${OS_META_ENV}" "${MISSION_OS_DIR}/os.meta.env"
 printf '%s\n' "${OS_ARTIFACT_REF}" > "${MISSION_OS_DIR}/artifact.ref"
-printf '%s\n' "${BAKED_AIRGAP_REF}" > "${MISSION_AIRGAP_DIR}/artifact.ref"
+printf '%s\n' "${BAKED_SUBSTRATE_REF}" > "${MISSION_SUBSTRATE_DIR}/artifact.ref"
 
 MISSION_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 COMPOSER_REVISION="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -251,21 +234,16 @@ export OS_ARTIFACT_TYPE
 export OS_ARTIFACT_REF
 export OS_PAYLOAD_SHA
 export OS_PAYLOAD_SIZE
-export PLATFORM_CONTRACT_SOURCE
-export PLATFORM_CONTRACT_REVISION
-export PLATFORM_CONTRACT_VERSION
-export PLATFORM_CONTRACT_CREATED
-export PLATFORM_CONTRACT_DIGEST
-export BAKED_AIRGAP_REF
-export BAKED_AIRGAP_DIGEST
-export BAKED_AIRGAP_SOURCE
-export BAKED_AIRGAP_REVISION
-export BAKED_AIRGAP_VERSION
-export BAKED_AIRGAP_CREATED
-export BAKED_AIRGAP_ARCH
-export BAKED_AIRGAP_PROFILE
-export BAKED_AIRGAP_K3S_VERSION
-export BAKED_AIRGAP_IMAGES_LOCK_SHA256
+export BAKED_SUBSTRATE_REF
+export BAKED_SUBSTRATE_DIGEST
+export BAKED_SUBSTRATE_SOURCE
+export BAKED_SUBSTRATE_REVISION
+export BAKED_SUBSTRATE_VERSION
+export BAKED_SUBSTRATE_CREATED
+export BAKED_SUBSTRATE_ARCH
+export BAKED_SUBSTRATE_PROFILE
+export BAKED_SUBSTRATE_K3S_VERSION
+export BAKED_SUBSTRATE_IMAGES_LOCK_SHA256
 export OURBOX_PRODUCT
 export OURBOX_DEVICE
 export OURBOX_TARGET
@@ -281,8 +259,8 @@ import os
 from pathlib import Path
 
 mission_dir = Path(os.environ["MISSION_DIR"])
-catalog_path = mission_dir / "artifacts" / "airgap" / "catalog.json"
-selection_path = mission_dir / "artifacts" / "airgap" / "selected-apps.json"
+catalog_path = mission_dir / "artifacts" / "substrate" / "catalog.json"
+selection_path = mission_dir / "artifacts" / "substrate" / "selected-apps.json"
 with catalog_path.open("r", encoding="utf-8") as handle:
     catalog = json.load(handle)
 with selection_path.open("r", encoding="utf-8") as handle:
@@ -342,20 +320,13 @@ manifest = {
         "compose_strategy": "woodbox-fat-iso-with-host-selected-os-application-catalog-and-app-selection",
         "mission_only": os.environ["MISSION_ONLY"] == "1",
     },
-    "platform_contract": {
-        "digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
-        "source": os.environ["PLATFORM_CONTRACT_SOURCE"],
-        "revision": os.environ["PLATFORM_CONTRACT_REVISION"],
-        "version": os.environ["PLATFORM_CONTRACT_VERSION"],
-        "created": os.environ["PLATFORM_CONTRACT_CREATED"],
-    },
     "requested": {
         "os": {
             "selection_source": "branch-smoke",
             "release_channel": "revalidation",
             "requested_ref": "",
         },
-        "airgap": {
+        "selected_substrate": {
             "selection_mode": "baked-from-selected-os",
             "selection_source": "branch-smoke",
             "release_channel": "revalidation",
@@ -381,7 +352,6 @@ manifest = {
             "artifact_ref": os.environ["OS_ARTIFACT_REF"],
             "artifact_digest": f"sha256:{os.environ['OS_PAYLOAD_SHA']}",
             "artifact_type": os.environ["OS_ARTIFACT_TYPE"],
-            "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
             "payload": {
                 "relpath": "artifacts/os/os-payload.tar.gz",
                 "sha256": os.environ["OS_PAYLOAD_SHA"],
@@ -389,21 +359,20 @@ manifest = {
             },
             "metadata_relpath": "artifacts/os/os.meta.env",
         },
-        "airgap": {
+        "selected_substrate": {
             "selection_mode": "baked-from-selected-os",
             "selection_source": "branch-smoke",
             "release_channel": "revalidation",
-            "artifact_ref": os.environ["BAKED_AIRGAP_REF"],
-            "artifact_digest": os.environ["BAKED_AIRGAP_DIGEST"],
-            "platform_contract_digest": os.environ["PLATFORM_CONTRACT_DIGEST"],
-            "arch": os.environ["BAKED_AIRGAP_ARCH"],
-            "profile": os.environ["BAKED_AIRGAP_PROFILE"],
-            "version": os.environ["BAKED_AIRGAP_VERSION"],
-            "created": os.environ["BAKED_AIRGAP_CREATED"],
-            "k3s_version": os.environ["BAKED_AIRGAP_K3S_VERSION"],
-            "images_lock_sha256": os.environ["BAKED_AIRGAP_IMAGES_LOCK_SHA256"],
-            "payload_relpath": "artifacts/airgap/ourbox-substrate.tar.gz",
-            "manifest_relpath": "artifacts/airgap/manifest.env",
+            "artifact_ref": os.environ["BAKED_SUBSTRATE_REF"],
+            "artifact_digest": os.environ["BAKED_SUBSTRATE_DIGEST"],
+            "arch": os.environ["BAKED_SUBSTRATE_ARCH"],
+            "profile": os.environ["BAKED_SUBSTRATE_PROFILE"],
+            "version": os.environ["BAKED_SUBSTRATE_VERSION"],
+            "created": os.environ["BAKED_SUBSTRATE_CREATED"],
+            "k3s_version": os.environ["BAKED_SUBSTRATE_K3S_VERSION"],
+            "images_lock_sha256": os.environ["BAKED_SUBSTRATE_IMAGES_LOCK_SHA256"],
+            "payload_relpath": "artifacts/substrate/ourbox-substrate.tar.gz",
+            "manifest_relpath": "artifacts/substrate/manifest.env",
             "present_in_selected_os_payload": True,
         },
         "applications": {
@@ -411,8 +380,8 @@ manifest = {
             "catalog_name": str(catalog.get("catalog_name", "")),
             "selection_mode": str(selection.get("selection_mode", "")),
             "selected_app_ids": list(selection.get("selected_app_ids", [])),
-            "catalog_relpath": "artifacts/airgap/catalog.json",
-            "selection_relpath": "artifacts/airgap/selected-apps.json",
+            "catalog_relpath": "artifacts/substrate/catalog.json",
+            "selection_relpath": "artifacts/substrate/selected-apps.json",
             "source_catalogs": [
                 {
                     "catalog_id": str(catalog.get("catalog_id", "")),

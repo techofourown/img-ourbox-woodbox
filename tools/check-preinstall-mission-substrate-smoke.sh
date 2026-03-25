@@ -12,13 +12,13 @@ PREINSTALL_DIR="${FIXTURE_ROOT}/installer/ourbox-preinstall"
 MISSION_ROOT="${TMP}/cdrom/ourbox/mission"
 PAYLOAD_DIR="${TMP}/cache/payload"
 OVERRIDE_DIR="${TMP}/cache/ourbox-substrate-override"
-MISSION_AIRGAP_DIR="${MISSION_ROOT}/artifacts/airgap"
+MISSION_SUBSTRATE_DIR="${MISSION_ROOT}/artifacts/substrate"
 MISSION_OS_DIR="${MISSION_ROOT}/artifacts/os"
 MISSION_SSH_DIR="${MISSION_ROOT}/artifacts/installed-target-ssh"
-SOURCE_BUNDLE_DIR="${TMP}/source-airgap"
+SOURCE_BUNDLE_DIR="${TMP}/source-substrate"
 INSTALLER_CACHE_DIR="${TMP}/cache"
 
-mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_AIRGAP_DIR}" "${MISSION_OS_DIR}" "${MISSION_SSH_DIR}" "${PAYLOAD_DIR}" "${INSTALLER_CACHE_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
+mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${MISSION_SUBSTRATE_DIR}" "${MISSION_OS_DIR}" "${MISSION_SSH_DIR}" "${PAYLOAD_DIR}" "${INSTALLER_CACHE_DIR}" "${SOURCE_BUNDLE_DIR}/k3s" "${SOURCE_BUNDLE_DIR}/platform/images"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
 cp "${ROOT}/tools/strict-kv-metadata.py" "${TOOLS_DIR}/strict-kv-metadata.py"
@@ -34,14 +34,13 @@ MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
 PAYLOAD_CACHE_DIR="${PAYLOAD_DIR}"
 SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}"
 
-PLATFORM_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-BAKED_AIRGAP_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-MISSION_AIRGAP_DIGEST="sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+BAKED_SUBSTRATE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+MISSION_OS_DIGEST="sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+MISSION_SUBSTRATE_DIGEST="sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 
 cat > "${PAYLOAD_CACHE_DIR}/payload.meta.env" <<EOF
-OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_DIGEST}
-OURBOX_SUBSTRATE_REF=ghcr.io/example/ourbox-substrate@${BAKED_AIRGAP_DIGEST}
-OURBOX_SUBSTRATE_DIGEST=${BAKED_AIRGAP_DIGEST}
+OURBOX_SUBSTRATE_REF=ghcr.io/example/ourbox-substrate@${BAKED_SUBSTRATE_DIGEST}
+OURBOX_SUBSTRATE_DIGEST=${BAKED_SUBSTRATE_DIGEST}
 OURBOX_SUBSTRATE_SOURCE=https://github.com/example/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=baked-revision
 OURBOX_SUBSTRATE_VERSION=v0.0.0-baked
@@ -57,7 +56,6 @@ OURBOX_SUBSTRATE_SOURCE=https://github.com/example/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=mission-revision
 OURBOX_SUBSTRATE_VERSION=v0.0.0-mission
 OURBOX_SUBSTRATE_CREATED=2026-03-12T00:10:00Z
-OURBOX_PLATFORM_CONTRACT_DIGEST=${PLATFORM_DIGEST}
 OURBOX_SUBSTRATE_ARCH=amd64
 K3S_VERSION=v1.35.0+k3s1
 OURBOX_PLATFORM_PROFILE=demo-apps
@@ -67,11 +65,11 @@ EOF
 
 printf '#!/bin/sh\nexit 0\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s"
 chmod +x "${SOURCE_BUNDLE_DIR}/k3s/k3s"
-printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-airgap-images-amd64.tar"
+printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-images-amd64.tar"
 printf '{"images":[]}\n' > "${SOURCE_BUNDLE_DIR}/platform/images.lock.json"
 printf 'PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SOURCE_BUNDLE_DIR}/platform/images/platform-demo.tar"
-cat > "${MISSION_AIRGAP_DIR}/catalog.json" <<'EOF'
+cat > "${MISSION_SUBSTRATE_DIR}/catalog.json" <<'EOF'
 {
   "schema": 1,
   "kind": "ourbox-application-catalog",
@@ -93,7 +91,7 @@ cat > "${MISSION_AIRGAP_DIR}/catalog.json" <<'EOF'
   ]
 }
 EOF
-cat > "${MISSION_AIRGAP_DIR}/selected-apps.json" <<'EOF'
+cat > "${MISSION_SUBSTRATE_DIR}/selected-apps.json" <<'EOF'
 {
   "schema": 1,
   "kind": "ourbox-selected-applications",
@@ -106,9 +104,9 @@ cat > "${MISSION_AIRGAP_DIR}/selected-apps.json" <<'EOF'
 }
 EOF
 
-tar -C "${SOURCE_BUNDLE_DIR}" -czf "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
-sha256sum "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz" | awk '{print $1"  ourbox-substrate.tar.gz"}' > "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz.sha256"
-cp "${SOURCE_BUNDLE_DIR}/manifest.env" "${MISSION_AIRGAP_DIR}/manifest.env"
+tar -C "${SOURCE_BUNDLE_DIR}" -czf "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
+sha256sum "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" | awk '{print $1"  ourbox-substrate.tar.gz"}' > "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz.sha256"
+cp "${SOURCE_BUNDLE_DIR}/manifest.env" "${MISSION_SUBSTRATE_DIR}/manifest.env"
 
 printf 'fixture os payload\n' > "${MISSION_OS_DIR}/os-payload.tar.gz"
 printf 'OS_ARTIFACT_TYPE=application/vnd.techofourown.ourbox.woodbox.os-payload.v1\n' > "${MISSION_OS_DIR}/os.meta.env"
@@ -125,7 +123,7 @@ cat > "${MISSION_MANIFEST}" <<EOF
   },
   "composer": {
     "name": "img-ourbox-woodbox",
-    "phase": "preinstall-mission-airgap-smoke",
+    "phase": "preinstall-mission-substrate-smoke",
     "source_revision": "abc123def456"
   },
   "adapter": {
@@ -149,17 +147,13 @@ cat > "${MISSION_MANIFEST}" <<EOF
     "compose_strategy": "woodbox-fat-iso-with-host-selected-os-application-catalog-and-app-selection",
     "mission_only": false
   },
-  "platform_contract": {
-    "digest": "${PLATFORM_DIGEST}"
-  },
   "requested": {
     "os": {
       "selection_source": "catalog",
       "release_channel": "stable",
       "requested_ref": ""
     },
-    "airgap": {
-      "selection_mode": "catalog-defaults",
+    "selected_substrate": {
       "selection_source": "catalog",
       "release_channel": "stable",
       "requested_ref": ""
@@ -186,11 +180,10 @@ cat > "${MISSION_MANIFEST}" <<EOF
   },
   "resolved": {
     "os": {
-      "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@${MISSION_AIRGAP_DIGEST}",
-      "artifact_digest": "${MISSION_AIRGAP_DIGEST}",
+      "artifact_ref": "ghcr.io/example/ourbox-woodbox-os@${MISSION_OS_DIGEST}",
+      "artifact_digest": "${MISSION_OS_DIGEST}",
       "selection_source": "catalog",
       "release_channel": "stable",
-      "platform_contract_digest": "${PLATFORM_DIGEST}",
       "payload": {
         "relpath": "artifacts/os/os-payload.tar.gz",
         "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -198,16 +191,14 @@ cat > "${MISSION_MANIFEST}" <<EOF
       },
       "metadata_relpath": "artifacts/os/os.meta.env"
     },
-    "airgap": {
-      "artifact_ref": "ghcr.io/example/ourbox-substrate@${MISSION_AIRGAP_DIGEST}",
-      "artifact_digest": "${MISSION_AIRGAP_DIGEST}",
-      "selection_mode": "catalog-defaults",
+    "selected_substrate": {
+      "artifact_ref": "ghcr.io/example/ourbox-substrate@${MISSION_SUBSTRATE_DIGEST}",
+      "artifact_digest": "${MISSION_SUBSTRATE_DIGEST}",
       "selection_source": "catalog",
       "release_channel": "stable",
-      "platform_contract_digest": "${PLATFORM_DIGEST}",
       "arch": "amd64",
-      "payload_relpath": "artifacts/airgap/ourbox-substrate.tar.gz",
-      "manifest_relpath": "artifacts/airgap/manifest.env",
+      "payload_relpath": "artifacts/substrate/ourbox-substrate.tar.gz",
+      "manifest_relpath": "artifacts/substrate/manifest.env",
       "present_in_selected_os_payload": false
     },
     "applications": {
@@ -218,8 +209,8 @@ cat > "${MISSION_MANIFEST}" <<EOF
         "landing",
         "dufs"
       ],
-      "catalog_relpath": "artifacts/airgap/catalog.json",
-      "selection_relpath": "artifacts/airgap/selected-apps.json"
+      "catalog_relpath": "artifacts/substrate/catalog.json",
+      "selection_relpath": "artifacts/substrate/selected-apps.json"
     },
     "installed_target_ssh": {
       "mode": "host-generated-authorized-key",
@@ -233,7 +224,7 @@ cat > "${MISSION_MANIFEST}" <<EOF
 }
 EOF
 
-load_selected_payload_airgap_metadata
+load_selected_payload_substrate_metadata
 [[ "${MISSION_PRESENT}" == "1" ]] || {
   echo "expected embedded mission metadata to be loaded" >&2
   exit 1
@@ -242,7 +233,7 @@ load_selected_payload_airgap_metadata
   echo "expected OS artifact source to switch to mission provenance" >&2
   exit 1
 }
-[[ "${OS_ARTIFACT_REF}" == "ghcr.io/example/ourbox-woodbox-os@${MISSION_AIRGAP_DIGEST}" ]] || {
+[[ "${OS_ARTIFACT_REF}" == "ghcr.io/example/ourbox-woodbox-os@${MISSION_OS_DIGEST}" ]] || {
   echo "unexpected mission OS artifact ref: ${OS_ARTIFACT_REF}" >&2
   exit 1
 }
@@ -270,19 +261,19 @@ load_selected_payload_airgap_metadata
 prepare_selected_substrate_bundle
 stage_selected_application_metadata
 [[ "${OURBOX_SUBSTRATE_ARTIFACT_SOURCE}" == "mission" ]] || {
-  echo "expected mission-local airgap override source, got ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE}" >&2
+  echo "expected mission-local substrate override source, got ${OURBOX_SUBSTRATE_ARTIFACT_SOURCE}" >&2
   exit 1
 }
-[[ "${OURBOX_SUBSTRATE_REF}" == "ghcr.io/example/ourbox-substrate@${MISSION_AIRGAP_DIGEST}" ]] || {
-  echo "unexpected mission airgap ref: ${OURBOX_SUBSTRATE_REF}" >&2
+[[ "${OURBOX_SUBSTRATE_REF}" == "ghcr.io/example/ourbox-substrate@${MISSION_SUBSTRATE_DIGEST}" ]] || {
+  echo "unexpected mission substrate ref: ${OURBOX_SUBSTRATE_REF}" >&2
   exit 1
 }
 [[ -x "${SUBSTRATE_OVERRIDE_DIR}/k3s/k3s" ]] || {
-  echo "mission airgap bundle was not extracted into override dir" >&2
+  echo "mission substrate bundle was not extracted into override dir" >&2
   exit 1
 }
 [[ -f "${SUBSTRATE_OVERRIDE_DIR}/platform/images/platform-demo.tar" ]] || {
-  echo "mission airgap platform image tar missing from override dir" >&2
+  echo "mission substrate platform image tar missing from override dir" >&2
   exit 1
 }
 [[ -f "${INSTALLER_CACHE_DIR}/catalog.json" ]] || {
@@ -301,12 +292,12 @@ import sys
 
 manifest_path = pathlib.Path(sys.argv[1])
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-manifest["resolved"]["airgap"]["payload_relpath"] = "../outside-ourbox-substrate.tar.gz"
+manifest["resolved"]["selected_substrate"]["payload_relpath"] = "../outside-ourbox-substrate.tar.gz"
 manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 PY
 
 set +e
-( load_selected_payload_airgap_metadata ) >"${TMP}/mission-relpath.log" 2>&1
+( load_selected_payload_substrate_metadata ) >"${TMP}/mission-relpath.log" 2>&1
 status=$?
 set -e
 
@@ -319,14 +310,14 @@ grep -F "must stay within the mission directory" "${TMP}/mission-relpath.log" >/
   exit 1
 }
 
-rm -f "${MISSION_AIRGAP_DIR}/ourbox-substrate.tar.gz.sha256"
+rm -f "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz.sha256"
 set +e
 (prepare_selected_substrate_bundle >/dev/null 2>&1)
 rc=$?
 set -e
 if [[ "${rc}" -eq 0 ]]; then
-  echo "expected prepare_selected_substrate_bundle to reject mission airgap payloads missing a checksum sidecar" >&2
+  echo "expected prepare_selected_substrate_bundle to reject mission substrate payloads missing a checksum sidecar" >&2
   exit 1
 fi
 
-printf '[%s] Woodbox preinstall mission-airgap smoke passed\n' "$(date -Is)"
+printf '[%s] Woodbox preinstall mission-substrate smoke passed\n' "$(date -Is)"

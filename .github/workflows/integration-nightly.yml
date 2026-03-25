@@ -63,9 +63,9 @@ jobs:
       - name: Clean stale workspace artifacts
         run: |
           rm -rf artifacts/ deploy/
-          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/manifests
-          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/landing
-          rm -rf installer/ourbox/rootfs/opt/ourbox/airgap/platform/todo-bloom
+          rm -rf installer/ourbox/rootfs/opt/ourbox/substrate/platform/manifests
+          rm -rf installer/ourbox/rootfs/opt/ourbox/substrate/platform/landing
+          rm -rf installer/ourbox/rootfs/opt/ourbox/substrate/platform/todo-bloom
 
       - name: Preflight build host
         run: ./tools/preflight-build-host.sh

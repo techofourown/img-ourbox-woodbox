@@ -101,7 +101,7 @@ sudo ./tools/bootstrap-host.sh         # Install host deps (ORAS, xorriso, etc.)
 
 ./tools/fetch-ourbox-substrate.sh      # Pull pinned ourbox-substrate bundle + platform contract via ORAS
 
-./tools/build-os-payload.sh            # Build OS payload tarball (rootfs overlay + airgap)
+./tools/build-os-payload.sh            # Build OS payload tarball (rootfs overlay + substrate)
 
 ./tools/build-installer-iso.sh         # Build installer substrate ISO (not a standalone install path)
 
@@ -163,9 +163,10 @@ cat /etc/ourbox/release
 ```
 
 Expected fields include: `OURBOX_PRODUCT`, `OURBOX_DEVICE`, `OURBOX_TARGET`, `OURBOX_SKU`,
-`OURBOX_VARIANT`, `OURBOX_VERSION`, `OURBOX_RECIPE_GIT_HASH`, platform contract provenance
-(`OURBOX_PLATFORM_CONTRACT_DIGEST`, etc.), and install-time provenance (`OURBOX_INSTALLER_ID`,
-`OURBOX_OS_ARTIFACT_REF`, `OURBOX_OS_IMAGE_SHA256`, etc.).
+`OURBOX_VARIANT`, `OURBOX_VERSION`, `OURBOX_RECIPE_GIT_HASH`, build timing
+(`OURBOX_BUILD_TS`), and install-time provenance such as `OURBOX_INSTALLER_ID`,
+`OURBOX_OS_ARTIFACT_REF`, `OURBOX_OS_IMAGE_SHA256`, `OURBOX_SUBSTRATE_REF`,
+and `OURBOX_SELECTED_APPLICATION_IDS`.
 
 ---
 

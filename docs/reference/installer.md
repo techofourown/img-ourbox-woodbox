@@ -83,13 +83,13 @@ Mission media embeds:
 - `/cdrom/ourbox/apt/target-packages.txt`
 - `/cdrom/ourbox/mission/mission-manifest.json`
 - `/cdrom/ourbox/mission/artifacts/os/...`
-- `/cdrom/ourbox/mission/artifacts/airgap/...`
+- `/cdrom/ourbox/mission/artifacts/substrate/...`
 
 When the selected catalog advertises application-catalog metadata, the mission
 also carries:
 
-- `/cdrom/ourbox/mission/artifacts/airgap/catalog.json`
-- `/cdrom/ourbox/mission/artifacts/airgap/selected-apps.json`
+- `/cdrom/ourbox/mission/artifacts/substrate/catalog.json`
+- `/cdrom/ourbox/mission/artifacts/substrate/selected-apps.json`
 
 When the host-side composer stages installed-target SSH key auth, the mission
 also carries:
@@ -146,7 +146,6 @@ Step 4:
   the OS payload, uses the baked bundle
 - otherwise extracts the staged mission substrate bundle into the override cache
 - validates the extracted bundle locally against:
-  - required `OURBOX_PLATFORM_CONTRACT_DIGEST`
   - expected `amd64` arch
   - required bundle shape and manifest fields
 - requires baked/selected application metadata to already exist in-band as:
@@ -237,13 +236,13 @@ Tag: `x86-catalog`
 Columns:
 
 - `channel`
+- `tag`
 - `created`
 - `version`
 - `variant`
 - `target`
 - `sku`
 - `git_sha`
-- `platform_contract_digest`
 - `k3s_version`
 - `payload_sha256`
 - `artifact_digest`
@@ -251,6 +250,9 @@ Columns:
 
 The OS catalog is consumed on the host by `sw-ourbox-installer`. It is not a
 target-side runtime input.
+
+Older examples may still mention a legacy contract-metadata column. That is
+legacy wording and not part of the current host-side selection contract.
 
 ## Autoinstall late-commands (payload extraction)
 
@@ -260,7 +262,7 @@ Late-commands in `autoinstall.tpl`:
 2. Install the remaining target packages from the substrate-local APT repo only
 3. If the mission-selected substrate bundle differs from the baked bundle, overlay the validated mutable substrate subset from the override cache
 4. Copy the selected application catalog metadata (`catalog.json` and `selected-apps.json`) into the target platform directory
-5. Install the `k3s` binary from `airgap/k3s/k3s`
+5. Install the `k3s` binary from `substrate/k3s/k3s`
 6. Append install-time provenance to `/target/etc/ourbox/release`
 7. Configure installed-target SSH when a staged host key or target-side password SSH was requested
 8. Enable required systemd services

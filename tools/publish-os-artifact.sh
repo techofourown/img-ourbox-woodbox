@@ -71,12 +71,9 @@ EOF
 META_ENV="${DEPLOY_DIR}/${BASE}.meta.env"
 [[ -f "${META_ENV}" ]] || META_ENV="${PAYLOAD_TAR%.tar.gz}.meta.env"
 
-PUBLISH_PLATFORM_CONTRACT_DIGEST_OVERRIDE="${OURBOX_PLATFORM_CONTRACT_DIGEST:-}"
-CONTRACT_DIGEST="unknown"
 if [[ -f "${META_ENV}" ]]; then
   # shellcheck disable=SC1090
   source "${META_ENV}"
-  CONTRACT_DIGEST="${OURBOX_PLATFORM_CONTRACT_DIGEST:-unknown}"
 fi
 K3S_VERSION="${K3S_VERSION:-unknown}"
 OURBOX_SUBSTRATE_REF="${OURBOX_SUBSTRATE_REF:-unknown}"
@@ -94,10 +91,6 @@ GIT_SHA="$(resolve_git_sha)"
 BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 export BASE SHA256 SIZE_BYTES OS_ARTIFACT_TYPE OURBOX_TARGET OURBOX_VARIANT OURBOX_VERSION OURBOX_SKU BUILD_TS GIT_SHA
-export OURBOX_PLATFORM_CONTRACT_DIGEST="${PUBLISH_PLATFORM_CONTRACT_DIGEST_OVERRIDE:-${CONTRACT_DIGEST}}"
-export OURBOX_PLATFORM_CONTRACT_SOURCE="${OURBOX_PLATFORM_CONTRACT_SOURCE:-unknown}"
-export OURBOX_PLATFORM_CONTRACT_REVISION="${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}"
-export OURBOX_PLATFORM_CONTRACT_VERSION="${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}"
 export K3S_VERSION
 export OURBOX_SUBSTRATE_REF OURBOX_SUBSTRATE_DIGEST OURBOX_SUBSTRATE_SOURCE
 export OURBOX_SUBSTRATE_REVISION OURBOX_SUBSTRATE_VERSION OURBOX_SUBSTRATE_CREATED
@@ -122,10 +115,6 @@ payload = {
     "OURBOX_SKU": os.environ["OURBOX_SKU"],
     "BUILD_TS": os.environ["BUILD_TS"],
     "GIT_SHA": os.environ["GIT_SHA"],
-    "OURBOX_PLATFORM_CONTRACT_DIGEST": os.environ["OURBOX_PLATFORM_CONTRACT_DIGEST"],
-    "OURBOX_PLATFORM_CONTRACT_SOURCE": os.environ["OURBOX_PLATFORM_CONTRACT_SOURCE"],
-    "OURBOX_PLATFORM_CONTRACT_REVISION": os.environ["OURBOX_PLATFORM_CONTRACT_REVISION"],
-    "OURBOX_PLATFORM_CONTRACT_VERSION": os.environ["OURBOX_PLATFORM_CONTRACT_VERSION"],
     "K3S_VERSION": os.environ["K3S_VERSION"],
     "OURBOX_SUBSTRATE_REF": os.environ["OURBOX_SUBSTRATE_REF"],
     "OURBOX_SUBSTRATE_DIGEST": os.environ["OURBOX_SUBSTRATE_DIGEST"],
@@ -170,7 +159,6 @@ push_ref() {
     --annotation "techofourown.target=${OURBOX_TARGET}"
     --annotation "techofourown.variant=${OURBOX_VARIANT}"
     --annotation "techofourown.sku=${OURBOX_SKU}"
-    --annotation "techofourown.platform-contract.digest=${OURBOX_PLATFORM_CONTRACT_DIGEST}"
     --annotation "techofourown.build.workflow=${GITHUB_WORKFLOW:-local}"
     --annotation "techofourown.build.run-id=${GITHUB_RUN_ID:-local}"
     --annotation "techofourown.build.run-attempt=${GITHUB_RUN_ATTEMPT:-1}"
@@ -238,7 +226,6 @@ payload = {
         "target": os.environ["OURBOX_TARGET"],
         "sku": os.environ["OURBOX_SKU"],
         "git_sha": os.environ["GIT_SHA"],
-        "platform_contract_digest": os.environ["OURBOX_PLATFORM_CONTRACT_DIGEST"],
         "k3s_version": os.environ["K3S_VERSION"],
     },
     "meta_env": meta_env,

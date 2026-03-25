@@ -396,7 +396,7 @@ select_data_disk() {
 }
 
 # ---------------------------------------------------------------------------
-# Mission-local payload and airgap selection state
+# Mission-local payload and substrate selection state
 # ---------------------------------------------------------------------------
 
 OS_ARTIFACT_SOURCE=""
@@ -407,7 +407,6 @@ INSTALLER_ID="woodbox"
 INSTALL_SELECTION_SOURCE=""
 RELEASE_CHANNEL=""
 SUBSTRATE_OVERRIDE_DIR="/opt/ourbox/installer/cache/ourbox-substrate-override"
-REQUIRED_SUBSTRATE_CONTRACT_DIGEST=""
 BAKED_SUBSTRATE_REF=""
 BAKED_SUBSTRATE_DIGEST=""
 BAKED_SUBSTRATE_SOURCE=""
@@ -435,23 +434,19 @@ OURBOX_APPLICATION_CATALOG_ID=""
 OURBOX_APPLICATION_CATALOG_NAME=""
 OURBOX_APPLICATION_SELECTION_MODE=""
 OURBOX_SELECTED_APPLICATION_IDS=""
-PAYLOAD_VERSION="unknown"
-PAYLOAD_VARIANT="unknown"
 MISSION_PRESENT=0
 MISSION_OS_ARTIFACT_REF=""
 MISSION_OS_ARTIFACT_DIGEST=""
 MISSION_OS_SELECTION_SOURCE=""
 MISSION_OS_RELEASE_CHANNEL=""
-MISSION_OS_PLATFORM_CONTRACT_DIGEST=""
-MISSION_AIRGAP_ARTIFACT_REF=""
-MISSION_AIRGAP_ARTIFACT_DIGEST=""
-MISSION_AIRGAP_SELECTION_SOURCE=""
-MISSION_AIRGAP_RELEASE_CHANNEL=""
-MISSION_SUBSTRATE_CONTRACT_DIGEST=""
-MISSION_AIRGAP_ARCH=""
-MISSION_AIRGAP_PAYLOAD_PATH=""
-MISSION_AIRGAP_MANIFEST_PATH=""
-MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD=""
+MISSION_SUBSTRATE_ARTIFACT_REF=""
+MISSION_SUBSTRATE_ARTIFACT_DIGEST=""
+MISSION_SUBSTRATE_SELECTION_SOURCE=""
+MISSION_SUBSTRATE_RELEASE_CHANNEL=""
+MISSION_SUBSTRATE_ARCH=""
+MISSION_SUBSTRATE_PAYLOAD_PATH=""
+MISSION_SUBSTRATE_MANIFEST_PATH=""
+MISSION_SUBSTRATE_PRESENT_IN_SELECTED_OS_PAYLOAD=""
 MISSION_SELECTED_APPLICATIONS_PRESENT=0
 MISSION_APPLICATION_CATALOG_PATH=""
 MISSION_SELECTED_APPLICATIONS_PATH=""
@@ -536,16 +531,15 @@ render_installed_target_ssh_autoinstall_block() {
 
 validate_extracted_substrate_bundle() {
   local bundle_dir="$1"
-  local required_contract_digest="$2"
-  local expected_arch="$3"
+  local expected_arch="$2"
   local manifest="${bundle_dir}/manifest.env"
-  local airgap_images_tar="${bundle_dir}/k3s/k3s-airgap-images-${expected_arch}.tar"
+  local k3s_images_tar="${bundle_dir}/k3s/k3s-images-${expected_arch}.tar"
   local manifest_dump=""
   local -a manifest_fields=()
 
   [[ -f "${manifest}" ]] || die "substrate bundle missing manifest.env: ${manifest}"
   [[ -x "${bundle_dir}/k3s/k3s" ]] || die "substrate bundle missing k3s binary: ${bundle_dir}/k3s/k3s"
-  [[ -f "${airgap_images_tar}" ]] || die "substrate bundle missing k3s airgap images tar: ${airgap_images_tar}"
+  [[ -f "${k3s_images_tar}" ]] || die "substrate bundle missing k3s images tar: ${k3s_images_tar}"
   [[ -f "${bundle_dir}/platform/images.lock.json" ]] || die "substrate bundle missing platform/images.lock.json"
   [[ -f "${bundle_dir}/platform/profile.env" ]] || die "substrate bundle missing platform/profile.env"
   [[ -d "${bundle_dir}/platform/images" ]] || die "substrate bundle missing platform/images directory"
@@ -560,8 +554,6 @@ validate_extracted_substrate_bundle() {
       --allow OURBOX_SUBSTRATE_REVISION \
       --allow OURBOX_SUBSTRATE_VERSION \
       --allow OURBOX_SUBSTRATE_CREATED \
-      --allow OURBOX_PLATFORM_CONTRACT_REF \
-      --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
       --allow OURBOX_SUBSTRATE_ARCH \
       --allow K3S_VERSION \
       --allow OURBOX_PLATFORM_PROFILE \
@@ -571,7 +563,6 @@ validate_extracted_substrate_bundle() {
       --require OURBOX_SUBSTRATE_REVISION \
       --require OURBOX_SUBSTRATE_VERSION \
       --require OURBOX_SUBSTRATE_CREATED \
-      --require OURBOX_PLATFORM_CONTRACT_DIGEST \
       --require OURBOX_SUBSTRATE_ARCH \
       --require K3S_VERSION \
       --require OURBOX_PLATFORM_PROFILE \
@@ -581,7 +572,6 @@ validate_extracted_substrate_bundle() {
       --print OURBOX_SUBSTRATE_REVISION \
       --print OURBOX_SUBSTRATE_VERSION \
       --print OURBOX_SUBSTRATE_CREATED \
-      --print OURBOX_PLATFORM_CONTRACT_DIGEST \
       --print OURBOX_SUBSTRATE_ARCH \
       --print K3S_VERSION \
       --print OURBOX_PLATFORM_PROFILE \
@@ -589,23 +579,20 @@ validate_extracted_substrate_bundle() {
       --print OURBOX_PLATFORM_IMAGES_LOCK_SHA256
   )" || die "failed to parse substrate manifest: ${manifest}"
   mapfile -t manifest_fields <<<"${manifest_dump}"
-  [[ "${#manifest_fields[@]}" -eq 10 ]] \
+  [[ "${#manifest_fields[@]}" -eq 9 ]] \
     || die "substrate manifest parse produced an unexpected field set: ${manifest}"
 
-  [[ "${required_contract_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "required platform contract digest must be a sha256:<64 hex> before validating substrate bundle"
-  [[ "${manifest_fields[4]}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "substrate manifest carries invalid OURBOX_PLATFORM_CONTRACT_DIGEST"
-  [[ "${manifest_fields[5]}" == "${expected_arch}" ]] || die "substrate bundle arch mismatch: expected ${expected_arch}, got ${manifest_fields[5]:-unknown}"
-  [[ "${manifest_fields[4]}" == "${required_contract_digest}" ]] || die "substrate bundle contract digest mismatch: expected ${required_contract_digest}, got ${manifest_fields[4]}"
-  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
+  [[ "${manifest_fields[4]}" == "${expected_arch}" ]] || die "substrate bundle arch mismatch: expected ${expected_arch}, got ${manifest_fields[4]:-unknown}"
+  [[ "${manifest_fields[8]}" =~ ^[0-9a-f]{64}$ ]] || die "substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
 
   OURBOX_SUBSTRATE_SOURCE="${manifest_fields[0]}"
   OURBOX_SUBSTRATE_REVISION="${manifest_fields[1]}"
   OURBOX_SUBSTRATE_VERSION="${manifest_fields[2]}"
   OURBOX_SUBSTRATE_CREATED="${manifest_fields[3]}"
-  OURBOX_SUBSTRATE_ARCH="${manifest_fields[5]}"
-  OURBOX_SUBSTRATE_PROFILE="${manifest_fields[7]}"
-  OURBOX_SUBSTRATE_K3S_VERSION="${manifest_fields[6]}"
-  OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${manifest_fields[9]}"
+  OURBOX_SUBSTRATE_ARCH="${manifest_fields[4]}"
+  OURBOX_SUBSTRATE_K3S_VERSION="${manifest_fields[5]}"
+  OURBOX_SUBSTRATE_PROFILE="${manifest_fields[6]}"
+  OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256="${manifest_fields[8]}"
 }
 
 # _stage_embedded_payload — copy embedded payload from mission media into cache dir
@@ -643,7 +630,7 @@ _verify_staged_payload() {
   fi
 }
 
-load_selected_payload_airgap_metadata() {
+load_selected_payload_substrate_metadata() {
   local meta_env="${PAYLOAD_CACHE_DIR}/payload.meta.env"
   local meta_dump=""
   local -a meta_fields=()
@@ -663,10 +650,6 @@ load_selected_payload_airgap_metadata() {
       --allow OURBOX_RECIPE_GIT_HASH \
       --allow BUILD_TS \
       --allow GIT_SHA \
-      --allow OURBOX_PLATFORM_CONTRACT_SOURCE \
-      --allow OURBOX_PLATFORM_CONTRACT_REVISION \
-      --allow OURBOX_PLATFORM_CONTRACT_VERSION \
-      --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
       --allow OURBOX_SUBSTRATE_REF \
       --allow OURBOX_SUBSTRATE_DIGEST \
       --allow OURBOX_SUBSTRATE_SOURCE \
@@ -682,7 +665,6 @@ load_selected_payload_airgap_metadata() {
       --allow K3S_VERSION \
       --allow GITHUB_RUN_ID \
       --allow GITHUB_RUN_ATTEMPT \
-      --require OURBOX_PLATFORM_CONTRACT_DIGEST \
       --require OURBOX_SUBSTRATE_REF \
       --require OURBOX_SUBSTRATE_DIGEST \
       --require OURBOX_SUBSTRATE_SOURCE \
@@ -693,7 +675,6 @@ load_selected_payload_airgap_metadata() {
       --require OURBOX_SUBSTRATE_PROFILE \
       --require OURBOX_SUBSTRATE_K3S_VERSION \
       --require OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
-      --print OURBOX_PLATFORM_CONTRACT_DIGEST \
       --print OURBOX_SUBSTRATE_REF \
       --print OURBOX_SUBSTRATE_DIGEST \
       --print OURBOX_SUBSTRATE_SOURCE \
@@ -703,40 +684,31 @@ load_selected_payload_airgap_metadata() {
       --print OURBOX_SUBSTRATE_ARCH \
       --print OURBOX_SUBSTRATE_PROFILE \
       --print OURBOX_SUBSTRATE_K3S_VERSION \
-      --print OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 \
-      --print OURBOX_VERSION \
-      --print OURBOX_VARIANT
+      --print OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256
   )" || die "failed to parse selected OS payload metadata: ${meta_env}"
   mapfile -t meta_fields <<<"${meta_dump}"
-  (( ${#meta_fields[@]} >= 11 && ${#meta_fields[@]} <= 13 )) || die "selected OS payload metadata parse produced an unexpected field set: ${meta_env}"
+  [[ "${#meta_fields[@]}" -eq 10 ]] || die "selected OS payload metadata parse produced an unexpected field set: ${meta_env}"
 
-  REQUIRED_SUBSTRATE_CONTRACT_DIGEST="${meta_fields[0]}"
-  [[ "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_PLATFORM_CONTRACT_DIGEST in ${meta_env}"
-
-  BAKED_SUBSTRATE_REF="${meta_fields[1]}"
+  BAKED_SUBSTRATE_REF="${meta_fields[0]}"
   [[ -n "${BAKED_SUBSTRATE_REF}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_REF in ${meta_env}"
-  BAKED_SUBSTRATE_DIGEST="${meta_fields[2]}"
+  BAKED_SUBSTRATE_DIGEST="${meta_fields[1]}"
   [[ "${BAKED_SUBSTRATE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_SUBSTRATE_DIGEST in ${meta_env}"
-  BAKED_SUBSTRATE_SOURCE="${meta_fields[3]}"
+  BAKED_SUBSTRATE_SOURCE="${meta_fields[2]}"
   [[ -n "${BAKED_SUBSTRATE_SOURCE}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_SOURCE in ${meta_env}"
-  BAKED_SUBSTRATE_REVISION="${meta_fields[4]}"
+  BAKED_SUBSTRATE_REVISION="${meta_fields[3]}"
   [[ -n "${BAKED_SUBSTRATE_REVISION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_REVISION in ${meta_env}"
-  BAKED_SUBSTRATE_VERSION="${meta_fields[5]}"
+  BAKED_SUBSTRATE_VERSION="${meta_fields[4]}"
   [[ -n "${BAKED_SUBSTRATE_VERSION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_VERSION in ${meta_env}"
-  BAKED_SUBSTRATE_CREATED="${meta_fields[6]}"
+  BAKED_SUBSTRATE_CREATED="${meta_fields[5]}"
   [[ -n "${BAKED_SUBSTRATE_CREATED}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_CREATED in ${meta_env}"
-  BAKED_SUBSTRATE_ARCH="${meta_fields[7]}"
-  [[ "${BAKED_SUBSTRATE_ARCH}" == "amd64" ]] || die "selected OS payload airgap arch mismatch: expected amd64, got ${BAKED_SUBSTRATE_ARCH:-unknown}"
-  BAKED_SUBSTRATE_PROFILE="${meta_fields[8]}"
+  BAKED_SUBSTRATE_ARCH="${meta_fields[6]}"
+  [[ "${BAKED_SUBSTRATE_ARCH}" == "amd64" ]] || die "selected OS payload substrate arch mismatch: expected amd64, got ${BAKED_SUBSTRATE_ARCH:-unknown}"
+  BAKED_SUBSTRATE_PROFILE="${meta_fields[7]}"
   [[ -n "${BAKED_SUBSTRATE_PROFILE}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_PROFILE in ${meta_env}"
-  BAKED_SUBSTRATE_K3S_VERSION="${meta_fields[9]}"
+  BAKED_SUBSTRATE_K3S_VERSION="${meta_fields[8]}"
   [[ -n "${BAKED_SUBSTRATE_K3S_VERSION}" ]] || die "selected OS payload is missing OURBOX_SUBSTRATE_K3S_VERSION in ${meta_env}"
-  BAKED_SUBSTRATE_IMAGES_LOCK_SHA256="${meta_fields[10]}"
+  BAKED_SUBSTRATE_IMAGES_LOCK_SHA256="${meta_fields[9]}"
   [[ "${BAKED_SUBSTRATE_IMAGES_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "selected OS payload is missing a valid OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256 in ${meta_env}"
-  PAYLOAD_VERSION="${meta_fields[11]:-unknown}"
-  [[ -n "${PAYLOAD_VERSION}" ]] || PAYLOAD_VERSION="unknown"
-  PAYLOAD_VARIANT="${meta_fields[12]:-unknown}"
-  [[ -n "${PAYLOAD_VARIANT}" ]] || PAYLOAD_VARIANT="unknown"
 
   load_embedded_mission_metadata
   load_mission_selected_application_metadata
@@ -790,7 +762,7 @@ if not isinstance(resolved, dict) or not resolved:
     raise SystemExit("embedded mission manifest must include a resolved object")
 
 selected_os = resolved.get("os") or {}
-selected_airgap = resolved.get("airgap") or {}
+selected_substrate = resolved.get("selected_substrate") or {}
 selected_applications = resolved.get("applications")
 installed_target_ssh = resolved.get("installed_target_ssh")
 supported_selection_modes = {"catalog-defaults", "all-apps", "custom"}
@@ -873,17 +845,15 @@ print(
             "selected_os_artifact_digest": str(selected_os.get("artifact_digest", "")),
             "selected_os_selection_source": str(selected_os.get("selection_source", "")),
             "selected_os_release_channel": str(selected_os.get("release_channel", "")),
-            "selected_os_platform_contract_digest": str(selected_os.get("platform_contract_digest", "")),
-            "selected_airgap_artifact_ref": str(selected_airgap.get("artifact_ref", "")),
-            "selected_airgap_artifact_digest": str(selected_airgap.get("artifact_digest", "")),
-            "selected_airgap_selection_source": str(selected_airgap.get("selection_source", "")),
-            "selected_airgap_release_channel": str(selected_airgap.get("release_channel", "")),
-            "selected_airgap_platform_contract_digest": str(selected_airgap.get("platform_contract_digest", "")),
-            "selected_airgap_arch": str(selected_airgap.get("arch", "")),
-            "selected_airgap_payload_relpath": str(selected_airgap.get("payload_relpath", "")),
-            "selected_airgap_manifest_relpath": str(selected_airgap.get("manifest_relpath", "")),
-            "selected_airgap_present_in_selected_os_payload": "1"
-            if selected_airgap.get("present_in_selected_os_payload", False)
+            "selected_substrate_artifact_ref": str(selected_substrate.get("artifact_ref", "")),
+            "selected_substrate_artifact_digest": str(selected_substrate.get("artifact_digest", "")),
+            "selected_substrate_selection_source": str(selected_substrate.get("selection_source", "")),
+            "selected_substrate_release_channel": str(selected_substrate.get("release_channel", "")),
+            "selected_substrate_arch": str(selected_substrate.get("arch", "")),
+            "selected_substrate_payload_relpath": str(selected_substrate.get("payload_relpath", "")),
+            "selected_substrate_manifest_relpath": str(selected_substrate.get("manifest_relpath", "")),
+            "selected_substrate_present_in_selected_os_payload": "1"
+            if selected_substrate.get("present_in_selected_os_payload", False)
             else "0",
             "selected_applications_present": "1" if app_present else "0",
             "application_catalog_id": app_catalog_id,
@@ -917,24 +887,22 @@ PY
   MISSION_OS_ARTIFACT_DIGEST="$(mission_json_field selected_os_artifact_digest)"
   MISSION_OS_SELECTION_SOURCE="$(mission_json_field selected_os_selection_source)"
   MISSION_OS_RELEASE_CHANNEL="$(mission_json_field selected_os_release_channel)"
-  MISSION_OS_PLATFORM_CONTRACT_DIGEST="$(mission_json_field selected_os_platform_contract_digest)"
-  MISSION_AIRGAP_ARTIFACT_REF="$(mission_json_field selected_airgap_artifact_ref)"
-  MISSION_AIRGAP_ARTIFACT_DIGEST="$(mission_json_field selected_airgap_artifact_digest)"
-  MISSION_AIRGAP_SELECTION_SOURCE="$(mission_json_field selected_airgap_selection_source)"
-  MISSION_AIRGAP_RELEASE_CHANNEL="$(mission_json_field selected_airgap_release_channel)"
-  MISSION_SUBSTRATE_CONTRACT_DIGEST="$(mission_json_field selected_airgap_platform_contract_digest)"
-  MISSION_AIRGAP_ARCH="$(mission_json_field selected_airgap_arch)"
-  MISSION_AIRGAP_PAYLOAD_PATH="$(
+  MISSION_SUBSTRATE_ARTIFACT_REF="$(mission_json_field selected_substrate_artifact_ref)"
+  MISSION_SUBSTRATE_ARTIFACT_DIGEST="$(mission_json_field selected_substrate_artifact_digest)"
+  MISSION_SUBSTRATE_SELECTION_SOURCE="$(mission_json_field selected_substrate_selection_source)"
+  MISSION_SUBSTRATE_RELEASE_CHANNEL="$(mission_json_field selected_substrate_release_channel)"
+  MISSION_SUBSTRATE_ARCH="$(mission_json_field selected_substrate_arch)"
+  MISSION_SUBSTRATE_PAYLOAD_PATH="$(
     resolve_mission_relpath \
-      "embedded mission selected_airgap.payload_relpath" \
-      "$(mission_json_field selected_airgap_payload_relpath)"
+      "embedded mission selected_substrate.payload_relpath" \
+      "$(mission_json_field selected_substrate_payload_relpath)"
   )"
-  MISSION_AIRGAP_MANIFEST_PATH="$(
+  MISSION_SUBSTRATE_MANIFEST_PATH="$(
     resolve_mission_relpath \
-      "embedded mission selected_airgap.manifest_relpath" \
-      "$(mission_json_field selected_airgap_manifest_relpath)"
+      "embedded mission selected_substrate.manifest_relpath" \
+      "$(mission_json_field selected_substrate_manifest_relpath)"
   )"
-  MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD="$(mission_json_field selected_airgap_present_in_selected_os_payload)"
+  MISSION_SUBSTRATE_PRESENT_IN_SELECTED_OS_PAYLOAD="$(mission_json_field selected_substrate_present_in_selected_os_payload)"
   MISSION_SELECTED_APPLICATIONS_PRESENT="$(mission_json_field selected_applications_present)"
   MISSION_APPLICATION_CATALOG_ID="$(mission_json_field application_catalog_id)"
   MISSION_APPLICATION_CATALOG_NAME="$(mission_json_field application_catalog_name)"
@@ -969,16 +937,12 @@ PY
 
   [[ -n "${MISSION_OS_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_os.artifact_ref"
   [[ "${MISSION_OS_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_os.artifact_digest"
-  [[ "${MISSION_OS_PLATFORM_CONTRACT_DIGEST}" == "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" ]] || \
-    die "embedded mission selected_os.platform_contract_digest mismatch: expected ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}, got ${MISSION_OS_PLATFORM_CONTRACT_DIGEST:-unknown}"
 
-  [[ -n "${MISSION_AIRGAP_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_airgap.artifact_ref"
-  [[ "${MISSION_AIRGAP_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_airgap.artifact_digest"
-  [[ "${MISSION_SUBSTRATE_CONTRACT_DIGEST}" == "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" ]] || \
-    die "embedded mission selected_airgap.platform_contract_digest mismatch: expected ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}, got ${MISSION_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
-  [[ "${MISSION_AIRGAP_ARCH}" == "amd64" ]] || die "embedded mission selected_airgap.arch mismatch: expected amd64, got ${MISSION_AIRGAP_ARCH:-unknown}"
-  [[ -f "${MISSION_AIRGAP_PAYLOAD_PATH}" ]] || die "embedded mission airgap payload missing: ${MISSION_AIRGAP_PAYLOAD_PATH}"
-  [[ -f "${MISSION_AIRGAP_MANIFEST_PATH}" ]] || die "embedded mission airgap manifest missing: ${MISSION_AIRGAP_MANIFEST_PATH}"
+  [[ -n "${MISSION_SUBSTRATE_ARTIFACT_REF}" ]] || die "embedded mission manifest is missing selected_substrate.artifact_ref"
+  [[ "${MISSION_SUBSTRATE_ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "embedded mission manifest is missing a valid selected_substrate.artifact_digest"
+  [[ "${MISSION_SUBSTRATE_ARCH}" == "amd64" ]] || die "embedded mission selected_substrate.arch mismatch: expected amd64, got ${MISSION_SUBSTRATE_ARCH:-unknown}"
+  [[ -f "${MISSION_SUBSTRATE_PAYLOAD_PATH}" ]] || die "embedded mission substrate payload missing: ${MISSION_SUBSTRATE_PAYLOAD_PATH}"
+  [[ -f "${MISSION_SUBSTRATE_MANIFEST_PATH}" ]] || die "embedded mission substrate manifest missing: ${MISSION_SUBSTRATE_MANIFEST_PATH}"
   if [[ "${MISSION_INSTALLED_TARGET_SSH_PRESENT}" == "1" ]]; then
     [[ "${MISSION_INSTALLED_TARGET_SSH_MODE}" == "host-generated-authorized-key" ]] \
       || die "embedded mission installed_target_ssh.mode must be host-generated-authorized-key"
@@ -1097,28 +1061,28 @@ PY
   OURBOX_SELECTED_APPLICATION_IDS="${MISSION_SELECTED_APPLICATION_IDS}"
 }
 
-verify_mission_selected_airgap_tarball() {
+verify_mission_selected_substrate_tarball() {
   local tarball="$1"
   local checksum_file="${tarball}.sha256"
-  [[ -f "${checksum_file}" ]] || die "embedded mission airgap checksum missing: ${checksum_file}"
+  [[ -f "${checksum_file}" ]] || die "embedded mission substrate checksum missing: ${checksum_file}"
 
   local expected="" actual=""
   expected="$(awk 'NF>=1 {print $1; exit}' "${checksum_file}")"
   expected="${expected,,}"
   [[ "${expected}" =~ ^[0-9a-f]{64}$ ]] || die "invalid sha256 in embedded mission checksum file: ${checksum_file}"
   actual="$(sha256sum "${tarball}" | awk '{print $1}')"
-  [[ "${expected}" == "${actual}" ]] || die "embedded mission airgap SHA256 mismatch: expected ${expected}, got ${actual}"
+  [[ "${expected}" == "${actual}" ]] || die "embedded mission substrate SHA256 mismatch: expected ${expected}, got ${actual}"
 }
 
-stage_embedded_mission_airgap_bundle() {
-  verify_mission_selected_airgap_tarball "${MISSION_AIRGAP_PAYLOAD_PATH}"
+stage_embedded_mission_substrate_bundle() {
+  verify_mission_selected_substrate_tarball "${MISSION_SUBSTRATE_PAYLOAD_PATH}"
 
-  OURBOX_SUBSTRATE_REF="${MISSION_AIRGAP_ARTIFACT_REF}"
-  OURBOX_SUBSTRATE_DIGEST="${MISSION_AIRGAP_ARTIFACT_DIGEST}"
-  OURBOX_SUBSTRATE_SELECTION_SOURCE="${MISSION_AIRGAP_SELECTION_SOURCE:-mission}"
-  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${MISSION_AIRGAP_RELEASE_CHANNEL:-}"
+  OURBOX_SUBSTRATE_REF="${MISSION_SUBSTRATE_ARTIFACT_REF}"
+  OURBOX_SUBSTRATE_DIGEST="${MISSION_SUBSTRATE_ARTIFACT_DIGEST}"
+  OURBOX_SUBSTRATE_SELECTION_SOURCE="${MISSION_SUBSTRATE_SELECTION_SOURCE:-mission}"
+  OURBOX_SUBSTRATE_RELEASE_CHANNEL="${MISSION_SUBSTRATE_RELEASE_CHANNEL:-}"
 
-  if [[ "${MISSION_AIRGAP_ARTIFACT_DIGEST}" == "${BAKED_SUBSTRATE_DIGEST}" && "${MISSION_AIRGAP_PRESENT_IN_SELECTED_OS_PAYLOAD}" == "1" ]]; then
+  if [[ "${MISSION_SUBSTRATE_ARTIFACT_DIGEST}" == "${BAKED_SUBSTRATE_DIGEST}" && "${MISSION_SUBSTRATE_PRESENT_IN_SELECTED_OS_PAYLOAD}" == "1" ]]; then
     OURBOX_SUBSTRATE_ARTIFACT_SOURCE="baked"
     OURBOX_SUBSTRATE_SOURCE="${BAKED_SUBSTRATE_SOURCE}"
     OURBOX_SUBSTRATE_REVISION="${BAKED_SUBSTRATE_REVISION}"
@@ -1133,14 +1097,14 @@ stage_embedded_mission_airgap_bundle() {
 
   rm -rf "${SUBSTRATE_OVERRIDE_DIR}"
   mkdir -p "${SUBSTRATE_OVERRIDE_DIR}"
-  tar -xzf "${MISSION_AIRGAP_PAYLOAD_PATH}" -C "${SUBSTRATE_OVERRIDE_DIR}"
-  validate_extracted_substrate_bundle "${SUBSTRATE_OVERRIDE_DIR}" "${REQUIRED_SUBSTRATE_CONTRACT_DIGEST}" "amd64"
+  tar -xzf "${MISSION_SUBSTRATE_PAYLOAD_PATH}" -C "${SUBSTRATE_OVERRIDE_DIR}"
+  validate_extracted_substrate_bundle "${SUBSTRATE_OVERRIDE_DIR}" "amd64"
   OURBOX_SUBSTRATE_ARTIFACT_SOURCE="mission"
 }
 
 prepare_selected_substrate_bundle() {
-  [[ "${MISSION_PRESENT}" == "1" ]] || die "Woodbox install requires host-composed mission media; target-side airgap selection and pulls have been removed"
-  stage_embedded_mission_airgap_bundle
+  [[ "${MISSION_PRESENT}" == "1" ]] || die "Woodbox install requires host-composed mission media; target-side substrate selection and pulls have been removed"
+  stage_embedded_mission_substrate_bundle
 }
 
 stage_selected_application_metadata() {
@@ -1204,9 +1168,6 @@ _show_artifact_panel() {
     echo "  Digest   : ${OS_ARTIFACT_DIGEST}"
   fi
   echo "  SHA256   : ${OS_IMAGE_SHA256}"
-  echo "  Version  : ${PAYLOAD_VERSION}"
-  echo "  Variant  : ${PAYLOAD_VARIANT}"
-  echo "  Contract : ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
   echo "  Selection: ${INSTALL_SELECTION_SOURCE}"
   if [[ -n "${RELEASE_CHANNEL}" ]]; then
     echo "  Channel  : ${RELEASE_CHANNEL}"
@@ -1233,7 +1194,7 @@ resolve_and_stage_os_artifact() {
   log "  Mission media detected; staging embedded OS payload"
   _stage_embedded_payload
   _verify_staged_payload
-  load_selected_payload_airgap_metadata
+  load_selected_payload_substrate_metadata
   [[ "${MISSION_PRESENT}" == "1" ]] || die "embedded mission metadata failed to load from ${MISSION_MANIFEST}"
   _show_artifact_panel
 }
@@ -1355,13 +1316,13 @@ fi
 [ -f "${SOURCE_DIR}/platform/profile.env" ] || { echo "missing override profile.env" >&2; exit 1; }
 [ -f "${SOURCE_DIR}/manifest.env" ] || { echo "missing override manifest.env" >&2; exit 1; }
 
-mkdir -p "${TARGET}/opt/ourbox/airgap/platform"
-rm -rf "${TARGET}/opt/ourbox/airgap/k3s" "${TARGET}/opt/ourbox/airgap/platform/images"
-cp -a "${SOURCE_DIR}/k3s" "${TARGET}/opt/ourbox/airgap/k3s"
-cp -a "${SOURCE_DIR}/platform/images" "${TARGET}/opt/ourbox/airgap/platform/images"
-cp -f "${SOURCE_DIR}/platform/images.lock.json" "${TARGET}/opt/ourbox/airgap/platform/images.lock.json"
-cp -f "${SOURCE_DIR}/platform/profile.env" "${TARGET}/opt/ourbox/airgap/platform/profile.env"
-cp -f "${SOURCE_DIR}/manifest.env" "${TARGET}/opt/ourbox/airgap/manifest.env"
+mkdir -p "${TARGET}/opt/ourbox/substrate/platform"
+rm -rf "${TARGET}/opt/ourbox/substrate/k3s" "${TARGET}/opt/ourbox/substrate/platform/images"
+cp -a "${SOURCE_DIR}/k3s" "${TARGET}/opt/ourbox/substrate/k3s"
+cp -a "${SOURCE_DIR}/platform/images" "${TARGET}/opt/ourbox/substrate/platform/images"
+cp -f "${SOURCE_DIR}/platform/images.lock.json" "${TARGET}/opt/ourbox/substrate/platform/images.lock.json"
+cp -f "${SOURCE_DIR}/platform/profile.env" "${TARGET}/opt/ourbox/substrate/platform/profile.env"
+cp -f "${SOURCE_DIR}/manifest.env" "${TARGET}/opt/ourbox/substrate/manifest.env"
 SCRIPT
   chmod +x "${cache_dir}/apply-ourbox-substrate-override.sh"
 
@@ -1371,7 +1332,7 @@ set -e
 TARGET="${1:-/target}"
 SOURCE_CATALOG="${OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/installer/cache/catalog.json}"
 SOURCE_SELECTION="${OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json}"
-PLATFORM_DIR="${TARGET}/opt/ourbox/airgap/platform"
+PLATFORM_DIR="${TARGET}/opt/ourbox/substrate/platform"
 
 mkdir -p "${PLATFORM_DIR}"
 if [ -f "${SOURCE_CATALOG}" ]; then
@@ -1688,10 +1649,10 @@ main() {
   echo
   resolve_and_stage_os_artifact
 
-  # --- Step 4: Airgap platform ---
+  # --- Step 4: Substrate platform ---
   banner
   echo "  Step 4 of 6: Stage the selected ourbox-substrate bundle"
-  echo "  Using the host-selected airgap bundle staged on this mission media."
+  echo "  Using the host-selected substrate bundle staged on this mission media."
   echo "  No target-side registry browsing or pulling will be used."
   echo
   prepare_selected_substrate_bundle
@@ -1742,7 +1703,6 @@ main() {
     echo "  App mode     : ${OURBOX_APPLICATION_SELECTION_MODE:-unknown}"
     echo "  Applications : ${OURBOX_SELECTED_APPLICATION_IDS:-unknown}"
   fi
-  echo "  Contract     : ${REQUIRED_SUBSTRATE_CONTRACT_DIGEST:-unknown}"
   _load_installer_ssh_status
   case "${OURBOX_INSTALLER_SSH_PASSWORD_STATE}" in
     configured-hash)

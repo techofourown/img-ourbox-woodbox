@@ -18,7 +18,6 @@ command -v python3 >/dev/null 2>&1 || die "python3 is required to validate platf
 # deployment filenames while retaining numbered control-plane filenames, so
 # accept either unnumbered or NN-prefixed variants for workload manifests.
 required_paths=(
-  "contract.env"
   "tools/check-target-prereqs.sh"
   "tools/contract-identity.sh"
   "tools/render-contract.py"

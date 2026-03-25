@@ -43,7 +43,7 @@ ${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}
 
   late-commands:
     # -----------------------------------------------------------------------
-    # [1/12] Extract staged OS payload (rootfs overlay + airgap artifacts).
+    # [1/12] Extract staged OS payload (rootfs overlay + substrate artifacts).
     #        Payload staged by ourbox-preinstall from embedded mission media.
     # -----------------------------------------------------------------------
     - echo "==> [1/12] Extracting OS payload"
@@ -54,9 +54,9 @@ ${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}
     - echo "==>       payload extracted OK"
     - 'echo "==>       rootfs entries: $(ls /opt/ourbox/installer/cache/payload-staging/rootfs/ 2>/dev/null | head -5 | tr "\n" " ")"'
     - cp -a /opt/ourbox/installer/cache/payload-staging/rootfs/. /target/
-    - mkdir -p /target/opt/ourbox/airgap
-    - cp -a /opt/ourbox/installer/cache/payload-staging/airgap/. /target/opt/ourbox/airgap/
-    - echo "==>       rootfs + airgap copied to /target"
+    - mkdir -p /target/opt/ourbox/substrate
+    - cp -a /opt/ourbox/installer/cache/payload-staging/substrate/. /target/opt/ourbox/substrate/
+    - echo "==>       rootfs + substrate copied to /target"
 
     # -----------------------------------------------------------------------
     # [2/12] Install the remaining target packages from the substrate-local
@@ -81,10 +81,10 @@ ${OURBOX_INSTALLED_TARGET_SSH_AUTOINSTALL_BLOCK}
     - echo "==>       selected application metadata staged"
 
     # -----------------------------------------------------------------------
-    # [5/12] Install k3s binary from the final selected airgap payload
+    # [5/12] Install k3s binary from the final selected substrate payload
     # -----------------------------------------------------------------------
     - echo "==> [5/12] Installing k3s binary"
-    - install -D -m 0755 /target/opt/ourbox/airgap/k3s/k3s /target/usr/local/bin/k3s
+    - install -D -m 0755 /target/opt/ourbox/substrate/k3s/k3s /target/usr/local/bin/k3s
     - 'echo "==>       k3s installed: $(ls -lh /target/usr/local/bin/k3s 2>/dev/null)"'
 
     # -----------------------------------------------------------------------
