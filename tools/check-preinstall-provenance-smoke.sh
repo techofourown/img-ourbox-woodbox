@@ -96,6 +96,7 @@ grep -F 'EXISTING_KEY="existing-value"' "${TARGET_DIR}/etc/ourbox/release" >/dev
 grep -F 'if [ "${SUBSTRATE_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null
 # shellcheck disable=SC2016
 grep -F 'cp -f "${SOURCE_IMAGES_LOCK}" "${PLATFORM_DIR}/images.lock.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+# shellcheck disable=SC2016
 grep -F 'cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
   echo "legacy install-defaults provenance fields must not be written" >&2
