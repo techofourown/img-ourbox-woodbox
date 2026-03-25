@@ -10,6 +10,7 @@ OS_META_ENV=""
 SUBSTRATE_ISO=""
 OUTPUT_DIR=""
 APPLICATION_CATALOG=""
+APPLICATION_IMAGES_LOCK=""
 SELECTED_APPS=""
 MISSION_ONLY=0
 
@@ -21,6 +22,7 @@ Usage:
     --os-meta-env PATH \
     --output-dir DIR \
     --application-catalog PATH \
+    --application-images-lock PATH \
     --selected-apps PATH \
     [--substrate-iso PATH] \
     [--mission-only]
@@ -57,6 +59,11 @@ while [[ $# -gt 0 ]]; do
       APPLICATION_CATALOG="$2"
       shift 2
       ;;
+    --application-images-lock)
+      [[ $# -ge 2 ]] || die "--application-images-lock requires a value"
+      APPLICATION_IMAGES_LOCK="$2"
+      shift 2
+      ;;
     --selected-apps)
       [[ $# -ge 2 ]] || die "--selected-apps requires a value"
       SELECTED_APPS="$2"
@@ -84,6 +91,8 @@ done
 [[ -n "${OUTPUT_DIR}" ]] || die "--output-dir is required"
 [[ -n "${APPLICATION_CATALOG}" ]] || die "--application-catalog is required"
 [[ -f "${APPLICATION_CATALOG}" ]] || die "application catalog not found: ${APPLICATION_CATALOG}"
+[[ -n "${APPLICATION_IMAGES_LOCK}" ]] || die "--application-images-lock is required"
+[[ -f "${APPLICATION_IMAGES_LOCK}" ]] || die "application images lock not found: ${APPLICATION_IMAGES_LOCK}"
 [[ -n "${SELECTED_APPS}" ]] || die "--selected-apps is required"
 [[ -f "${SELECTED_APPS}" ]] || die "selected apps file not found: ${SELECTED_APPS}"
 if [[ "${MISSION_ONLY}" != "1" ]]; then
@@ -206,8 +215,10 @@ OS_ARTIFACT_REF="ghcr.io/techofourown/ourbox-woodbox-os-smoke@sha256:${OS_PAYLOA
 cp -a "${PAYLOAD_ROOT}/substrate/." "${BUNDLE_ROOT}/"
 
 MISSION_APPLICATION_CATALOG_PATH="${MISSION_SUBSTRATE_DIR}/catalog.json"
+MISSION_APPLICATION_IMAGES_LOCK_PATH="${MISSION_SUBSTRATE_DIR}/application-images.lock.json"
 MISSION_SELECTED_APPS_PATH="${MISSION_SUBSTRATE_DIR}/selected-apps.json"
 cp -f "${APPLICATION_CATALOG}" "${MISSION_APPLICATION_CATALOG_PATH}"
+cp -f "${APPLICATION_IMAGES_LOCK}" "${MISSION_APPLICATION_IMAGES_LOCK_PATH}"
 cp -f "${SELECTED_APPS}" "${MISSION_SELECTED_APPS_PATH}"
 
 cp -f "${BUNDLE_ROOT}/manifest.env" "${MISSION_SUBSTRATE_DIR}/manifest.env"
@@ -261,10 +272,13 @@ from pathlib import Path
 mission_dir = Path(os.environ["MISSION_DIR"])
 catalog_path = mission_dir / "artifacts" / "substrate" / "catalog.json"
 selection_path = mission_dir / "artifacts" / "substrate" / "selected-apps.json"
+images_lock_path = mission_dir / "artifacts" / "substrate" / "application-images.lock.json"
 with catalog_path.open("r", encoding="utf-8") as handle:
     catalog = json.load(handle)
 with selection_path.open("r", encoding="utf-8") as handle:
     selection = json.load(handle)
+with images_lock_path.open("r", encoding="utf-8") as handle:
+    images_lock = json.load(handle)
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -381,6 +395,7 @@ manifest = {
             "selection_mode": str(selection.get("selection_mode", "")),
             "selected_app_ids": list(selection.get("selected_app_ids", [])),
             "catalog_relpath": "artifacts/substrate/catalog.json",
+            "images_lock_relpath": "artifacts/substrate/application-images.lock.json",
             "selection_relpath": "artifacts/substrate/selected-apps.json",
             "source_catalogs": [
                 {

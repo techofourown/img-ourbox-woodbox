@@ -103,6 +103,21 @@ cat > "${MISSION_SUBSTRATE_DIR}/selected-apps.json" <<'EOF'
   ]
 }
 EOF
+cat > "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "name": "dufs",
+      "ref": "ghcr.io/example/dufs@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}
+EOF
 
 tar -C "${SOURCE_BUNDLE_DIR}" -czf "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" k3s platform manifest.env
 sha256sum "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz" | awk '{print $1"  ourbox-substrate.tar.gz"}' > "${MISSION_SUBSTRATE_DIR}/ourbox-substrate.tar.gz.sha256"
@@ -210,6 +225,7 @@ cat > "${MISSION_MANIFEST}" <<EOF
         "dufs"
       ],
       "catalog_relpath": "artifacts/substrate/catalog.json",
+      "images_lock_relpath": "artifacts/substrate/application-images.lock.json",
       "selection_relpath": "artifacts/substrate/selected-apps.json"
     },
     "installed_target_ssh": {
@@ -278,6 +294,10 @@ stage_selected_application_metadata
 }
 [[ -f "${INSTALLER_CACHE_DIR}/catalog.json" ]] || {
   echo "mission application catalog was not staged into installer cache" >&2
+  exit 1
+}
+[[ -f "${INSTALLER_CACHE_DIR}/application-images.lock.json" ]] || {
+  echo "mission application-images.lock.json was not staged into installer cache" >&2
   exit 1
 }
 [[ -f "${INSTALLER_CACHE_DIR}/selected-apps.json" ]] || {
