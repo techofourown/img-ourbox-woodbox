@@ -21,15 +21,15 @@ __pycache__/
 
 
 # installer-side artifact pull cache (populated at install time in live env)
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/manifests/*.yaml
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/landing/*.html
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/landing/*.js
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/landing/*.css
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/todo-bloom/*.html
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/todo-bloom/*.js
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/todo-bloom/*.css
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env
-/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.digest
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/manifests/*.yaml
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/landing/*.html
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/landing/*.js
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/landing/*.css
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/todo-bloom/*.html
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/todo-bloom/*.js
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/todo-bloom/*.css
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/contract.env
+/installer/ourbox/rootfs/opt/ourbox/substrate/platform/contract.digest
 
 # installer artifact pull cache
 /deploy-installer-from-registry/

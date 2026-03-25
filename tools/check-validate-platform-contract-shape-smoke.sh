@@ -24,10 +24,6 @@ cat > "${TOOLS_DIR}/contract-identity.sh" <<'EOF_GOOD_IDENTITY'
 #!/usr/bin/env bash
 set -euo pipefail
 cat <<'EOF_OUTPUT'
-OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_PLATFORM_CONTRACT_REVISION=fixture-revision
-OURBOX_PLATFORM_CONTRACT_VERSION=fixture-version
-OURBOX_PLATFORM_CONTRACT_DIGEST=unknown
 OURBOX_PLATFORM_PROFILE=demo-apps
 OURBOX_PLATFORM_PROFILE_KIND=demo-apps
 OURBOX_PLATFORM_ROUTE_MODEL=ingress
@@ -127,12 +123,6 @@ EOF_RENDERED_IMAGES_LOCK
 
 chmod +x "${TOOLS_DIR}/check-target-prereqs.sh" "${TOOLS_DIR}/contract-identity.sh" "${TOOLS_DIR}/verify-runtime.sh"
 
-cat > "${CONTRACT_DIR}/contract.env" <<'EOF_CONTRACT'
-OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_PLATFORM_CONTRACT_REVISION=fixture-revision
-OURBOX_PLATFORM_CONTRACT_VERSION=fixture-version
-EOF_CONTRACT
-
 for manifest in \
   20-landing-deployment.yaml \
   dufs-deployment.yaml \
@@ -186,10 +176,6 @@ cat > "${TOOLS_DIR}/contract-identity.sh" <<'EOF_BAD_IDENTITY'
 #!/usr/bin/env bash
 set -euo pipefail
 cat <<'EOF_OUTPUT'
-OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_PLATFORM_CONTRACT_REVISION=fixture-revision
-OURBOX_PLATFORM_CONTRACT_VERSION=fixture-version
-OURBOX_PLATFORM_CONTRACT_DIGEST=unknown
 OURBOX_PLATFORM_PROFILE=demo-apps
 OURBOX_PLATFORM_PROFILE_KIND=demo-apps
 OURBOX_PLATFORM_ROUTE_MODEL=ingress

@@ -3,7 +3,7 @@
 #
 # The OS payload contains everything needed to install Woodbox onto a target:
 #   - rootfs overlay (installer/ourbox/rootfs/)
-#   - substrate bundle (k3s binary + platform image tars from artifacts/airgap/)
+#   - substrate bundle (k3s binary + platform image tars from artifacts/substrate/)
 #   - platform contract content (synced from sw-ourbox-os by fetch-ourbox-substrate.sh)
 #   - payload provenance metadata (payload.meta.env)
 #
@@ -45,30 +45,24 @@ BASE="os-payload-${OURBOX_PRODUCT}-${OURBOX_DEVICE}-${OURBOX_TARGET_SLUG}-${OURB
 OUT_TAR="${ROOT}/deploy/${BASE}.tar.gz"
 OUT_SHA="${OUT_TAR}.sha256"
 
-# Require airgap artifacts
-[[ -x "${ROOT}/artifacts/airgap/k3s/k3s" ]] || \
-  die "missing artifacts/airgap/k3s/k3s — run: ./tools/fetch-ourbox-substrate.sh"
-[[ -f "${ROOT}/artifacts/airgap/manifest.env" ]] || \
-  die "missing artifacts/airgap/manifest.env — run: ./tools/fetch-ourbox-substrate.sh"
-[[ -f "${ROOT}/artifacts/airgap/platform/images.lock.json" ]] || \
-  die "missing artifacts/airgap/platform/images.lock.json — run: ./tools/fetch-ourbox-substrate.sh"
+# Require substrate artifacts
+[[ -x "${ROOT}/artifacts/substrate/k3s/k3s" ]] || \
+  die "missing artifacts/substrate/k3s/k3s — run: ./tools/fetch-ourbox-substrate.sh"
+[[ -f "${ROOT}/artifacts/substrate/manifest.env" ]] || \
+  die "missing artifacts/substrate/manifest.env — run: ./tools/fetch-ourbox-substrate.sh"
+[[ -f "${ROOT}/artifacts/substrate/platform/images.lock.json" ]] || \
+  die "missing artifacts/substrate/platform/images.lock.json — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Require platform contract sync
-[[ -f "${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env" ]] || \
+[[ -d "${ROOT}/installer/ourbox/rootfs/opt/ourbox/substrate/platform" ]] || \
   die "missing synced platform contract — run: ./tools/fetch-ourbox-substrate.sh"
 
 # Load upstream metadata for provenance recording
-SUBSTRATE_SELECTED_BUNDLE_ENV="${ROOT}/artifacts/airgap/selected-bundle.env"
+SUBSTRATE_SELECTED_BUNDLE_ENV="${ROOT}/artifacts/substrate/selected-bundle.env"
 [[ -f "${SUBSTRATE_SELECTED_BUNDLE_ENV}" ]] || \
-  die "missing artifacts/airgap/selected-bundle.env — run: ./tools/fetch-ourbox-substrate.sh"
+  die "missing artifacts/substrate/selected-bundle.env — run: ./tools/fetch-ourbox-substrate.sh"
 # shellcheck disable=SC1090
 source "${SUBSTRATE_SELECTED_BUNDLE_ENV}"
-
-CONTRACT_ENV="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.env"
-CONTRACT_DIGEST_FILE="${ROOT}/installer/ourbox/rootfs/opt/ourbox/airgap/platform/contract.digest"
-# shellcheck disable=SC1090
-source "${CONTRACT_ENV}"
-CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}" 2>/dev/null || echo unknown)"
 
 OURBOX_SUBSTRATE_REF="${OURBOX_SUBSTRATE_REF:-unknown}"
 OURBOX_SUBSTRATE_DIGEST="${OURBOX_SUBSTRATE_DIGEST:-unknown}"
@@ -92,13 +86,13 @@ trap 'rm -rf "${WORKDIR}"' EXIT
 PAYLOAD_DIR="${WORKDIR}/payload"
 mkdir -p \
   "${PAYLOAD_DIR}/rootfs" \
-  "${PAYLOAD_DIR}/airgap"
+  "${PAYLOAD_DIR}/substrate"
 
 log "Staging rootfs overlay"
 rsync -a "${ROOT}/installer/ourbox/rootfs/" "${PAYLOAD_DIR}/rootfs/"
 
-log "Staging airgap artifacts"
-rsync -a "${ROOT}/artifacts/airgap/" "${PAYLOAD_DIR}/airgap/"
+log "Staging substrate artifacts"
+rsync -a "${ROOT}/artifacts/substrate/" "${PAYLOAD_DIR}/substrate/"
 
 log "Writing expanded /etc/ourbox/release into payload rootfs"
 install -d -m 0755 "${PAYLOAD_DIR}/rootfs/etc/ourbox"
@@ -110,11 +104,6 @@ OURBOX_SKU=${OURBOX_SKU}
 OURBOX_VARIANT=${OURBOX_VARIANT}
 OURBOX_VERSION=${OURBOX_VERSION}
 OURBOX_RECIPE_GIT_HASH=${GIT_SHA}
-OURBOX_PLATFORM_CONTRACT_SOURCE=${OURBOX_PLATFORM_CONTRACT_SOURCE:-https://github.com/techofourown/sw-ourbox-os}
-OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
-OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
-OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}
-OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
 OURBOX_BASE_ISO_URL=${UBUNTU_ISO_URL:-unknown}
 OURBOX_BASE_ISO_SHA256=${UBUNTU_ISO_SHA256:-unknown}
 OURBOX_BUILD_TS=${BUILD_TS}
@@ -137,11 +126,6 @@ OURBOX_VERSION=${OURBOX_VERSION}
 OURBOX_RECIPE_GIT_HASH=${GIT_SHA}
 GIT_SHA=${GIT_SHA_SHORT}
 BUILD_TS=${BUILD_TS}
-OURBOX_PLATFORM_CONTRACT_SOURCE=${OURBOX_PLATFORM_CONTRACT_SOURCE:-https://github.com/techofourown/sw-ourbox-os}
-OURBOX_PLATFORM_CONTRACT_REVISION=${OURBOX_PLATFORM_CONTRACT_REVISION:-unknown}
-OURBOX_PLATFORM_CONTRACT_VERSION=${OURBOX_PLATFORM_CONTRACT_VERSION:-unknown}
-OURBOX_PLATFORM_CONTRACT_CREATED=${OURBOX_PLATFORM_CONTRACT_CREATED:-unknown}
-OURBOX_PLATFORM_CONTRACT_DIGEST=${CONTRACT_DIGEST}
 OURBOX_SUBSTRATE_REF=${OURBOX_SUBSTRATE_REF}
 OURBOX_SUBSTRATE_DIGEST=${OURBOX_SUBSTRATE_DIGEST}
 OURBOX_SUBSTRATE_SOURCE=${OURBOX_SUBSTRATE_SOURCE}
@@ -176,5 +160,4 @@ log "Metadata sidecar: ${OUT_META}"
 log "OS payload ready: ${OUT_TAR}"
 log "SHA256: ${OUT_SHA}"
 log "Build timestamp: ${BUILD_TS}"
-log "Platform contract digest: ${CONTRACT_DIGEST}"
 log "Recipe git SHA: ${GIT_SHA_SHORT}"

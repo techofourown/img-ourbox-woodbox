@@ -43,9 +43,8 @@ resolve_selected_bundle_identity() {
 }
 
 write_selected_bundle_metadata() {
-  local expected_contract_digest="$1"
-  local selected_pinned_ref="$2"
-  local selected_digest="$3"
+  local selected_pinned_ref="$1"
+  local selected_digest="$2"
   local manifest="${OUT}/manifest.env"
   local strict_metadata_parser="${ROOT}/tools/strict-kv-metadata.py"
   local manifest_dump=""
@@ -61,8 +60,6 @@ write_selected_bundle_metadata() {
       --allow OURBOX_SUBSTRATE_REVISION \
       --allow OURBOX_SUBSTRATE_VERSION \
       --allow OURBOX_SUBSTRATE_CREATED \
-      --allow OURBOX_PLATFORM_CONTRACT_REF \
-      --allow OURBOX_PLATFORM_CONTRACT_DIGEST \
       --allow OURBOX_SUBSTRATE_ARCH \
       --allow K3S_VERSION \
       --allow OURBOX_PLATFORM_PROFILE \
@@ -72,7 +69,6 @@ write_selected_bundle_metadata() {
       --require OURBOX_SUBSTRATE_REVISION \
       --require OURBOX_SUBSTRATE_VERSION \
       --require OURBOX_SUBSTRATE_CREATED \
-      --require OURBOX_PLATFORM_CONTRACT_DIGEST \
       --require OURBOX_SUBSTRATE_ARCH \
       --require K3S_VERSION \
       --require OURBOX_PLATFORM_PROFILE \
@@ -81,19 +77,16 @@ write_selected_bundle_metadata() {
       --print OURBOX_SUBSTRATE_REVISION \
       --print OURBOX_SUBSTRATE_VERSION \
       --print OURBOX_SUBSTRATE_CREATED \
-      --print OURBOX_PLATFORM_CONTRACT_REF \
-      --print OURBOX_PLATFORM_CONTRACT_DIGEST \
       --print OURBOX_SUBSTRATE_ARCH \
       --print K3S_VERSION \
       --print OURBOX_PLATFORM_PROFILE \
       --print OURBOX_PLATFORM_IMAGES_LOCK_SHA256
   )"
   mapfile -t manifest_fields <<<"${manifest_dump}"
-  [[ "${#manifest_fields[@]}" -eq 10 ]] || die "failed to parse ${manifest}"
+  [[ "${#manifest_fields[@]}" -eq 8 ]] || die "failed to parse ${manifest}"
 
-  [[ "${manifest_fields[6]}" == "amd64" ]] || die "ourbox-substrate arch mismatch: expected amd64, got ${manifest_fields[6]:-unknown}"
-  [[ "${manifest_fields[5]}" == "${expected_contract_digest}" ]] || die "ourbox-substrate contract digest mismatch: expected ${expected_contract_digest}, got ${manifest_fields[5]:-unknown}"
-  [[ "${manifest_fields[9]}" =~ ^[0-9a-f]{64}$ ]] || die "ourbox-substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
+  [[ "${manifest_fields[4]}" == "amd64" ]] || die "ourbox-substrate arch mismatch: expected amd64, got ${manifest_fields[4]:-unknown}"
+  [[ "${manifest_fields[7]}" =~ ^[0-9a-f]{64}$ ]] || die "ourbox-substrate manifest carries invalid OURBOX_PLATFORM_IMAGES_LOCK_SHA256"
 
   cat > "${OUT}/selected-bundle.env" <<EOF
 OURBOX_SUBSTRATE_REF=${selected_pinned_ref}
@@ -102,12 +95,10 @@ OURBOX_SUBSTRATE_SOURCE=${manifest_fields[0]}
 OURBOX_SUBSTRATE_REVISION=${manifest_fields[1]}
 OURBOX_SUBSTRATE_VERSION=${manifest_fields[2]}
 OURBOX_SUBSTRATE_CREATED=${manifest_fields[3]}
-OURBOX_SUBSTRATE_ARCH=${manifest_fields[6]}
-OURBOX_SUBSTRATE_PROFILE=${manifest_fields[8]}
-OURBOX_SUBSTRATE_K3S_VERSION=${manifest_fields[7]}
-OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${manifest_fields[9]}
-OURBOX_PLATFORM_CONTRACT_REF=${manifest_fields[4]}
-OURBOX_PLATFORM_CONTRACT_DIGEST=${manifest_fields[5]}
+OURBOX_SUBSTRATE_ARCH=${manifest_fields[4]}
+OURBOX_SUBSTRATE_PROFILE=${manifest_fields[6]}
+OURBOX_SUBSTRATE_K3S_VERSION=${manifest_fields[5]}
+OURBOX_SUBSTRATE_IMAGES_LOCK_SHA256=${manifest_fields[7]}
 EOF
 }
 
@@ -150,7 +141,7 @@ REF="${OURBOX_SUBSTRATE_REF}"
 
 need_cmd oras
 
-OUT="${ROOT}/artifacts/airgap"
+OUT="${ROOT}/artifacts/substrate"
 PULL_DIR="${ROOT}/artifacts/.ourbox-substrate-pull"
 META_DIR="${ROOT}/artifacts/.ourbox-substrate-meta"
 
@@ -217,38 +208,27 @@ tar -xzf "${TARBALL}" -C "${OUT}"
 [[ -f "${OUT}/manifest.env" ]] || die "Missing manifest.env in ${OUT}"
 
 shopt -s nullglob
-k3s_tars=("${OUT}/k3s/k3s-airgap-images-"*.tar)
+k3s_tars=("${OUT}/k3s/k3s-images-"*.tar)
 platform_tars=("${OUT}/platform/images/"*.tar)
 shopt -u nullglob
 
-(( ${#k3s_tars[@]} > 0 )) || die "No k3s airgap image tar found in ${OUT}/k3s"
+(( ${#k3s_tars[@]} > 0 )) || die "No k3s images tar found in ${OUT}/k3s"
 (( ${#platform_tars[@]} > 0 )) || die "No platform image tars found in ${OUT}/platform/images"
 validate_substrate_platform_metadata "${OUT}"
 
 log "Artifacts created:"
 ls -lah "${OUT}/k3s" "${OUT}/platform/images" "${OUT}/manifest.env"
 
-log "Deriving platform contract ref from substrate bundle manifest"
-BUNDLE_CONTRACT_REF="$(grep '^OURBOX_PLATFORM_CONTRACT_REF=' "${OUT}/manifest.env" | cut -d= -f2- | tr -d '\r')"
-[[ -n "${BUNDLE_CONTRACT_REF}" ]] || die "OURBOX_PLATFORM_CONTRACT_REF not found in substrate bundle manifest: ${OUT}/manifest.env"
-[[ "${BUNDLE_CONTRACT_REF}" =~ @sha256:[0-9a-f]{64}$ ]] || die "OURBOX_PLATFORM_CONTRACT_REF in bundle manifest is not digest-pinned: ${BUNDLE_CONTRACT_REF}"
-export OURBOX_PLATFORM_CONTRACT_REF="${BUNDLE_CONTRACT_REF}"
-
 log "Fetching pinned platform contract (OCI artifact)"
 "${ROOT}/tools/fetch-platform-contract.sh"
 
-CONTRACT_DIGEST_FILE="${ROOT}/artifacts/platform-contract/extracted/platform-contract/contract.digest"
-[[ -f "${CONTRACT_DIGEST_FILE}" ]] || die "platform contract digest file missing after fetch: ${CONTRACT_DIGEST_FILE}"
-EXPECTED_CONTRACT_DIGEST="$(cat "${CONTRACT_DIGEST_FILE}")"
-[[ "${EXPECTED_CONTRACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "platform contract digest is invalid: ${EXPECTED_CONTRACT_DIGEST}"
-
 mapfile -t bundle_identity < <(resolve_selected_bundle_identity)
-SELECTED_AIRGAP_PINNED_REF="${bundle_identity[0]:-}"
-SELECTED_AIRGAP_DIGEST="${bundle_identity[1]:-}"
-[[ -n "${SELECTED_AIRGAP_PINNED_REF}" ]] || die "selected substrate pinned ref was not resolved"
-[[ "${SELECTED_AIRGAP_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected substrate digest is invalid: ${SELECTED_AIRGAP_DIGEST:-missing}"
+SELECTED_SUBSTRATE_PINNED_REF="${bundle_identity[0]:-}"
+SELECTED_SUBSTRATE_DIGEST="${bundle_identity[1]:-}"
+[[ -n "${SELECTED_SUBSTRATE_PINNED_REF}" ]] || die "selected substrate pinned ref was not resolved"
+[[ "${SELECTED_SUBSTRATE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "selected substrate digest is invalid: ${SELECTED_SUBSTRATE_DIGEST:-missing}"
 
-write_selected_bundle_metadata "${EXPECTED_CONTRACT_DIGEST}" "${SELECTED_AIRGAP_PINNED_REF}" "${SELECTED_AIRGAP_DIGEST}"
+write_selected_bundle_metadata "${SELECTED_SUBSTRATE_PINNED_REF}" "${SELECTED_SUBSTRATE_DIGEST}"
 log "Selected baked substrate bundle recorded at ${OUT}/selected-bundle.env"
 
 log "Syncing pinned platform contract into installer tree"

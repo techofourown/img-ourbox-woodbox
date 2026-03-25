@@ -31,7 +31,7 @@ export OS_IMAGE_SHA256="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 export RELEASE_CHANNEL="stable"
 export INSTALL_SELECTION_SOURCE="os-default-ref"
 export OURBOX_SUBSTRATE_SOURCE="https://github.com/techofourown/sw-ourbox-os"
-export OURBOX_SUBSTRATE_REVISION="fixture-airgap-revision"
+export OURBOX_SUBSTRATE_REVISION="fixture-substrate-revision"
 export OURBOX_SUBSTRATE_VERSION="v0.0.0-fixture"
 export OURBOX_SUBSTRATE_CREATED="2026-03-11T00:00:00Z"
 export OURBOX_SUBSTRATE_ARCH="amd64"
@@ -54,7 +54,7 @@ TARGET_DIR="${TMP}/target"
 OVERRIDE_DIR="${TMP}/ourbox-substrate-override"
 APPLICATION_SELECTION_DIR="${TMP}/application-selection"
 mkdir -p "${TARGET_DIR}/etc/ourbox"
-mkdir -p "${TARGET_DIR}/opt/ourbox/airgap/platform" \
+mkdir -p "${TARGET_DIR}/opt/ourbox/substrate/platform" \
   "${OVERRIDE_DIR}/k3s" \
   "${OVERRIDE_DIR}/platform/images" \
   "${APPLICATION_SELECTION_DIR}"
@@ -104,44 +104,35 @@ if grep -Fq "OURBOX_INSTALL_DEFAULTS_" "${CACHE_DIR}/append-provenance.sh"; then
   echo "legacy install-defaults release fields must not be appended" >&2
   exit 1
 fi
-if grep -F 'contract.digest' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null; then
-  echo "override helper must not replace platform contract files" >&2
-  exit 1
-fi
 
 printf 'fixture-k3s\n' > "${OVERRIDE_DIR}/k3s/README"
 printf 'fixture-image\n' > "${OVERRIDE_DIR}/platform/images/example.txt"
 printf '{"images":[]}\n' > "${OVERRIDE_DIR}/platform/images.lock.json"
 printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${OVERRIDE_DIR}/platform/profile.env"
 printf 'K3S_VERSION=v1.35.0+k3s1\n' > "${OVERRIDE_DIR}/manifest.env"
-printf 'keep-me\n' > "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest"
 
 OURBOX_INSTALLER_PROVENANCE_FILE="${CACHE_DIR}/install-provenance.env" \
 OURBOX_INSTALLER_SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}" \
   "${CACHE_DIR}/apply-ourbox-substrate-override.sh" "${TARGET_DIR}"
 
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/k3s/README" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/k3s/README" ]] || {
   echo "override helper did not stage k3s payload into target" >&2
   exit 1
 }
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/images/example.txt" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/platform/images/example.txt" ]] || {
   echo "override helper did not stage platform images into target" >&2
   exit 1
 }
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/images.lock.json" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/platform/images.lock.json" ]] || {
   echo "override helper did not stage images.lock.json into target" >&2
   exit 1
 }
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/profile.env" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/platform/profile.env" ]] || {
   echo "override helper did not stage profile.env into target" >&2
   exit 1
 }
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/manifest.env" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/manifest.env" ]] || {
   echo "override helper did not stage manifest.env into target" >&2
-  exit 1
-}
-grep -F 'keep-me' "${TARGET_DIR}/opt/ourbox/airgap/platform/contract.digest" >/dev/null || {
-  echo "override helper unexpectedly replaced platform contract digest" >&2
   exit 1
 }
 
@@ -152,11 +143,11 @@ OURBOX_INSTALLER_APPLICATION_CATALOG_FILE="${APPLICATION_SELECTION_DIR}/catalog.
 OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE="${APPLICATION_SELECTION_DIR}/selected-apps.json" \
   "${CACHE_DIR}/apply-application-selection.sh" "${TARGET_DIR}"
 
-cmp -s "${APPLICATION_SELECTION_DIR}/catalog.json" "${TARGET_DIR}/opt/ourbox/airgap/platform/catalog.json" || {
+cmp -s "${APPLICATION_SELECTION_DIR}/catalog.json" "${TARGET_DIR}/opt/ourbox/substrate/platform/catalog.json" || {
   echo "application selection helper did not copy catalog.json into target" >&2
   exit 1
 }
-cmp -s "${APPLICATION_SELECTION_DIR}/selected-apps.json" "${TARGET_DIR}/opt/ourbox/airgap/platform/selected-apps.json" || {
+cmp -s "${APPLICATION_SELECTION_DIR}/selected-apps.json" "${TARGET_DIR}/opt/ourbox/substrate/platform/selected-apps.json" || {
   echo "application selection helper did not copy selected-apps.json into target" >&2
   exit 1
 }
@@ -166,11 +157,11 @@ OURBOX_INSTALLER_APPLICATION_CATALOG_FILE="${APPLICATION_SELECTION_DIR}/catalog.
 OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE="${APPLICATION_SELECTION_DIR}/selected-apps.json" \
   "${CACHE_DIR}/apply-application-selection.sh" "${TARGET_DIR}"
 
-[[ -f "${TARGET_DIR}/opt/ourbox/airgap/platform/catalog.json" ]] || {
+[[ -f "${TARGET_DIR}/opt/ourbox/substrate/platform/catalog.json" ]] || {
   echo "application selection helper unexpectedly removed catalog.json from target" >&2
   exit 1
 }
-[[ ! -f "${TARGET_DIR}/opt/ourbox/airgap/platform/selected-apps.json" ]] || {
+[[ ! -f "${TARGET_DIR}/opt/ourbox/substrate/platform/selected-apps.json" ]] || {
   echo "application selection helper did not remove selected-apps.json when no selection file was staged" >&2
   exit 1
 }

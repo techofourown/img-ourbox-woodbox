@@ -25,7 +25,6 @@
         "target": "x86",
         "sku": "TOO-OBX-WBX-BASE-JU3XK8",
         "git_sha": "92b5a1ffcd0a",
-        "platform_contract_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
         "k3s_version": "v1.35.0+k3s1"
       },
       "meta_env": {
@@ -39,10 +38,6 @@
         "OURBOX_SKU": "TOO-OBX-WBX-BASE-JU3XK8",
         "BUILD_TS": "2026-03-09T03:38:48Z",
         "GIT_SHA": "92b5a1ffcd0a",
-        "OURBOX_PLATFORM_CONTRACT_DIGEST": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
-        "OURBOX_PLATFORM_CONTRACT_SOURCE": "https://github.com/techofourown/sw-ourbox-os",
-        "OURBOX_PLATFORM_CONTRACT_REVISION": "93e087a671428ee9e87688d039a8715abea735a7",
-        "OURBOX_PLATFORM_CONTRACT_VERSION": "v0.10.1",
         "K3S_VERSION": "v1.35.0+k3s1",
         "GITHUB_WORKFLOW": "Official Candidate Build & Publish (Woodbox)",
         "GITHUB_RUN_ID": "22837297056",

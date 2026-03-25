@@ -75,18 +75,6 @@ fi
 
 tar -xzf "${TARBALL}" -C "${EXTRACT_DIR}"
 
-[[ -f "${EXTRACT_DIR}/platform-contract/contract.env" ]] || {
-  echo "Missing platform-contract/contract.env in extracted payload" >&2
-  exit 1
-}
-
 "${ROOT}/tools/validate-platform-contract-shape.sh" "${EXTRACT_DIR}/platform-contract"
-
-if [[ -n "${RESOLVED_DIGEST}" ]]; then
-  printf '%s\n' "${RESOLVED_DIGEST}" > "${EXTRACT_DIR}/platform-contract/contract.digest"
-  echo "  Digest recorded: ${RESOLVED_DIGEST}"
-else
-  echo "  WARNING: no digest captured; contract.digest will not be written" >&2
-fi
 
 echo "OK: extracted to ${EXTRACT_DIR}/platform-contract"

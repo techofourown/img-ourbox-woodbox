@@ -7,25 +7,24 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
 PAYLOAD_ROOT="${TMP}/payload-root"
-PAYLOAD_AIRGAP="${PAYLOAD_ROOT}/airgap"
+PAYLOAD_SUBSTRATE="${PAYLOAD_ROOT}/substrate"
 PAYLOAD_ROOTFS="${PAYLOAD_ROOT}/rootfs"
 OUT_DIR="${TMP}/out"
 APPLICATION_CATALOG="${TMP}/catalog.json"
 SELECTED_APPS="${TMP}/selected-apps.json"
-mkdir -p "${PAYLOAD_AIRGAP}/k3s" "${PAYLOAD_AIRGAP}/platform/images" "${PAYLOAD_ROOTFS}"
+mkdir -p "${PAYLOAD_SUBSTRATE}/k3s" "${PAYLOAD_SUBSTRATE}/platform/images" "${PAYLOAD_ROOTFS}"
 
-printf '#!/bin/sh\nexit 0\n' > "${PAYLOAD_AIRGAP}/k3s/k3s"
-chmod +x "${PAYLOAD_AIRGAP}/k3s/k3s"
-printf 'fixture\n' > "${PAYLOAD_AIRGAP}/k3s/k3s-airgap-images-amd64.tar"
-printf 'fixture image tar\n' > "${PAYLOAD_AIRGAP}/platform/images/landing.tar"
-printf '{"images":[]}\n' > "${PAYLOAD_AIRGAP}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${PAYLOAD_AIRGAP}/platform/profile.env"
-cat > "${PAYLOAD_AIRGAP}/manifest.env" <<'EOF'
+printf '#!/bin/sh\nexit 0\n' > "${PAYLOAD_SUBSTRATE}/k3s/k3s"
+chmod +x "${PAYLOAD_SUBSTRATE}/k3s/k3s"
+printf 'fixture\n' > "${PAYLOAD_SUBSTRATE}/k3s/k3s-images-amd64.tar"
+printf 'fixture image tar\n' > "${PAYLOAD_SUBSTRATE}/platform/images/landing.tar"
+printf '{"images":[]}\n' > "${PAYLOAD_SUBSTRATE}/platform/images.lock.json"
+printf 'PROFILE=demo-apps\n' > "${PAYLOAD_SUBSTRATE}/platform/profile.env"
+cat > "${PAYLOAD_SUBSTRATE}/manifest.env" <<'EOF'
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-revision
 OURBOX_SUBSTRATE_VERSION=v0.0.0-fixture
 OURBOX_SUBSTRATE_CREATED=2026-03-13T00:00:00Z
-OURBOX_PLATFORM_CONTRACT_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 OURBOX_SUBSTRATE_ARCH=amd64
 K3S_VERSION=v1.35.0+k3s1
 OURBOX_PLATFORM_PROFILE=demo-apps
@@ -45,10 +44,6 @@ OURBOX_TARGET=x86
 OURBOX_SKU=TOO-OBX-WBX-BASE-JU3XK8
 OURBOX_VARIANT=prod
 OURBOX_VERSION=fixture
-OURBOX_PLATFORM_CONTRACT_SOURCE=https://github.com/techofourown/sw-ourbox-os
-OURBOX_PLATFORM_CONTRACT_REVISION=fixture-contract
-OURBOX_PLATFORM_CONTRACT_VERSION=v0.20.0
-OURBOX_PLATFORM_CONTRACT_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 OURBOX_SUBSTRATE_REF=ghcr.io/techofourown/sw-ourbox-os/ourbox-substrate@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 OURBOX_SUBSTRATE_DIGEST=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
@@ -121,15 +116,15 @@ MISSION_DIR="${OUT_DIR}/mission"
   echo "mission-manifest.json missing" >&2
   exit 1
 }
-[[ -f "${MISSION_DIR}/artifacts/airgap/catalog.json" ]] || {
+[[ -f "${MISSION_DIR}/artifacts/substrate/catalog.json" ]] || {
   echo "application catalog missing from mission output" >&2
   exit 1
 }
-[[ -f "${MISSION_DIR}/artifacts/airgap/selected-apps.json" ]] || {
+[[ -f "${MISSION_DIR}/artifacts/substrate/selected-apps.json" ]] || {
   echo "selected-apps.json missing from mission output" >&2
   exit 1
 }
-[[ -f "${MISSION_DIR}/artifacts/airgap/ourbox-substrate.tar.gz.sha256" ]] || {
+[[ -f "${MISSION_DIR}/artifacts/substrate/ourbox-substrate.tar.gz.sha256" ]] || {
   echo "substrate bundle checksum sidecar missing from mission output" >&2
   exit 1
 }
