@@ -301,6 +301,3 @@ Late-commands in `autoinstall.tpl`:
 - `OURBOX_APPLICATION_CATALOG_NAME`
 - `OURBOX_APPLICATION_SELECTION_MODE`
 - `OURBOX_SELECTED_APPLICATION_IDS`
-
-Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still be present on older payloads
-or already-installed systems. Treat them as informational trace only.

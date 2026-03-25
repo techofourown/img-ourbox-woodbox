@@ -46,10 +46,6 @@ Fields appended at install time by autoinstall late-commands:
 - `OURBOX_INSTALL_SELECTION_SOURCE`
 - `OURBOX_RELEASE_CHANNEL`
 
-Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear on transitional
-payloads or installed systems, but they are informational only and not the
-normative compatibility surface.
-
 ### Why it exists
 
 - debugging ("what build is on this device?")

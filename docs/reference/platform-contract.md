@@ -76,10 +76,6 @@ Primary build, payload, and install provenance now lives in the
 `OURBOX_SUBSTRATE_*` fields recorded in payload metadata, publish metadata, and
 installed-system release files.
 
-Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear while the remaining
-cleanup lands, but they are informational trace only. They are not
-compatibility gates.
-
 ## Updating approved inputs
 
 1. Approve the new upstream snapshot in

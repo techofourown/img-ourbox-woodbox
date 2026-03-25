@@ -147,10 +147,6 @@ Additional metadata is published as artifact files:
   machine-readable consumption
 - `os-payload.tar.gz.sha256` / `installer.iso.sha256` — SHA-256 checksum for offline verification
 
-Legacy `OURBOX_PLATFORM_CONTRACT_*` fields may still appear in transitional
-artifact-carried metadata. They are informational only and not compatibility
-gates.
-
 Canonical artifact identity for consumption is **by digest**
 (e.g., `ghcr.io/techofourown/ourbox-woodbox-os@sha256:...`).
 

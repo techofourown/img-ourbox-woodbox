@@ -1,9 +1,8 @@
 # ADR-0004: Consume the OurBox OS Platform Contract from `sw-ourbox-os`
 
 > Status note (2026-03): Woodbox now consumes both `platform-contract` and
-> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Legacy
-> platform-contract metadata may still appear in provenance, but compatibility
-> is enforced by exact selected artifact identities plus local bundle and
+> `ourbox-substrate` as pinned OCI inputs from `sw-ourbox-os`. Compatibility is
+> enforced by exact selected artifact identities plus local bundle and
 > capability checks, not by contract-digest matching.
 
 
