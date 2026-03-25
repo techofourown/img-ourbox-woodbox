@@ -107,11 +107,31 @@ EOF
   "apps": [
     {
       "id": "landing",
-      "display_name": "Landing"
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
     },
     {
       "id": "dufs",
-      "display_name": "Dufs"
+      "display_name": "Dufs",
+      "image_names": [
+        "dufs"
+      ],
+      "services": [
+        {
+          "name": "dufs",
+          "image": "dufs",
+          "port": 5000
+        }
+      ]
     }
   ]
 }
@@ -311,6 +331,21 @@ build_substrate_bundle valid
 write_manifest 1
 mutate_manifest 'del manifest["resolved"]["applications"]["images_lock_relpath"]'
 expect_validation_failure "mission manifests missing selected_applications.images_lock_relpath"
+
+build_substrate_bundle valid
+write_manifest 1
+cat > "${APP_IMAGES_LOCK}" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}
+EOF
+expect_validation_failure "mission application images locks missing selected service images"
 
 build_substrate_bundle valid
 write_manifest 1
