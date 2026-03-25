@@ -73,7 +73,7 @@ EOF
   printf '#!/bin/sh\nexit 0\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
   chmod +x "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
   printf 'fixture k3s images\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s-images-amd64.tar"
-  printf 'PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
+  printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
   printf 'fixture image tar\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images/platform-demo.tar"
   if [[ "${variant}" != "missing-images-lock" ]]; then
     printf '{"images":[]}\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images.lock.json"

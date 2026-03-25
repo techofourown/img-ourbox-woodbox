@@ -67,7 +67,7 @@ printf '#!/bin/sh\nexit 0\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s"
 chmod +x "${SOURCE_BUNDLE_DIR}/k3s/k3s"
 printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-images-amd64.tar"
 printf '{"images":[]}\n' > "${SOURCE_BUNDLE_DIR}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SOURCE_BUNDLE_DIR}/platform/images/platform-demo.tar"
 cat > "${MISSION_SUBSTRATE_DIR}/catalog.json" <<'EOF'
 {

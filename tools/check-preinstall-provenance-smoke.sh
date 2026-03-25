@@ -53,6 +53,7 @@ write_install_provenance
 TARGET_DIR="${TMP}/target"
 OVERRIDE_DIR="${TMP}/ourbox-substrate-override"
 APPLICATION_SELECTION_DIR="${TMP}/application-selection"
+BAKED_PLATFORM_IMAGES_LOCK="${TMP}/baked-platform-images.lock.json"
 mkdir -p "${TARGET_DIR}/etc/ourbox"
 mkdir -p "${TARGET_DIR}/opt/ourbox/substrate/platform" \
   "${OVERRIDE_DIR}/k3s" \
@@ -95,7 +96,13 @@ grep -F 'EXISTING_KEY="existing-value"' "${TARGET_DIR}/etc/ourbox/release" >/dev
 # shellcheck disable=SC2016
 grep -F 'if [ "${SUBSTRATE_ARTIFACT_SOURCE:-baked}" = "baked" ]; then' "${CACHE_DIR}/apply-ourbox-substrate-override.sh" >/dev/null
 # shellcheck disable=SC2016
-grep -F 'cp -f "${SOURCE_IMAGES_LOCK}" "${PLATFORM_DIR}/images.lock.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+grep -F 'PLATFORM_IMAGES_LOCK="${PLATFORM_DIR}/platform-images.lock.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+# shellcheck disable=SC2016
+grep -F 'APPLICATION_IMAGES_LOCK="${PLATFORM_DIR}/images.lock.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+# shellcheck disable=SC2016
+grep -F 'if [ ! -f "${PLATFORM_IMAGES_LOCK}" ] && [ -f "${APPLICATION_IMAGES_LOCK}" ]; then' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
+# shellcheck disable=SC2016
+grep -F 'cp -f "${SOURCE_IMAGES_LOCK}" "${APPLICATION_IMAGES_LOCK}"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 # shellcheck disable=SC2016
 grep -F 'cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"' "${CACHE_DIR}/apply-application-selection.sh" >/dev/null
 if grep -Fq "INSTALL_DEFAULTS_" "${CACHE_DIR}/install-provenance.env"; then
@@ -141,6 +148,9 @@ OURBOX_INSTALLER_SUBSTRATE_OVERRIDE_DIR="${OVERRIDE_DIR}" \
 printf '{"catalog_id":"demo-apps"}\n' > "${APPLICATION_SELECTION_DIR}/catalog.json"
 printf '{"schema":1,"images":[{"name":"landing","ref":"ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"}]}\n' > "${APPLICATION_SELECTION_DIR}/application-images.lock.json"
 printf '{"selected_app_ids":["landing","dufs"]}\n' > "${APPLICATION_SELECTION_DIR}/selected-apps.json"
+printf '{"schema":1,"images":[{"name":"platform","ref":"ghcr.io/example/platform@sha256:2222222222222222222222222222222222222222222222222222222222222222"}]}\n' > "${BAKED_PLATFORM_IMAGES_LOCK}"
+cp -f "${BAKED_PLATFORM_IMAGES_LOCK}" "${TARGET_DIR}/opt/ourbox/substrate/platform/images.lock.json"
+rm -f "${TARGET_DIR}/opt/ourbox/substrate/platform/platform-images.lock.json"
 
 OURBOX_INSTALLER_APPLICATION_CATALOG_FILE="${APPLICATION_SELECTION_DIR}/catalog.json" \
 OURBOX_INSTALLER_APPLICATION_IMAGES_LOCK_FILE="${APPLICATION_SELECTION_DIR}/application-images.lock.json" \
@@ -157,6 +167,10 @@ cmp -s "${APPLICATION_SELECTION_DIR}/selected-apps.json" "${TARGET_DIR}/opt/ourb
 }
 cmp -s "${APPLICATION_SELECTION_DIR}/application-images.lock.json" "${TARGET_DIR}/opt/ourbox/substrate/platform/images.lock.json" || {
   echo "application selection helper did not copy application-images.lock.json into target" >&2
+  exit 1
+}
+cmp -s "${BAKED_PLATFORM_IMAGES_LOCK}" "${TARGET_DIR}/opt/ourbox/substrate/platform/platform-images.lock.json" || {
+  echo "application selection helper did not preserve the baked platform images lock" >&2
   exit 1
 }
 

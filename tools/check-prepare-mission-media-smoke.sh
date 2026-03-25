@@ -20,7 +20,7 @@ chmod +x "${PAYLOAD_SUBSTRATE}/k3s/k3s"
 printf 'fixture\n' > "${PAYLOAD_SUBSTRATE}/k3s/k3s-images-amd64.tar"
 printf 'fixture image tar\n' > "${PAYLOAD_SUBSTRATE}/platform/images/landing.tar"
 printf '{"images":[]}\n' > "${PAYLOAD_SUBSTRATE}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${PAYLOAD_SUBSTRATE}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${PAYLOAD_SUBSTRATE}/platform/profile.env"
 cat > "${PAYLOAD_SUBSTRATE}/manifest.env" <<'EOF'
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-revision

@@ -1349,15 +1349,20 @@ SOURCE_CATALOG="${OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/install
 SOURCE_IMAGES_LOCK="${OURBOX_INSTALLER_APPLICATION_IMAGES_LOCK_FILE:-/opt/ourbox/installer/cache/application-images.lock.json}"
 SOURCE_SELECTION="${OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json}"
 PLATFORM_DIR="${TARGET}/opt/ourbox/substrate/platform"
+PLATFORM_IMAGES_LOCK="${PLATFORM_DIR}/platform-images.lock.json"
+APPLICATION_IMAGES_LOCK="${PLATFORM_DIR}/images.lock.json"
 
 mkdir -p "${PLATFORM_DIR}"
+if [ ! -f "${PLATFORM_IMAGES_LOCK}" ] && [ -f "${APPLICATION_IMAGES_LOCK}" ]; then
+  cp -f "${APPLICATION_IMAGES_LOCK}" "${PLATFORM_IMAGES_LOCK}"
+fi
 if [ -f "${SOURCE_CATALOG}" ]; then
   cp -f "${SOURCE_CATALOG}" "${PLATFORM_DIR}/catalog.json"
 fi
 if [ -f "${SOURCE_IMAGES_LOCK}" ]; then
-  cp -f "${SOURCE_IMAGES_LOCK}" "${PLATFORM_DIR}/images.lock.json"
+  cp -f "${SOURCE_IMAGES_LOCK}" "${APPLICATION_IMAGES_LOCK}"
 else
-  rm -f "${PLATFORM_DIR}/images.lock.json"
+  rm -f "${APPLICATION_IMAGES_LOCK}"
 fi
 if [ -f "${SOURCE_SELECTION}" ]; then
   cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"
