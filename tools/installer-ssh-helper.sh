@@ -16,6 +16,7 @@ ourbox_installer_ssh_normalize_inputs() {
   OURBOX_INSTALLER_SSH_PASSWORD_HASH="${OURBOX_INSTALLER_SSH_PASSWORD_HASH:-}"
   OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS="${OURBOX_INSTALLER_SSH_AUTHORIZED_KEYS:-}"
   OURBOX_INSTALLER_SSH_ALLOW_ROOT="${OURBOX_INSTALLER_SSH_ALLOW_ROOT:-0}"
+  OURBOX_INSTALLER_SSH_GRANT_SUDO="${OURBOX_INSTALLER_SSH_GRANT_SUDO:-1}"
   OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY="${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY:-0}"
 
   case "${OURBOX_INSTALLER_SSH_MODE}" in
@@ -26,6 +27,11 @@ ourbox_installer_ssh_normalize_inputs() {
   case "${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" in
     0|1) ;;
     *) ourbox_installer_ssh_die "invalid OURBOX_INSTALLER_SSH_ALLOW_ROOT: ${OURBOX_INSTALLER_SSH_ALLOW_ROOT}" ;;
+  esac
+
+  case "${OURBOX_INSTALLER_SSH_GRANT_SUDO}" in
+    0|1) ;;
+    *) ourbox_installer_ssh_die "invalid OURBOX_INSTALLER_SSH_GRANT_SUDO: ${OURBOX_INSTALLER_SSH_GRANT_SUDO}" ;;
   esac
 
   case "${OURBOX_INSTALLER_SSH_GENERATE_PASSWORD_IF_EMPTY}" in
@@ -214,6 +220,31 @@ ourbox_installer_ssh_write_sshd_fragment() {
   } > "${config_file}" || ourbox_installer_ssh_die "failed to write ${config_file}"
 }
 
+ourbox_installer_ssh_apply_sudo_policy() {
+  local sudoers_file="/etc/sudoers.d/90-ourbox-installer"
+
+  if [[ "${OURBOX_INSTALLER_SSH_MODE}" == "off" ]]; then
+    rm -f "${sudoers_file}"
+    return 0
+  fi
+
+  if [[ "${OURBOX_INSTALLER_SSH_GRANT_SUDO}" == "1" ]]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      ourbox_installer_ssh_log "sudo not available; skipping sudo policy for ${OURBOX_INSTALLER_SSH_USER}"
+      return 0
+    fi
+    mkdir -p "$(dirname "${sudoers_file}")" \
+      || ourbox_installer_ssh_die "failed to create $(dirname "${sudoers_file}")"
+    printf '%s ALL=(ALL) NOPASSWD: ALL\n' "${OURBOX_INSTALLER_SSH_USER}" > "${sudoers_file}" \
+      || ourbox_installer_ssh_die "failed to write ${sudoers_file}"
+    chmod 0440 "${sudoers_file}" \
+      || ourbox_installer_ssh_die "failed to chmod ${sudoers_file}"
+    ourbox_installer_ssh_log "sudo granted to ${OURBOX_INSTALLER_SSH_USER}"
+  else
+    rm -f "${sudoers_file}"
+  fi
+}
+
 ourbox_installer_ssh_apply_common_state() {
   local config_file="${1:?config path required}"
 
@@ -221,4 +252,5 @@ ourbox_installer_ssh_apply_common_state() {
   ourbox_installer_ssh_apply_password_hash_or_lock
   ourbox_installer_ssh_apply_authorized_keys
   ourbox_installer_ssh_write_sshd_fragment "${config_file}"
+  ourbox_installer_ssh_apply_sudo_policy
 }
