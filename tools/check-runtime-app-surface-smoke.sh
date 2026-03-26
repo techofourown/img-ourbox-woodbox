@@ -236,7 +236,7 @@ grep -Fq 'BOOTSTRAP_STATUS_FILE="/run/ourbox/bootstrap-status.env"' "${BOOTSTRAP
   echo "bootstrap does not publish bootstrap-status.env" >&2
   exit 1
 }
-grep -Fq 'BOOTSTRAP_ERROR_FILE="${STATE_DIR}/bootstrap-last-error.txt"' "${BOOTSTRAP_SCRIPT}" || {
+grep -Fq "BOOTSTRAP_ERROR_FILE=\"\${STATE_DIR}/bootstrap-last-error.txt\"" "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap does not publish bootstrap-last-error.txt" >&2
   exit 1
 }

@@ -6,7 +6,7 @@ BOOTSTRAP="${ROOT}/installer/ourbox/rootfs/usr/local/sbin/ourbox-bootstrap"
 
 fragment="$(
   awk '
-    /^require_application_intent_files\(\)/ { exit }
+    /^set_bootstrap_phase "mount-check"$/ { exit }
     { print }
   ' "${BOOTSTRAP}"
 )"

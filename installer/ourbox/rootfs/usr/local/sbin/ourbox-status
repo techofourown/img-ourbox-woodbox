@@ -393,7 +393,9 @@ while true; do
 
   landing_selected=0
   if [[ "$surface_ok" == "1" ]]; then
-    surface_landing_selected && landing_selected=1 || true
+    if surface_landing_selected; then
+      landing_selected=1
+    fi
   fi
 
   app_status_ok=0
