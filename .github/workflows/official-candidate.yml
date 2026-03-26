@@ -53,6 +53,7 @@ jobs:
       - name: Resolve current beta upstream inputs
         run: |
           set -euo pipefail
+          # Resolve the latest approved sw-ourbox-os snapshot from main at workflow runtime.
           source ./tools/approved-upstream-inputs.upstream.env
           python3 ./tools/release-control/release_control.py resolve-approved-upstream-input \
             --github-repo "${SW_OURBOX_OS_APPROVED_INPUTS_REPO}" \
