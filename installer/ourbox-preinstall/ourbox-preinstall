@@ -1480,7 +1480,7 @@ if [ "\${SSH_PASSWORD_ENABLED}" = "1" ] || [ "\${user_missing_after_overlay}" = 
   # Subiquity may lock the account when ssh.authorized-keys is present in autoinstall.
   # usermod -p sets the hash but does not remove a leading ! lock prefix on all distros.
   # Explicitly unlock to guarantee password auth works.
-  curtin in-target --target="\${TARGET}" -- passwd -u "\${SSH_USERNAME}" 2>/dev/null || true
+  curtin in-target --target="\${TARGET}" -- passwd -u "\${SSH_USERNAME}"
   echo "Installed target account unlocked for \${SSH_USERNAME}"
 fi
 
