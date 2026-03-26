@@ -1476,6 +1476,12 @@ PubkeyAuthentication yes
 PermitRootLogin no
 EOF
 
+mkdir -p "\${TARGET}/etc/sudoers.d"
+cat > "\${TARGET}/etc/sudoers.d/90-ourbox-diagnostics" <<EOF
+\${SSH_USERNAME} ALL=(root) NOPASSWD: /usr/local/sbin/ourbox-diagnostics
+EOF
+chmod 0440 "\${TARGET}/etc/sudoers.d/90-ourbox-diagnostics"
+
 if [ "\${SSH_KEY_PRESENT}" = "1" ]; then
   [ -f "\${AUTHORIZED_KEY_SRC}" ] || { echo "missing staged installed-target SSH authorized key: \${AUTHORIZED_KEY_SRC}" >&2; exit 1; }
   user_record="\$(awk -F: -v user="\${SSH_USERNAME}" '\$1 == user {print \$3 ":" \$4 ":" \$6; exit}' "\${TARGET}/etc/passwd")"

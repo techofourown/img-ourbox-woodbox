@@ -112,6 +112,19 @@ grep -q '^PasswordAuthentication yes$' "${TARGET_DIR}/etc/ssh/sshd_config.d/60-o
   echo "expected installed-target SSH helper to enable password authentication when requested" >&2
   exit 1
 }
+[[ -f "${TARGET_DIR}/etc/sudoers.d/90-ourbox-diagnostics" ]] || {
+  echo "expected installed-target SSH helper to write a diagnostics sudoers drop-in" >&2
+  exit 1
+}
+grep -q '^ourbox ALL=(root) NOPASSWD: /usr/local/sbin/ourbox-diagnostics$' \
+  "${TARGET_DIR}/etc/sudoers.d/90-ourbox-diagnostics" || {
+  echo "expected diagnostics sudoers drop-in to target the installed user and helper path" >&2
+  exit 1
+}
+[[ "$(stat -c '%a' "${TARGET_DIR}/etc/sudoers.d/90-ourbox-diagnostics")" == "440" ]] || {
+  echo "expected diagnostics sudoers drop-in permissions to be 440" >&2
+  exit 1
+}
 [[ -f "${TARGET_DIR}/home/ourbox/.ssh/authorized_keys" ]] || {
   echo "expected installed-target SSH helper to stage authorized_keys" >&2
   exit 1
