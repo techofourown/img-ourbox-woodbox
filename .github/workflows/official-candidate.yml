@@ -36,10 +36,12 @@ jobs:
 
       - name: Record manual trigger metadata
         if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_REASON: ${{ inputs.reason }}
         run: |
           {
             echo "## Manual freshen request"
-            echo "- reason: ${{ inputs.reason }}"
+            printf -- '- reason: %s\n' "${DISPATCH_REASON}"
             echo "- branch: ${{ github.ref_name }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
