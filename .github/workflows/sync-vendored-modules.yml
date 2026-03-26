@@ -8,8 +8,12 @@ name: Sync Vendored Modules
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * 1'   # Weekly, Monday 06:00 UTC
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
 
 permissions:
   contents: write
@@ -48,7 +52,7 @@ jobs:
             tools/release-control/release_control.py \
             tools/release-control/candidate-provenance.schema.json \
             tools/release-control.upstream.env
-          git commit -m "chore: sync vendored modules to sw-ourbox-os ${VENDORED_MODULES_REVISION}
+          git commit -m "chore: sync vendored modules to sw-ourbox-os ${VENDORED_MODULES_REVISION} [skip ci]
 
 Auto-advance installer-ssh-helper and release-control to the approved
 revisions recorded in sw-ourbox-os approved-upstream-inputs.json."
