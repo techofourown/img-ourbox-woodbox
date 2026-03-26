@@ -45,12 +45,7 @@ jobs:
           git add \
             tools/installer-ssh-helper.sh \
             tools/installer-ssh-helper.upstream.env \
-            tools/release-control/lib.sh \
-            tools/release-control/find-successful-candidate-run.sh \
-            tools/release-control/resolve-promotable-release.sh \
-            tools/release-control/resolve-promotion-context.sh \
-            tools/release-control/release_control.py \
-            tools/release-control/candidate-provenance.schema.json \
+            tools/release-control \
             tools/release-control.upstream.env
           git commit -m "chore: sync vendored modules to sw-ourbox-os ${VENDORED_MODULES_REVISION} [skip ci]
 
