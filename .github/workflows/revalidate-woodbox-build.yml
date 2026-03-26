@@ -4,7 +4,7 @@ name: Revalidate Woodbox Build (non-publishing)
 # Use this after infrastructure changes, runner migrations, or to satisfy the
 # ADR-0008 revalidation requirement.
 #
-# For an actual official republish, touch release/REVALIDATION_TRIGGER in a PR instead.
+# For an actual official republish, use the workflow_dispatch button on official-candidate.yml.
 
 on:
   workflow_dispatch:

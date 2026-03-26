@@ -107,10 +107,17 @@ GitHub Release authorization are present for that source commit.
 
 ### Forcing an official republish without source changes
 
-Touch `release/REVALIDATION_TRIGGER` in a PR. That file is not in the `paths-ignore` list,
-so merging a change to it will trigger `official-candidate.yml`. Use this when you need an
-official artifact after infrastructure maintenance or runner migration, without making a
-substantive code change. See `release/REVALIDATION_TRIGGER` for the documented procedure.
+Use the **workflow_dispatch** button on `official-candidate.yml`:
+
+1. Go to Actions → "Official Candidate Build & Publish (Woodbox)"
+2. Click "Run workflow", select `main`, and enter a reason.
+3. The build runs and publishes without a PR or noop commit.
+
+The required `reason` input is recorded in the GitHub Actions step summary for audit.
+
+> **Deprecated**: the old `release/REVALIDATION_TRIGGER` PR path still works mechanically
+> (any push to main triggers the workflow) but creates unnecessary ceremony. Prefer the
+> workflow_dispatch button for all new freshen requests.
 
 ### Non-publishing revalidation
 

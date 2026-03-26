@@ -1,15 +1,15 @@
-# Revalidation trigger for OurBox Woodbox.
+# DEPRECATED — use the manual workflow_dispatch button instead.
 #
-# Touching this file (updating its content) in a PR and merging to main
-# triggers a new official-candidate build and publish without requiring a
-# substantive source change. Use this after infrastructure maintenance,
-# runner migrations, or when you need a fresh official artifact.
+# The official-candidate workflow now supports workflow_dispatch with a
+# required "reason" input. To trigger a fresh official candidate build:
 #
-# Procedure:
-#   1. Open a PR with a one-line change to this file (e.g., bump the date below).
-#   2. Merge the PR to main.
-#   3. The official-candidate workflow will trigger and publish new artifacts.
+#   1. Go to Actions → "Official Candidate Build & Publish (Woodbox)"
+#   2. Click "Run workflow", select main, enter a reason.
+#   3. The build runs and publishes without a PR or noop commit.
 #
-# This file is intentionally not in the paths-ignore list of official-candidate.yml.
+# The old procedure (touch this file in a PR, merge to main) still
+# works mechanically — any push to main triggers the workflow — but
+# it creates unnecessary ceremony and clutters the git log. Prefer
+# the workflow_dispatch button for all new freshen requests.
 #
-# Last triggered: 2026-03-26
+# Last triggered via PR: 2026-03-26 (v0.23.13 — landing configmap fix)
