@@ -61,6 +61,53 @@ cat > "${BIN_DIR}/curtin" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "${CURTIN_LOG:?}"
+
+target=""
+cmd=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    in-target)
+      shift
+      ;;
+    --target=*)
+      target="${1#--target=}"
+      shift
+      ;;
+    --target)
+      target="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      cmd=("$@")
+      break
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+case "${cmd[0]:-}" in
+  useradd)
+    username="${cmd[$((${#cmd[@]} - 1))]}"
+    mkdir -p "${target}/home/${username}"
+    if ! grep -q "^${username}:" "${target}/etc/passwd"; then
+      printf '%s:x:1000:1000:OurBox:/home/%s:/bin/bash\n' "${username}" "${username}" >> "${target}/etc/passwd"
+    fi
+    ;;
+  chpasswd)
+    IFS=: read -r username password_hash
+    if [[ -f "${target}/etc/shadow" ]]; then
+      grep -v "^${username}:" "${target}/etc/shadow" > "${target}/etc/shadow.tmp"
+      mv "${target}/etc/shadow.tmp" "${target}/etc/shadow"
+    fi
+    printf '%s:%s:20400:0:99999:7:::\n' "${username}" "${password_hash}" >> "${target}/etc/shadow"
+    ;;
+  systemctl)
+    ;;
+esac
 SCRIPT
 chmod +x "${BIN_DIR}/curtin"
 
@@ -80,6 +127,7 @@ OURBOX_PREINSTALL_SYS_CLASS_NET_ROOT="${SYSFS_DIR}" \
 
 export INSTALLER_CACHE_DIR="${CACHE_DIR}"
 export OURBOX_USERNAME="ourbox"
+export OURBOX_PASSWORD_HASH='$6$fixture$P0slYxD3s2kYVQQU21Wc6h7a5fY7M9JVNF5E0f2fG7d7hJYB6wof/9G6XqYQ8MDC0YQ9d6A2iA9oD5QY0B0jW0'
 export OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=1
 export MISSION_INSTALLED_TARGET_SSH_PRESENT=1
 export MISSION_INSTALLED_TARGET_SSH_KEY_NAME="fixture-shared-dev"
@@ -91,6 +139,10 @@ write_offline_install_helpers
 cat > "${TARGET_DIR}/etc/passwd" <<'EOF'
 root:x:0:0:root:/root:/bin/bash
 ourbox:x:1000:1000:OurBox:/home/ourbox:/bin/bash
+EOF
+
+cat > "${TARGET_DIR}/etc/shadow" <<'EOF'
+root:*:19793:0:99999:7:::
 EOF
 
 PATH="${BIN_DIR}:${PATH}" PACKAGE_INSTALL_LOG="${PACKAGE_INSTALL_LOG}" CURTIN_LOG="${CURTIN_LOG}" \
@@ -143,6 +195,14 @@ cmp -s "${MISSION_SSH_KEY}" "${TARGET_DIR}/home/ourbox/.ssh/authorized_keys" || 
 }
 grep -q 'systemctl enable ssh.service' "${CURTIN_LOG}" || {
   echo "expected installed-target SSH helper to enable ssh.service in the target" >&2
+  exit 1
+}
+grep -q 'chpasswd -e' "${CURTIN_LOG}" || {
+  echo "expected installed-target SSH helper to reapply the password hash for existing users" >&2
+  exit 1
+}
+grep -q '^ourbox:' "${TARGET_DIR}/etc/shadow" || {
+  echo "expected installed-target SSH helper to ensure the installed user has a shadow entry" >&2
   exit 1
 }
 
