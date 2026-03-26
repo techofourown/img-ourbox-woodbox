@@ -1,3 +1,10 @@
+## [0.14.12](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.11...v0.14.12) (2026-03-26)
+
+
+### Bug Fixes
+
+* annotate workflow-time upstream resolution ([e010e07](https://github.com/techofourown/img-ourbox-woodbox/commit/e010e070e1491156dde81e6e9c21f3a417a0131f))
+
 ## [0.14.11](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.10...v0.14.11) (2026-03-26)
 
 
