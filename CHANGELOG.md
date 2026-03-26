@@ -1,3 +1,13 @@
+## [0.16.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.16.1...v0.16.2) (2026-03-26)
+
+
+### Bug Fixes
+
+* unlock installed-target user account after Subiquity locks it ([f667ed1](https://github.com/techofourown/img-ourbox-woodbox/commit/f667ed1de3c57126d6c224e3d28496584b138e78))
+* unlock installed-target user account after Subiquity locks it ([1580410](https://github.com/techofourown/img-ourbox-woodbox/commit/1580410274cb5c47b978525b5dfcbc2681fab776))
+* unlock installed-target user account after Subiquity locks it ([23117bd](https://github.com/techofourown/img-ourbox-woodbox/commit/23117bda4a1428b2121b2305914a531e122554ff))
+* use GitHub App token in sync workflow to push past branch protection ([9d3c5a1](https://github.com/techofourown/img-ourbox-woodbox/commit/9d3c5a19cb4faa6e06efa0ace94a0f4482b5b797))
+
 ## [0.16.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.16.0...v0.16.1) (2026-03-26)
 
 
