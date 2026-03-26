@@ -7,6 +7,12 @@ on:
       - 'docs/**'
       - 'README.md'
       - 'CLAUDE.md'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you running a fresh official candidate build?'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +28,23 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      - name: Require main for manual publish
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "Run this workflow from main only." >&2
+          exit 1
+
+      - name: Record manual trigger metadata
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_REASON: ${{ inputs.reason }}
+        run: |
+          {
+            echo "## Manual freshen request"
+            printf -- '- reason: %s\n' "${DISPATCH_REASON}"
+            echo "- branch: ${{ github.ref_name }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Fix workspace ownership from previous build
         run: sudo chown -R "$(id -u):$(id -g)" "${GITHUB_WORKSPACE}" 2>/dev/null || true
 
