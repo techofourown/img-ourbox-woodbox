@@ -16,7 +16,7 @@ on:
       - 'CLAUDE.md'
 
 permissions:
-  contents: write
+  contents: read   # push to main uses the GitHub App token, not GITHUB_TOKEN
 
 concurrency:
   group: sync-vendored-modules
@@ -29,10 +29,18 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SEMREL_APP_ID }}
+          private-key: ${{ secrets.SEMREL_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Sync vendored modules
         run: bash tools/sync-vendored-modules.sh
