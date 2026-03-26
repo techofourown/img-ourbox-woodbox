@@ -1,3 +1,16 @@
+# [0.15.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.12...v0.15.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* pass dispatch reason through env to prevent shell injection ([6a2a878](https://github.com/techofourown/img-ourbox-woodbox/commit/6a2a878a4767f3fcd2966d3087344cd51c3632a0))
+
+
+### Features
+
+* add workflow_dispatch button to official candidate build ([18555b5](https://github.com/techofourown/img-ourbox-woodbox/commit/18555b536fa69f64851049ab357e3480384fbe03))
+* add workflow_dispatch button to official candidate build ([c592f67](https://github.com/techofourown/img-ourbox-woodbox/commit/c592f67aa8f6cdfdedfcf5ece79bbb6a2b65bb3c))
+
 ## [0.14.12](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.11...v0.14.12) (2026-03-26)
 
 
