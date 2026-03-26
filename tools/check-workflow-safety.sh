@@ -4,9 +4,10 @@
 # Rules:
 #   1. No workflow that runs on a self-hosted runner may be triggered by
 #      pull_request or pull_request_target (untrusted code on privileged builder).
-#   2. No official publish/promote workflow may expose a broad workflow_dispatch
-#      trigger (official publication must only flow from push-to-main, schedule,
-#      or dual-condition promotion handoff).
+#   2. No official publish/promote workflow may expose workflow_dispatch without
+#      a main-branch guard step (official publication must only flow from
+#      push-to-main, guarded workflow_dispatch, schedule, or dual-condition
+#      promotion handoff).
 #   3. Official publish workflows triggered by branch push must declare a path
 #      filter (paths-ignore or paths) to avoid rebuilding on docs-only changes.
 #   4. If an official promote workflow uses a release: trigger, it must constrain
@@ -52,7 +53,7 @@ while IFS= read -r wf; do
 done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -name '*.yml' -o -name '*.yaml')
 
 # ---------------------------------------------------------------------------
-# Rule 2: official publish/promote workflows must not expose workflow_dispatch
+# Rule 2: official publish/promote workflows with workflow_dispatch must guard on main
 # ---------------------------------------------------------------------------
 while IFS= read -r wf; do
   name="$(basename "${wf}")"
@@ -63,7 +64,13 @@ while IFS= read -r wf; do
   fi
 
   if grep -qE '^  workflow_dispatch:' "${wf}"; then
-    fail "${name}: official publish/promote workflow exposes workflow_dispatch — official publication must only trigger from push-to-main, schedule, or dual-condition promotion handoff"
+    # workflow_dispatch is allowed if the workflow contains a main-branch guard
+    # step that rejects runs from non-main branches.
+    if grep -qE "github\.ref != 'refs/heads/main'" "${wf}"; then
+      PASS=$((PASS + 1))
+    else
+      fail "${name}: official publish/promote workflow exposes workflow_dispatch without a main-branch guard — add a step that rejects github.ref != 'refs/heads/main'"
+    fi
   else
     PASS=$((PASS + 1))
   fi
