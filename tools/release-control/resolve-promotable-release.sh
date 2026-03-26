@@ -2,9 +2,11 @@
 # Resolve the authorized GitHub Release tag for a candidate source commit.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${RELEASE_CONTROL_ROOT:-$(cd "${_SCRIPT_DIR}/../.." && pwd)}"
 # shellcheck disable=SC1091
-source "${ROOT}/tools/release-control/lib.sh"
+source "${_SCRIPT_DIR}/lib.sh"
+unset _SCRIPT_DIR
 
 need_cmd git
 need_cmd gh
@@ -14,6 +16,16 @@ PROMOTION_CONTEXT="${1:?Usage: resolve-promotable-release.sh <stable|exp-labs|ve
 SOURCE_COMMIT="${2:?Usage: resolve-promotable-release.sh <stable|exp-labs|versioned> <source-commit>}"
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
 NO_MATCH_EXIT=3
+
+# Normalize: if the supplied source commit is itself a chore(release) bump,
+# strip it to the real source commit — so workflow_run promotes triggered
+# by the release commit still find the correct release tag.
+_source_subject="$(git -C "${ROOT}" log -1 --format=%s "${SOURCE_COMMIT}" 2>/dev/null || true)"
+if [[ "${_source_subject}" == chore\(release\):* ]]; then
+  SOURCE_COMMIT="$(git -C "${ROOT}" rev-parse "${SOURCE_COMMIT}^" 2>/dev/null \
+    || die "Unable to resolve parent of release commit ${SOURCE_COMMIT}")"
+fi
+unset _source_subject
 
 resolve_source_commit() {
   local release_ref="$1"

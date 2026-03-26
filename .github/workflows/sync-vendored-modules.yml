@@ -1,0 +1,54 @@
+name: Sync Vendored Modules
+
+# Reads vendored_modules from sw-ourbox-os approved-upstream-inputs.json and
+# auto-advances installer-ssh-helper and release-control to the approved
+# revisions. Commits directly to main when modules are behind; no manual PR
+# needed. This is the downstream half of the intent/identity automation rule
+# (see sw-ourbox-os docs/architecture/artifact-distribution-and-integration.md).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-vendored-modules
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync vendored modules from sw-ourbox-os
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync vendored modules
+        run: bash tools/sync-vendored-modules.sh
+
+      - name: Commit updated modules if changed
+        if: env.VENDORED_MODULES_CHANGED == '1'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add \
+            tools/installer-ssh-helper.sh \
+            tools/installer-ssh-helper.upstream.env \
+            tools/release-control \
+            tools/release-control.upstream.env
+          git commit -m "chore: sync vendored modules to sw-ourbox-os ${VENDORED_MODULES_REVISION} [skip ci]
+
+Auto-advance installer-ssh-helper and release-control to the approved
+revisions recorded in sw-ourbox-os approved-upstream-inputs.json."
+          git push origin main
