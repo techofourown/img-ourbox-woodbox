@@ -217,8 +217,11 @@ cat /etc/ourbox/release | grep OURBOX_OS_
 
 ## ADR-0008 revalidation
 
-To trigger an official republish after infrastructure maintenance without a source change,
-touch `release/REVALIDATION_TRIGGER` in a PR. See that file for the documented procedure.
+To trigger an official republish after infrastructure maintenance without a source change:
+- Use GitHub Actions → `official-candidate.yml` → Run workflow (select `main`, enter a reason)
+
+> **Deprecated**: the old `release/REVALIDATION_TRIGGER` PR path still works but creates
+> unnecessary ceremony. Prefer the workflow_dispatch button.
 
 To run a non-publishing revalidation build:
 - Use GitHub Actions → `revalidate-woodbox-build.yml` → Run workflow
