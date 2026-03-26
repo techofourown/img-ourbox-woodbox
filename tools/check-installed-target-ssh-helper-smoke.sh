@@ -13,11 +13,15 @@ APT_DIR="${TMP}/apt"
 SYSFS_DIR="${TMP}/sys-class-net"
 CACHE_DIR="${TMP}/cache"
 TARGET_DIR="${TMP}/target"
+TARGET_DIR_KEY_ONLY="${TMP}/target-key-only"
 BIN_DIR="${TMP}/bin"
 MISSION_SSH_KEY="${TMP}/mission-authorized-key.pub"
 PACKAGE_INSTALL_LOG="${TMP}/package-install.log"
+PACKAGE_INSTALL_LOG_KEY_ONLY="${TMP}/package-install-key-only.log"
 CURTIN_LOG="${TMP}/curtin.log"
-mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${APT_DIR}" "${SYSFS_DIR}/enp2s0" "${CACHE_DIR}" "${TARGET_DIR}/etc" "${BIN_DIR}"
+CURTIN_LOG_KEY_ONLY="${TMP}/curtin-key-only.log"
+mkdir -p "${TOOLS_DIR}" "${PREINSTALL_DIR}" "${APT_DIR}" "${SYSFS_DIR}/enp2s0" "${CACHE_DIR}" \
+  "${TARGET_DIR}/etc" "${TARGET_DIR_KEY_ONLY}/etc" "${BIN_DIR}"
 
 cp "${ROOT}/tools/lib.sh" "${TOOLS_DIR}/lib.sh"
 cp "${ROOT}/installer/ourbox-preinstall/ourbox-preinstall" "${PREINSTALL_DIR}/ourbox-preinstall"
@@ -203,6 +207,37 @@ grep -q 'chpasswd -e' "${CURTIN_LOG}" || {
 }
 grep -q '^ourbox:' "${TARGET_DIR}/etc/shadow" || {
   echo "expected installed-target SSH helper to ensure the installed user has a shadow entry" >&2
+  exit 1
+}
+
+export OURBOX_INSTALLED_TARGET_SSH_PASSWORD_ENABLED=0
+write_offline_install_helpers
+
+cat > "${TARGET_DIR_KEY_ONLY}/etc/passwd" <<'EOF'
+root:x:0:0:root:/root:/bin/bash
+EOF
+
+cat > "${TARGET_DIR_KEY_ONLY}/etc/shadow" <<'EOF'
+root:*:19793:0:99999:7:::
+EOF
+
+PATH="${BIN_DIR}:${PATH}" PACKAGE_INSTALL_LOG="${PACKAGE_INSTALL_LOG_KEY_ONLY}" CURTIN_LOG="${CURTIN_LOG_KEY_ONLY}" \
+  "${CACHE_DIR}/configure-installed-target-ssh.sh" "${TARGET_DIR_KEY_ONLY}"
+
+grep -q 'chpasswd -e' "${CURTIN_LOG_KEY_ONLY}" || {
+  echo "expected key-only installed-target SSH helper to preserve the configured login password" >&2
+  exit 1
+}
+grep -q '^PasswordAuthentication no$' "${TARGET_DIR_KEY_ONLY}/etc/ssh/sshd_config.d/60-ourbox-installed-target.conf" || {
+  echo "expected key-only installed-target SSH helper to keep SSH password authentication disabled" >&2
+  exit 1
+}
+grep -q '^ourbox:' "${TARGET_DIR_KEY_ONLY}/etc/shadow" || {
+  echo "expected key-only installed-target SSH helper to create a shadow entry for the recreated user" >&2
+  exit 1
+}
+[[ -f "${TARGET_DIR_KEY_ONLY}/home/ourbox/.ssh/authorized_keys" ]] || {
+  echo "expected key-only installed-target SSH helper to stage authorized_keys for the recreated user" >&2
   exit 1
 }
 
