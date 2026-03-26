@@ -1475,8 +1475,13 @@ if [ "\${SSH_PASSWORD_ENABLED}" = "1" ] || [ "\${user_missing_after_overlay}" = 
     echo "installed-target SSH password requested but no password hash was provided" >&2
     exit 1
   }
-  printf '%s:%s\n' "\${SSH_USERNAME}" "\${USER_PASSWORD_HASH}" | curtin in-target --target="\${TARGET}" -- chpasswd -e
+  curtin in-target --target="\${TARGET}" -- usermod -p "\${USER_PASSWORD_HASH}" "\${SSH_USERNAME}"
   echo "Installed target password hash applied for \${SSH_USERNAME}"
+  # Subiquity may lock the account when ssh.authorized-keys is present in autoinstall.
+  # usermod -p sets the hash but does not remove a leading ! lock prefix on all distros.
+  # Explicitly unlock to guarantee password auth works.
+  curtin in-target --target="\${TARGET}" -- passwd -u "\${SSH_USERNAME}" 2>/dev/null || true
+  echo "Installed target account unlocked for \${SSH_USERNAME}"
 fi
 
 password_authentication="no"
