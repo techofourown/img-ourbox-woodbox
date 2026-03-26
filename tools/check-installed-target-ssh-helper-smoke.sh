@@ -109,6 +109,19 @@ case "${cmd[0]:-}" in
     fi
     printf '%s:%s:20400:0:99999:7:::\n' "${username}" "${password_hash}" >> "${target}/etc/shadow"
     ;;
+  usermod)
+    # usermod -p HASH USERNAME
+    password_hash="${cmd[2]}"
+    username="${cmd[3]}"
+    if [[ -f "${target}/etc/shadow" ]]; then
+      grep -v "^${username}:" "${target}/etc/shadow" > "${target}/etc/shadow.tmp"
+      mv "${target}/etc/shadow.tmp" "${target}/etc/shadow"
+    fi
+    printf '%s:%s:20400:0:99999:7:::\n' "${username}" "${password_hash}" >> "${target}/etc/shadow"
+    ;;
+  passwd)
+    # passwd -u USERNAME — unlock (strip leading ! from shadow hash)
+    ;;
   systemctl)
     ;;
 esac
@@ -201,7 +214,7 @@ grep -q 'systemctl enable ssh.service' "${CURTIN_LOG}" || {
   echo "expected installed-target SSH helper to enable ssh.service in the target" >&2
   exit 1
 }
-grep -q 'chpasswd -e' "${CURTIN_LOG}" || {
+grep -q 'usermod -p' "${CURTIN_LOG}" || {
   echo "expected installed-target SSH helper to reapply the password hash for existing users" >&2
   exit 1
 }
@@ -224,7 +237,7 @@ EOF
 PATH="${BIN_DIR}:${PATH}" PACKAGE_INSTALL_LOG="${PACKAGE_INSTALL_LOG_KEY_ONLY}" CURTIN_LOG="${CURTIN_LOG_KEY_ONLY}" \
   "${CACHE_DIR}/configure-installed-target-ssh.sh" "${TARGET_DIR_KEY_ONLY}"
 
-grep -q 'chpasswd -e' "${CURTIN_LOG_KEY_ONLY}" || {
+grep -q 'usermod -p' "${CURTIN_LOG_KEY_ONLY}" || {
   echo "expected key-only installed-target SSH helper to preserve the configured login password" >&2
   exit 1
 }
