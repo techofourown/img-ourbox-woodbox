@@ -18,6 +18,7 @@ OS_META_ENV="${OS_DIR}/os.meta.env"
 SUBSTRATE_PAYLOAD="${SUBSTRATE_DIR}/ourbox-substrate.tar.gz"
 SUBSTRATE_MANIFEST="${SUBSTRATE_DIR}/manifest.env"
 APP_CATALOG="${SUBSTRATE_DIR}/catalog.json"
+APP_IMAGES_LOCK="${SUBSTRATE_DIR}/application-images.lock.json"
 SELECTED_APPS="${SUBSTRATE_DIR}/selected-apps.json"
 AUTHORIZED_KEY="${SSH_DIR}/authorized-key.pub"
 MISSION_MANIFEST="${MISSION_DIR}/mission-manifest.json"
@@ -72,7 +73,7 @@ EOF
   printf '#!/bin/sh\nexit 0\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
   chmod +x "${SUBSTRATE_SOURCE_DIR}/k3s/k3s"
   printf 'fixture k3s images\n' > "${SUBSTRATE_SOURCE_DIR}/k3s/k3s-images-amd64.tar"
-  printf 'PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
+  printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SUBSTRATE_SOURCE_DIR}/platform/profile.env"
   printf 'fixture image tar\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images/platform-demo.tar"
   if [[ "${variant}" != "missing-images-lock" ]]; then
     printf '{"images":[]}\n' > "${SUBSTRATE_SOURCE_DIR}/platform/images.lock.json"
@@ -106,11 +107,31 @@ EOF
   "apps": [
     {
       "id": "landing",
-      "display_name": "Landing"
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
     },
     {
       "id": "dufs",
-      "display_name": "Dufs"
+      "display_name": "Dufs",
+      "image_names": [
+        "dufs"
+      ],
+      "services": [
+        {
+          "name": "dufs",
+          "image": "dufs",
+          "port": 5000
+        }
+      ]
     }
   ]
 }
@@ -124,6 +145,21 @@ EOF
   "selected_app_ids": [
     "landing",
     "dufs"
+  ]
+}
+EOF
+  cat > "${APP_IMAGES_LOCK}" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "name": "dufs",
+      "ref": "ghcr.io/example/dufs@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
   ]
 }
 EOF
@@ -220,6 +256,7 @@ manifest["resolved"]["applications"] = {
     "selection_mode": "catalog-defaults",
     "selected_app_ids": ["landing", "dufs"],
     "catalog_relpath": "artifacts/substrate/catalog.json",
+    "images_lock_relpath": "artifacts/substrate/application-images.lock.json",
     "selection_relpath": "artifacts/substrate/selected-apps.json"
 }
 manifest["resolved"]["installed_target_ssh"] = {
@@ -289,6 +326,26 @@ build_substrate_bundle valid
 write_manifest 1
 mutate_manifest 'del manifest["resolved"]["applications"]["selection_relpath"]'
 expect_validation_failure "mission manifests missing selected_applications.selection_relpath"
+
+build_substrate_bundle valid
+write_manifest 1
+mutate_manifest 'del manifest["resolved"]["applications"]["images_lock_relpath"]'
+expect_validation_failure "mission manifests missing selected_applications.images_lock_relpath"
+
+build_substrate_bundle valid
+write_manifest 1
+cat > "${APP_IMAGES_LOCK}" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}
+EOF
+expect_validation_failure "mission application images locks missing selected service images"
 
 build_substrate_bundle valid
 write_manifest 1

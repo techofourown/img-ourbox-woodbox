@@ -6,7 +6,7 @@ BOOTSTRAP="${ROOT}/installer/ourbox/rootfs/usr/local/sbin/ourbox-bootstrap"
 
 fragment="$(
   awk '
-    /^require_application_intent_files\(\)/ { exit }
+    /^set_bootstrap_phase "mount-check"$/ { exit }
     { print }
   ' "${BOOTSTRAP}"
 )"
@@ -54,6 +54,7 @@ run_case \
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 PLATFORM_CONTRACT_DIR="${tmpdir}/platform"
+BOOTSTRAP_STATUS_FILE="${tmpdir}/bootstrap-status.env"
 mkdir -p "${PLATFORM_CONTRACT_DIR}"
 PLATFORM_PROFILE_INPUT=""
 OURBOX_PLATFORM_PROFILE="demo-apps"
@@ -66,6 +67,7 @@ run_case \
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 PLATFORM_CONTRACT_DIR="${tmpdir}/platform"
+BOOTSTRAP_STATUS_FILE="${tmpdir}/bootstrap-status.env"
 mkdir -p "${PLATFORM_CONTRACT_DIR}"
 printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${PLATFORM_CONTRACT_DIR}/profile.env"
 PLATFORM_PROFILE_INPUT=""
@@ -78,6 +80,7 @@ run_failure_case \
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 PLATFORM_CONTRACT_DIR="${tmpdir}/platform"
+BOOTSTRAP_STATUS_FILE="${tmpdir}/bootstrap-status.env"
 mkdir -p "${PLATFORM_CONTRACT_DIR}"
 PLATFORM_PROFILE_INPUT=""
 OURBOX_PROFILE="demo-apps"
@@ -89,6 +92,7 @@ run_failure_case \
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 PLATFORM_CONTRACT_DIR="${tmpdir}/platform"
+BOOTSTRAP_STATUS_FILE="${tmpdir}/bootstrap-status.env"
 mkdir -p "${PLATFORM_CONTRACT_DIR}"
 printf 'OURBOX_PROFILE=demo-apps\n' > "${PLATFORM_CONTRACT_DIR}/profile.env"
 PLATFORM_PROFILE_INPUT=""
@@ -100,6 +104,7 @@ run_failure_case \
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 PLATFORM_CONTRACT_DIR="${tmpdir}/platform"
+BOOTSTRAP_STATUS_FILE="${tmpdir}/bootstrap-status.env"
 mkdir -p "${PLATFORM_CONTRACT_DIR}"
 printf 'PROFILE=demo-apps\n' > "${PLATFORM_CONTRACT_DIR}/profile.env"
 PLATFORM_PROFILE_INPUT=""

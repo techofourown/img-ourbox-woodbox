@@ -9,6 +9,7 @@ usage() {
   echo ""
   echo "Commands:"
   echo "  status   Show current system status (default)"
+  echo "  diagnostics  Show detailed bootstrap diagnostics"
   echo "  quiet    Silence console status messages"
   echo "  loud     Resume console status messages"
   echo ""
@@ -20,6 +21,23 @@ cmd_status() {
   else
     echo "Status service not running yet. Try: journalctl -u ourbox-status"
   fi
+}
+
+cmd_diagnostics() {
+  if [[ ! -x /usr/local/sbin/ourbox-diagnostics ]]; then
+    echo "Diagnostics helper is not installed." >&2
+    exit 1
+  fi
+
+  if [[ "$(id -u)" -eq 0 ]]; then
+    exec /usr/local/sbin/ourbox-diagnostics
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    exec sudo -n /usr/local/sbin/ourbox-diagnostics
+  fi
+
+  exec /usr/local/sbin/ourbox-diagnostics
 }
 
 cmd_quiet() {
@@ -36,6 +54,7 @@ cmd_loud() {
 
 case "${1:-status}" in
   status)  cmd_status ;;
+  diagnostics) cmd_diagnostics ;;
   quiet)   cmd_quiet ;;
   loud)    cmd_loud ;;
   -h|--help|help) usage ;;

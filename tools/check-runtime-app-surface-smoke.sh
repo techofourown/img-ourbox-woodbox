@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATUS_SCRIPT="${ROOT}/installer/ourbox/rootfs/usr/local/sbin/ourbox-status"
 MDNS_SCRIPT="${ROOT}/installer/ourbox/rootfs/usr/local/sbin/ourbox-mdns-aliases"
 BOOTSTRAP_SCRIPT="${ROOT}/installer/ourbox/rootfs/usr/local/sbin/ourbox-bootstrap"
+WOODBOX_CLI="${ROOT}/installer/ourbox/rootfs/usr/local/bin/woodbox"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
@@ -231,12 +232,28 @@ grep -Fq 'selected-app-surface.json' "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap does not persist selected-app-surface.json" >&2
   exit 1
 }
+grep -Fq 'BOOTSTRAP_STATUS_FILE="/run/ourbox/bootstrap-status.env"' "${BOOTSTRAP_SCRIPT}" || {
+  echo "bootstrap does not publish bootstrap-status.env" >&2
+  exit 1
+}
+grep -Fq "BOOTSTRAP_ERROR_FILE=\"\${STATE_DIR}/bootstrap-last-error.txt\"" "${BOOTSTRAP_SCRIPT}" || {
+  echo "bootstrap does not publish bootstrap-last-error.txt" >&2
+  exit 1
+}
 grep -Fq "[[ -f \"\${SELECTED_APP_SURFACE_STATE}\" ]] || return 1" "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap fast-path does not require selected-app-surface.json" >&2
   exit 1
 }
 grep -Fq 'systemctl restart ourbox-mdns-aliases.service ourbox-status.service' "${BOOTSTRAP_SCRIPT}" || {
   echo "bootstrap does not restart runtime surface consumers after render" >&2
+  exit 1
+}
+grep -Fq 'woodbox diagnostics' "${STATUS_SCRIPT}" || {
+  echo "runtime status does not advertise the diagnostics command" >&2
+  exit 1
+}
+grep -Fq 'sudo -n /usr/local/sbin/ourbox-diagnostics' "${WOODBOX_CLI}" || {
+  echo "woodbox CLI does not invoke the diagnostics helper via sudo -n" >&2
   exit 1
 }
 

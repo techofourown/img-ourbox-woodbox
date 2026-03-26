@@ -11,6 +11,7 @@ PAYLOAD_SUBSTRATE="${PAYLOAD_ROOT}/substrate"
 PAYLOAD_ROOTFS="${PAYLOAD_ROOT}/rootfs"
 OUT_DIR="${TMP}/out"
 APPLICATION_CATALOG="${TMP}/catalog.json"
+APPLICATION_IMAGES_LOCK="${TMP}/application-images.lock.json"
 SELECTED_APPS="${TMP}/selected-apps.json"
 mkdir -p "${PAYLOAD_SUBSTRATE}/k3s" "${PAYLOAD_SUBSTRATE}/platform/images" "${PAYLOAD_ROOTFS}"
 
@@ -19,7 +20,7 @@ chmod +x "${PAYLOAD_SUBSTRATE}/k3s/k3s"
 printf 'fixture\n' > "${PAYLOAD_SUBSTRATE}/k3s/k3s-images-amd64.tar"
 printf 'fixture image tar\n' > "${PAYLOAD_SUBSTRATE}/platform/images/landing.tar"
 printf '{"images":[]}\n' > "${PAYLOAD_SUBSTRATE}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${PAYLOAD_SUBSTRATE}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${PAYLOAD_SUBSTRATE}/platform/profile.env"
 cat > "${PAYLOAD_SUBSTRATE}/manifest.env" <<'EOF'
 OURBOX_SUBSTRATE_SOURCE=https://github.com/techofourown/sw-ourbox-os
 OURBOX_SUBSTRATE_REVISION=fixture-revision
@@ -68,7 +69,17 @@ cat > "${APPLICATION_CATALOG}" <<'EOF'
   "apps": [
     {
       "id": "landing",
-      "display_name": "Landing"
+      "display_name": "Landing",
+      "image_names": [
+        "landing"
+      ],
+      "services": [
+        {
+          "name": "landing",
+          "image": "landing",
+          "port": 80
+        }
+      ]
     }
   ]
 }
@@ -82,6 +93,17 @@ cat > "${SELECTED_APPS}" <<'EOF'
   "selection_mode": "catalog-defaults",
   "selected_app_ids": [
     "landing"
+  ]
+}
+EOF
+cat > "${APPLICATION_IMAGES_LOCK}" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
   ]
 }
 EOF
@@ -107,6 +129,7 @@ bash "${ROOT}/tools/prepare-mission-media-smoke.sh" \
   --os-payload "${PAYLOAD_TAR}" \
   --os-meta-env "${META_ENV}" \
   --application-catalog "${APPLICATION_CATALOG}" \
+  --application-images-lock "${APPLICATION_IMAGES_LOCK}" \
   --selected-apps "${SELECTED_APPS}" \
   --output-dir "${OUT_DIR}" \
   --mission-only
@@ -122,6 +145,10 @@ MISSION_DIR="${OUT_DIR}/mission"
 }
 [[ -f "${MISSION_DIR}/artifacts/substrate/selected-apps.json" ]] || {
   echo "selected-apps.json missing from mission output" >&2
+  exit 1
+}
+[[ -f "${MISSION_DIR}/artifacts/substrate/application-images.lock.json" ]] || {
+  echo "application-images.lock.json missing from mission output" >&2
   exit 1
 }
 [[ -f "${MISSION_DIR}/artifacts/substrate/ourbox-substrate.tar.gz.sha256" ]] || {
@@ -143,6 +170,8 @@ if selected_apps.get("selection_mode") != "catalog-defaults":
     raise SystemExit("unexpected selected_applications.selection_mode")
 if selected_apps.get("selected_app_ids") != ["landing"]:
     raise SystemExit("unexpected selected_applications.selected_app_ids")
+if selected_apps.get("images_lock_relpath") != "artifacts/substrate/application-images.lock.json":
+    raise SystemExit("unexpected selected_applications.images_lock_relpath")
 PY
 
 printf '[%s] prepare-mission-media-smoke helper smoke passed\n' "$(date -Is)"

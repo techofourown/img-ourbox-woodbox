@@ -67,7 +67,7 @@ printf '#!/bin/sh\nexit 0\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s"
 chmod +x "${SOURCE_BUNDLE_DIR}/k3s/k3s"
 printf 'fixture\n' > "${SOURCE_BUNDLE_DIR}/k3s/k3s-images-amd64.tar"
 printf '{"images":[]}\n' > "${SOURCE_BUNDLE_DIR}/platform/images.lock.json"
-printf 'PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
+printf 'OURBOX_PLATFORM_PROFILE=demo-apps\n' > "${SOURCE_BUNDLE_DIR}/platform/profile.env"
 printf 'fixture image tar\n' > "${SOURCE_BUNDLE_DIR}/platform/images/platform-demo.tar"
 cat > "${MISSION_SUBSTRATE_DIR}/catalog.json" <<'EOF'
 {
@@ -100,6 +100,21 @@ cat > "${MISSION_SUBSTRATE_DIR}/selected-apps.json" <<'EOF'
   "selected_app_ids": [
     "landing",
     "dufs"
+  ]
+}
+EOF
+cat > "${MISSION_SUBSTRATE_DIR}/application-images.lock.json" <<'EOF'
+{
+  "schema": 1,
+  "images": [
+    {
+      "name": "landing",
+      "ref": "ghcr.io/example/landing@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "name": "dufs",
+      "ref": "ghcr.io/example/dufs@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
   ]
 }
 EOF
@@ -210,6 +225,7 @@ cat > "${MISSION_MANIFEST}" <<EOF
         "dufs"
       ],
       "catalog_relpath": "artifacts/substrate/catalog.json",
+      "images_lock_relpath": "artifacts/substrate/application-images.lock.json",
       "selection_relpath": "artifacts/substrate/selected-apps.json"
     },
     "installed_target_ssh": {
@@ -278,6 +294,10 @@ stage_selected_application_metadata
 }
 [[ -f "${INSTALLER_CACHE_DIR}/catalog.json" ]] || {
   echo "mission application catalog was not staged into installer cache" >&2
+  exit 1
+}
+[[ -f "${INSTALLER_CACHE_DIR}/application-images.lock.json" ]] || {
+  echo "mission application-images.lock.json was not staged into installer cache" >&2
   exit 1
 }
 [[ -f "${INSTALLER_CACHE_DIR}/selected-apps.json" ]] || {

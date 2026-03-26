@@ -11,11 +11,13 @@ set -euo pipefail
 QUIET_MARKER="/var/lib/ourbox/state/quiet"
 STATUS_DIR="${OURBOX_STATUS_RUN_DIR:-/run/ourbox}"
 STATUS_FILE="${STATUS_DIR}/status"
+BOOTSTRAP_STATUS_FILE="${STATUS_DIR}/bootstrap-status.env"
 BOOT_INTERVAL=10
 READY_INTERVAL=60
 HOSTNAME="$(hostname)"
 PLATFORM_STATE_FILE="/var/lib/ourbox/state/platform-contract.env"
 APP_SURFACE_FILE="/var/lib/ourbox/state/selected-app-surface.json"
+BOOTSTRAP_ERROR_FILE="/var/lib/ourbox/state/bootstrap-last-error.txt"
 STATUS_BASE_URL="${OURBOX_STATUS_BASE_URL:-http://127.0.0.1}"
 
 mkdir -p "${STATUS_DIR}"
@@ -158,6 +160,26 @@ check_bootstrap_done() {
   [[ -f /var/lib/ourbox/state/bootstrap.done ]]
 }
 
+bootstrap_status_value() {
+  env_file_value "${BOOTSTRAP_STATUS_FILE}" "$1"
+}
+
+bootstrap_phase() {
+  bootstrap_status_value "OURBOX_BOOTSTRAP_PHASE"
+}
+
+bootstrap_result() {
+  bootstrap_status_value "OURBOX_BOOTSTRAP_RESULT"
+}
+
+bootstrap_last_error() {
+  if [[ -f "${BOOTSTRAP_ERROR_FILE}" ]]; then
+    cat "${BOOTSTRAP_ERROR_FILE}"
+    return 0
+  fi
+  bootstrap_status_value "OURBOX_BOOTSTRAP_LAST_ERROR"
+}
+
 check_pods_ready() {
   local total ready
   total="$(/usr/local/bin/k3s kubectl get pods -n ourbox-system --no-headers 2>/dev/null | wc -l)"
@@ -242,6 +264,7 @@ format_status() {
   local ip="$1" box_host="$2" data_ok="$3" net_ok="$4" k3s_ok="$5" traefik_ok="$6"
   local surface_ok="$7" mdns_ok="$8" bootstrap_ok="$9" pods_info="${10}" all_ready="${11}"
   local app_urls="${12}" landing_selected="${13}" app_status_ok="${14}" app_status_summary="${15}"
+  local bootstrap_phase_value="${16}" bootstrap_result_value="${17}" bootstrap_error_value="${18}"
 
   local mark_ok="OK" mark_wait=".." mark_no="  "
   local out=""
@@ -316,8 +339,19 @@ format_status() {
 
   if [[ "$bootstrap_ok" != "1" ]]; then
     out+=$'\n'
-    out+="  First boot in progress — this takes several minutes."$'\n'
-    out+="  Do not power off the device."$'\n'
+    if [[ "${bootstrap_result_value}" == "failed" ]]; then
+      out+="  Bootstrap failed during: ${bootstrap_phase_value:-unknown}"$'\n'
+      if [[ -n "${bootstrap_error_value}" ]]; then
+        out+="  Last error: ${bootstrap_error_value}"$'\n'
+      fi
+      out+="  Run: woodbox diagnostics"$'\n'
+    else
+      out+="  First boot in progress — this takes several minutes."$'\n'
+      if [[ -n "${bootstrap_phase_value}" ]]; then
+        out+="  Bootstrap phase: ${bootstrap_phase_value}"$'\n'
+      fi
+      out+="  Do not power off the device."$'\n'
+    fi
   fi
 
   if [[ "$all_ready" == "1" ]]; then
@@ -331,6 +365,7 @@ format_status() {
     out+=$'\n'
     out+="    Commands:"$'\n'
     out+="      woodbox status  — show this status"$'\n'
+    out+="      woodbox diagnostics  — show bootstrap diagnostics"$'\n'
     out+="      woodbox quiet   — silence console output"$'\n'
     out+="      woodbox loud    — resume console output"$'\n'
     out+="  ========================================"$'\n'
@@ -358,7 +393,9 @@ while true; do
 
   landing_selected=0
   if [[ "$surface_ok" == "1" ]]; then
-    surface_landing_selected && landing_selected=1 || true
+    if surface_landing_selected; then
+      landing_selected=1
+    fi
   fi
 
   app_status_ok=0
@@ -386,10 +423,14 @@ while true; do
   fi
 
   app_urls="$(surface_app_urls || true)"
+  bootstrap_phase_value="$(bootstrap_phase || true)"
+  bootstrap_result_value="$(bootstrap_result || true)"
+  bootstrap_error_value="$(bootstrap_last_error || true)"
 
   status="$(format_status "$ip" "$box_host" "$data_ok" "$net_ok" "$k3s_ok" "$traefik_ok" \
     "$surface_ok" "$mdns_ok" "$bootstrap_ok" "$pods_info" "$all_ready" "$app_urls" \
-    "$landing_selected" "$app_status_ok" "$app_status_summary")"
+    "$landing_selected" "$app_status_ok" "$app_status_summary" "$bootstrap_phase_value" \
+    "$bootstrap_result_value" "$bootstrap_error_value")"
 
   echo "$status" > "${STATUS_FILE}"
 

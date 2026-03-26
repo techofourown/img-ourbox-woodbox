@@ -718,6 +718,7 @@ load_embedded_mission_metadata() {
   MISSION_PRESENT=0
   MISSION_SELECTED_APPLICATIONS_PRESENT=0
   MISSION_APPLICATION_CATALOG_PATH=""
+  MISSION_APPLICATION_IMAGES_LOCK_PATH=""
   MISSION_SELECTED_APPLICATIONS_PATH=""
   MISSION_APPLICATION_CATALOG_ID=""
   MISSION_APPLICATION_CATALOG_NAME=""
@@ -733,6 +734,7 @@ load_embedded_mission_metadata() {
 
   local mission_dump=""
   local app_catalog_relpath=""
+  local app_images_lock_relpath=""
   local app_selection_relpath=""
   local installed_target_ssh_authorized_key_relpath=""
 
@@ -773,6 +775,7 @@ app_catalog_name = ""
 app_selection_mode = ""
 app_selected_ids = ""
 app_catalog_relpath = ""
+app_images_lock_relpath = ""
 app_selection_relpath = ""
 installed_target_ssh_present = False
 installed_target_ssh_mode = ""
@@ -788,6 +791,7 @@ else:
     app_catalog_name = str(selected_applications.get("catalog_name", ""))
     app_selection_mode = str(selected_applications.get("selection_mode", ""))
     app_catalog_relpath = str(selected_applications.get("catalog_relpath", ""))
+    app_images_lock_relpath = str(selected_applications.get("images_lock_relpath", ""))
     app_selection_relpath = str(selected_applications.get("selection_relpath", ""))
     selected_app_ids = selected_applications.get("selected_app_ids")
     if not app_catalog_id:
@@ -801,6 +805,8 @@ else:
         )
     if not app_catalog_relpath:
         raise SystemExit("embedded mission selected_applications.catalog_relpath must be set")
+    if not app_images_lock_relpath:
+        raise SystemExit("embedded mission selected_applications.images_lock_relpath must be set")
     if not app_selection_relpath:
         raise SystemExit("embedded mission selected_applications.selection_relpath must be set")
     if not isinstance(selected_app_ids, list) or not selected_app_ids:
@@ -861,6 +867,7 @@ print(
             "application_selection_mode": app_selection_mode,
             "selected_application_ids": app_selected_ids,
             "application_catalog_relpath": app_catalog_relpath,
+            "application_images_lock_relpath": app_images_lock_relpath,
             "selected_applications_relpath": app_selection_relpath,
             "installed_target_ssh_present": "1" if installed_target_ssh_present else "0",
             "installed_target_ssh_mode": installed_target_ssh_mode,
@@ -914,15 +921,22 @@ PY
   MISSION_INSTALLED_TARGET_SSH_KEY_TYPE="$(mission_json_field installed_target_ssh_key_type)"
   MISSION_INSTALLED_TARGET_SSH_PUBLIC_KEY_FINGERPRINT="$(mission_json_field installed_target_ssh_public_key_fingerprint)"
   app_catalog_relpath="$(mission_json_field application_catalog_relpath)"
+  app_images_lock_relpath="$(mission_json_field application_images_lock_relpath)"
   app_selection_relpath="$(mission_json_field selected_applications_relpath)"
   installed_target_ssh_authorized_key_relpath="$(mission_json_field installed_target_ssh_authorized_key_relpath)"
   MISSION_APPLICATION_CATALOG_PATH=""
+  MISSION_APPLICATION_IMAGES_LOCK_PATH=""
   MISSION_SELECTED_APPLICATIONS_PATH=""
   MISSION_INSTALLED_TARGET_SSH_AUTHORIZED_KEY_PATH=""
   [[ -n "${app_catalog_relpath}" ]] && MISSION_APPLICATION_CATALOG_PATH="$(
     resolve_mission_relpath \
       "embedded mission selected_applications.catalog_relpath" \
       "${app_catalog_relpath}"
+  )"
+  [[ -n "${app_images_lock_relpath}" ]] && MISSION_APPLICATION_IMAGES_LOCK_PATH="$(
+    resolve_mission_relpath \
+      "embedded mission selected_applications.images_lock_relpath" \
+      "${app_images_lock_relpath}"
   )"
   [[ -n "${app_selection_relpath}" ]] && MISSION_SELECTED_APPLICATIONS_PATH="$(
     resolve_mission_relpath \
@@ -1115,6 +1129,7 @@ stage_selected_application_metadata() {
     die "Woodbox install requires mission selected application metadata"
 
   cp -f "${MISSION_APPLICATION_CATALOG_PATH}" "${cache_dir}/catalog.json"
+  cp -f "${MISSION_APPLICATION_IMAGES_LOCK_PATH}" "${cache_dir}/application-images.lock.json"
   cp -f "${MISSION_SELECTED_APPLICATIONS_PATH}" "${cache_dir}/selected-apps.json"
 }
 
@@ -1320,7 +1335,7 @@ mkdir -p "${TARGET}/opt/ourbox/substrate/platform"
 rm -rf "${TARGET}/opt/ourbox/substrate/k3s" "${TARGET}/opt/ourbox/substrate/platform/images"
 cp -a "${SOURCE_DIR}/k3s" "${TARGET}/opt/ourbox/substrate/k3s"
 cp -a "${SOURCE_DIR}/platform/images" "${TARGET}/opt/ourbox/substrate/platform/images"
-cp -f "${SOURCE_DIR}/platform/images.lock.json" "${TARGET}/opt/ourbox/substrate/platform/images.lock.json"
+cp -f "${SOURCE_DIR}/platform/images.lock.json" "${TARGET}/opt/ourbox/substrate/platform/platform-images.lock.json"
 cp -f "${SOURCE_DIR}/platform/profile.env" "${TARGET}/opt/ourbox/substrate/platform/profile.env"
 cp -f "${SOURCE_DIR}/manifest.env" "${TARGET}/opt/ourbox/substrate/manifest.env"
 SCRIPT
@@ -1331,12 +1346,23 @@ SCRIPT
 set -e
 TARGET="${1:-/target}"
 SOURCE_CATALOG="${OURBOX_INSTALLER_APPLICATION_CATALOG_FILE:-/opt/ourbox/installer/cache/catalog.json}"
+SOURCE_IMAGES_LOCK="${OURBOX_INSTALLER_APPLICATION_IMAGES_LOCK_FILE:-/opt/ourbox/installer/cache/application-images.lock.json}"
 SOURCE_SELECTION="${OURBOX_INSTALLER_SELECTED_APPLICATIONS_FILE:-/opt/ourbox/installer/cache/selected-apps.json}"
 PLATFORM_DIR="${TARGET}/opt/ourbox/substrate/platform"
+PLATFORM_IMAGES_LOCK="${PLATFORM_DIR}/platform-images.lock.json"
+APPLICATION_IMAGES_LOCK="${PLATFORM_DIR}/images.lock.json"
 
 mkdir -p "${PLATFORM_DIR}"
+if [ ! -f "${PLATFORM_IMAGES_LOCK}" ] && [ -f "${APPLICATION_IMAGES_LOCK}" ]; then
+  cp -f "${APPLICATION_IMAGES_LOCK}" "${PLATFORM_IMAGES_LOCK}"
+fi
 if [ -f "${SOURCE_CATALOG}" ]; then
   cp -f "${SOURCE_CATALOG}" "${PLATFORM_DIR}/catalog.json"
+fi
+if [ -f "${SOURCE_IMAGES_LOCK}" ]; then
+  cp -f "${SOURCE_IMAGES_LOCK}" "${APPLICATION_IMAGES_LOCK}"
+else
+  rm -f "${APPLICATION_IMAGES_LOCK}"
 fi
 if [ -f "${SOURCE_SELECTION}" ]; then
   cp -f "${SOURCE_SELECTION}" "${PLATFORM_DIR}/selected-apps.json"
@@ -1449,6 +1475,12 @@ KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 PermitRootLogin no
 EOF
+
+mkdir -p "\${TARGET}/etc/sudoers.d"
+cat > "\${TARGET}/etc/sudoers.d/90-ourbox-diagnostics" <<EOF
+\${SSH_USERNAME} ALL=(root) NOPASSWD: /usr/local/sbin/ourbox-diagnostics
+EOF
+chmod 0440 "\${TARGET}/etc/sudoers.d/90-ourbox-diagnostics"
 
 if [ "\${SSH_KEY_PRESENT}" = "1" ]; then
   [ -f "\${AUTHORIZED_KEY_SRC}" ] || { echo "missing staged installed-target SSH authorized key: \${AUTHORIZED_KEY_SRC}" >&2; exit 1; }
