@@ -1,3 +1,16 @@
+# [0.16.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.15.0...v0.16.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* stage release-control directory in sync workflow, not fixed file list ([5738b85](https://github.com/techofourown/img-ourbox-woodbox/commit/5738b85bd83895701495db54e63b0400760402af))
+* trigger vendored module sync on push to main, not weekly schedule ([9979a58](https://github.com/techofourown/img-ourbox-woodbox/commit/9979a58ba7d50aa465bc9ba4385c10fdd965ac8c))
+
+
+### Features
+
+* wire OURBOX_INSTALLER_SSH_GRANT_SUDO and auto-sync vendored modules ([85f90a9](https://github.com/techofourown/img-ourbox-woodbox/commit/85f90a9641b7ba299351faa2a1d8b1adb90cbcc2))
+
 # [0.15.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.12...v0.15.0) (2026-03-26)
 
 
