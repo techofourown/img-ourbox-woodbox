@@ -1453,14 +1453,30 @@ fi
   --repo-dir "\${SSH_REPO_DIR}" \
   --package-manifest "\${SSH_PACKAGE_MANIFEST}"
 
-# The OS payload overlay (late command [1/12]) replaces /target/etc/passwd and
-# /target/etc/shadow with the pre-built payload rootfs versions, removing the
-# autoinstall-created user. Recreate the user so login and SSH both work.
+# The OS payload overlay can clobber target account state. In practice the
+# installed user may be removed entirely, or may survive only in /etc/passwd
+# without a matching /etc/shadow entry. Repair both the account and password
+# state so the requested installed-target SSH posture actually works.
+user_missing_after_overlay=0
+shadow_missing_after_overlay=0
 if ! awk -F: -v u="\${SSH_USERNAME}" '\$1 == u {found=1} END{exit !found}' "\${TARGET}/etc/passwd"; then
+  user_missing_after_overlay=1
   echo "Installed target user \${SSH_USERNAME} absent after OS payload overlay; recreating"
   curtin in-target --target="\${TARGET}" -- useradd -m -s /bin/bash -G sudo "\${SSH_USERNAME}"
-  printf '%s:%s\n' "\${SSH_USERNAME}" "\${USER_PASSWORD_HASH}" | curtin in-target --target="\${TARGET}" -- chpasswd -e
   echo "Installed target user \${SSH_USERNAME} recreated"
+fi
+
+if ! awk -F: -v u="\${SSH_USERNAME}" '\$1 == u {found=1} END{exit !found}' "\${TARGET}/etc/shadow"; then
+  shadow_missing_after_overlay=1
+fi
+
+if [ "\${SSH_PASSWORD_ENABLED}" = "1" ] || [ "\${user_missing_after_overlay}" = "1" ] || [ "\${shadow_missing_after_overlay}" = "1" ]; then
+  [ -n "\${USER_PASSWORD_HASH}" ] || {
+    echo "installed-target SSH password requested but no password hash was provided" >&2
+    exit 1
+  }
+  printf '%s:%s\n' "\${SSH_USERNAME}" "\${USER_PASSWORD_HASH}" | curtin in-target --target="\${TARGET}" -- chpasswd -e
+  echo "Installed target password hash applied for \${SSH_USERNAME}"
 fi
 
 password_authentication="no"
