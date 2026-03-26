@@ -1,3 +1,11 @@
+## [0.14.11](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.10...v0.14.11) (2026-03-26)
+
+
+### Bug Fixes
+
+* preserve local password on key-only repair ([e725841](https://github.com/techofourown/img-ourbox-woodbox/commit/e7258410f44ed613d645bbfbe0f17d8df9326c90))
+* repair installed-target password state ([c869aee](https://github.com/techofourown/img-ourbox-woodbox/commit/c869aee77ac5accb348318e2faf05063793e6280))
+
 ## [0.14.10](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.9...v0.14.10) (2026-03-26)
 
 
