@@ -1,3 +1,10 @@
+## [0.16.1](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.16.0...v0.16.1) (2026-03-26)
+
+
+### Bug Fixes
+
+* use printf for commit message in sync workflow to fix YAML parse error ([02775f2](https://github.com/techofourown/img-ourbox-woodbox/commit/02775f2cc39981205649f7c505350aaae4d7cdb4))
+
 # [0.16.0](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.15.0...v0.16.0) (2026-03-26)
 
 
