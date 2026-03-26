@@ -1,3 +1,16 @@
+## [0.14.10](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.9...v0.14.10) (2026-03-26)
+
+
+### Bug Fixes
+
+* add woodbox bootstrap diagnostics surface ([c2b1544](https://github.com/techofourown/img-ourbox-woodbox/commit/c2b1544bf3370ca84dbd8008725c10f56965972c))
+* add woodbox bootstrap diagnostics surface ([0c7ec1b](https://github.com/techofourown/img-ourbox-woodbox/commit/0c7ec1b48ebd750492dce11db46aa0c2ae0d9624))
+* harden Woodbox mission app validation ([11a17bd](https://github.com/techofourown/img-ourbox-woodbox/commit/11a17bdd45bd9c298d859ad31012de34f43c1b98))
+* preserve baked Woodbox platform locks ([29d5fba](https://github.com/techofourown/img-ourbox-woodbox/commit/29d5fbaade8fa27c580ac0d9221be27c963417cd))
+* rewire Woodbox revalidation app fixtures ([bffbdd0](https://github.com/techofourown/img-ourbox-woodbox/commit/bffbdd025e06d933b3f46b1a841efc31f78f29f9))
+* satisfy Woodbox shell lint ([7b0a272](https://github.com/techofourown/img-ourbox-woodbox/commit/7b0a272cde13ab183897de841689455597c38cc4))
+* split Woodbox substrate image locks ([0391c6c](https://github.com/techofourown/img-ourbox-woodbox/commit/0391c6c26447f9cf066eae6d91111928933a1e84))
+
 ## [0.14.9](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.14.8...v0.14.9) (2026-03-25)
 
 
