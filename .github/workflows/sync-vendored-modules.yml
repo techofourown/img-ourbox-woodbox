@@ -47,8 +47,7 @@ jobs:
             tools/installer-ssh-helper.upstream.env \
             tools/release-control \
             tools/release-control.upstream.env
-          git commit -m "chore: sync vendored modules to sw-ourbox-os ${VENDORED_MODULES_REVISION} [skip ci]
-
-Auto-advance installer-ssh-helper and release-control to the approved
-revisions recorded in sw-ourbox-os approved-upstream-inputs.json."
+          git commit -m "$(printf \
+            'chore: sync vendored modules to sw-ourbox-os %s [skip ci]\n\nAuto-advance installer-ssh-helper and release-control to the\napproved revisions from approved-upstream-inputs.json.' \
+            "${VENDORED_MODULES_REVISION}")"
           git push origin main
