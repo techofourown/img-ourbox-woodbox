@@ -1,3 +1,10 @@
+## [0.16.3](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.16.2...v0.16.3) (2026-03-27)
+
+
+### Bug Fixes
+
+* add installer-consumed fields to woodbox media adapter ([68614bb](https://github.com/techofourown/img-ourbox-woodbox/commit/68614bb8c6de9baaaf541e12f7bcf0797fbd6129))
+
 ## [0.16.2](https://github.com/techofourown/img-ourbox-woodbox/compare/v0.16.1...v0.16.2) (2026-03-26)
 
 
